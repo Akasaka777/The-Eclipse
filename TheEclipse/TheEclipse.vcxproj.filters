@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\Common\MathUtil.cpp" />
+    <ClCompile Include="src\Common\StringUtil.cpp" />
+    <ClCompile Include="src\Common\Types.cpp" />
+    <ClCompile Include="src\Core\Application.cpp" />
+    <ClCompile Include="src\Core\Camera.cpp" />
+    <ClCompile Include="src\Core\FontManager.cpp" />
+    <ClCompile Include="src\Core\GameConfig.cpp" />
+    <ClCompile Include="src\Core\Input.cpp" />
+    <ClCompile Include="src\Core\ResourceManager.cpp" />
+    <ClCompile Include="src\Core\SceneManager.cpp" />
+    <ClCompile Include="src\Game\Actor.cpp" />
+    <ClCompile Include="src\Game\ActorAssets.cpp" />
+    <ClCompile Include="src\Game\Boss.cpp" />
+    <ClCompile Include="src\Game\Combat.cpp" />
+    <ClCompile Include="src\Game\Enemy.cpp" />
+    <ClCompile Include="src\Game\EnemyDatabase.cpp" />
+    <ClCompile Include="src\Game\Equipment.cpp" />
+    <ClCompile Include="src\Game\GameContext.cpp" />
+    <ClCompile Include="src\Game\Inventory.cpp" />
+    <ClCompile Include="src\Game\ItemDatabase.cpp" />
+    <ClCompile Include="src\Game\Player.cpp" />
+    <ClCompile Include="src\Game\PlayerData.cpp" />
+    <ClCompile Include="src\Game\QuestDatabase.cpp" />
+    <ClCompile Include="src\Game\Stage.cpp" />
+    <ClCompile Include="src\Game\Stats.cpp" />
+    <ClCompile Include="src\Game\SwordSkill.cpp" />
+    <ClCompile Include="src\Graphics\Animation.cpp" />
+    <ClCompile Include="src\Graphics\CharacterArt.cpp" />
+    <ClCompile Include="src\Graphics\DrawUtil.cpp" />
+    <ClCompile Include="src\Scenes\HomeScene.cpp" />
+    <ClCompile Include="src\Scenes\QuestScene.cpp" />
+    <ClCompile Include="src\Scenes\ResultScene.cpp" />
+    <ClCompile Include="src\Scenes\TitleScene.cpp" />
+    <ClCompile Include="src\UI\BattleHud.cpp" />
+    <ClCompile Include="src\UI\BattleMenu.cpp" />
+    <ClCompile Include="src\UI\EquipPanel.cpp" />
+    <ClCompile Include="src\UI\QuestPanel.cpp" />
+    <ClCompile Include="src\UI\SettingsPanel.cpp" />
+    <ClCompile Include="src\UI\UIWidgets.cpp" />
+    <ClCompile Include="src\UI\UpgradePanel.cpp" />
+    <ClCompile Include="src\main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\Common\MathUtil.h" />
+    <ClInclude Include="src\Common\StringUtil.h" />
+    <ClInclude Include="src\Common\Types.h" />
+    <ClInclude Include="src\Core\Application.h" />
+    <ClInclude Include="src\Core\Camera.h" />
+    <ClInclude Include="src\Core\DxInclude.h" />
+    <ClInclude Include="src\Core\FontManager.h" />
+    <ClInclude Include="src\Core\GameConfig.h" />
+    <ClInclude Include="src\Core\Input.h" />
+    <ClInclude Include="src\Core\ResourceManager.h" />
+    <ClInclude Include="src\Core\Scene.h" />
+    <ClInclude Include="src\Core\SceneManager.h" />
+    <ClInclude Include="src\Game\Actor.h" />
+    <ClInclude Include="src\Game\ActorAssets.h" />
+    <ClInclude Include="src\Game\Boss.h" />
+    <ClInclude Include="src\Game\Combat.h" />
+    <ClInclude Include="src\Game\Enemy.h" />
+    <ClInclude Include="src\Game\EnemyDatabase.h" />
+    <ClInclude Include="src\Game\Equipment.h" />
+    <ClInclude Include="src\Game\GameContext.h" />
+    <ClInclude Include="src\Game\Inventory.h" />
+    <ClInclude Include="src\Game\ItemDatabase.h" />
+    <ClInclude Include="src\Game\Player.h" />
+    <ClInclude Include="src\Game\PlayerData.h" />
+    <ClInclude Include="src\Game\QuestDatabase.h" />
+    <ClInclude Include="src\Game\Stage.h" />
+    <ClInclude Include="src\Game\Stats.h" />
+    <ClInclude Include="src\Game\SwordSkill.h" />
+    <ClInclude Include="src\Game\WeaponType.h" />
+    <ClInclude Include="src\Graphics\Animation.h" />
+    <ClInclude Include="src\Graphics\CharacterArt.h" />
+    <ClInclude Include="src\Graphics\DrawUtil.h" />
+    <ClInclude Include="src\Scenes\HomeScene.h" />
+    <ClInclude Include="src\Scenes\QuestScene.h" />
+    <ClInclude Include="src\Scenes\ResultScene.h" />
+    <ClInclude Include="src\Scenes\TitleScene.h" />
+    <ClInclude Include="src\UI\BattleHud.h" />
+    <ClInclude Include="src\UI\BattleMenu.h" />
+    <ClInclude Include="src\UI\EquipPanel.h" />
+    <ClInclude Include="src\UI\QuestPanel.h" />
+    <ClInclude Include="src\UI\SettingsPanel.h" />
+    <ClInclude Include="src\UI\UIWidgets.h" />
+    <ClInclude Include="src\UI\UpgradePanel.h" />
+  </ItemGroup>
+</Project>

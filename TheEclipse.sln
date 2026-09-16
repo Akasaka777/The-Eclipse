@@ -1,0 +1,31 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TheEclipse", "TheEclipse\TheEclipse.vcxproj", "{8F3C2A41-6B7E-4E25-9A64-7C1D5E9B0A11}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8F3C2A41-6B7E-4E25-9A64-7C1D5E9B0A11}.Debug|x64.ActiveCfg = Debug|x64
+		{8F3C2A41-6B7E-4E25-9A64-7C1D5E9B0A11}.Debug|x64.Build.0 = Debug|x64
+		{8F3C2A41-6B7E-4E25-9A64-7C1D5E9B0A11}.Debug|x86.ActiveCfg = Debug|Win32
+		{8F3C2A41-6B7E-4E25-9A64-7C1D5E9B0A11}.Debug|x86.Build.0 = Debug|Win32
+		{8F3C2A41-6B7E-4E25-9A64-7C1D5E9B0A11}.Release|x64.ActiveCfg = Release|x64
+		{8F3C2A41-6B7E-4E25-9A64-7C1D5E9B0A11}.Release|x64.Build.0 = Release|x64
+		{8F3C2A41-6B7E-4E25-9A64-7C1D5E9B0A11}.Release|x86.ActiveCfg = Release|Win32
+		{8F3C2A41-6B7E-4E25-9A64-7C1D5E9B0A11}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2C6A1F55-9E88-4E6B-9C73-3A1E4D2B7C90}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    DxLib の配置場所を解決するプロパティシート。
+
+    優先順位
+      1. 環境変数 DXLIB_DIR （例: C:\lib\DxLib_VC\プロジェクトに追加すべきファイル_VC用）
+      2. リポジトリ直下の external\DxLib
+
+    指定したフォルダには DxLib.h と DxLib.lib（x64 は x64\ 以下）が入っている想定です。
+  -->
+  <PropertyGroup Label="UserMacros">
+    <DxLibDir Condition="'$(DxLibDir)' == '' and '$(DXLIB_DIR)' != ''">$(DXLIB_DIR)</DxLibDir>
+    <DxLibDir Condition="'$(DxLibDir)' == ''">$(ProjectDir)..\external\DxLib</DxLibDir>
+    <DxLibLibDir Condition="'$(Platform)' == 'x64'">$(DxLibDir)\x64</DxLibLibDir>
+    <DxLibLibDir Condition="'$(Platform)' != 'x64'">$(DxLibDir)</DxLibLibDir>
+  </PropertyGroup>
+  <PropertyGroup />
+</Project>

@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{8F3C2A41-6B7E-4E25-9A64-7C1D5E9B0A11}</ProjectGuid>
+    <RootNamespace>TheEclipse</RootNamespace>
+    <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
+    <ProjectName>TheEclipse</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <!-- DxLib はマルチバイト文字セットで使用する -->
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <!-- DxLib はマルチバイト文字セットで使用する -->
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <!-- DxLib はマルチバイト文字セットで使用する -->
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <!-- DxLib はマルチバイト文字セットで使用する -->
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <!-- DxLib の場所を解決する -->
+    <Import Project="DxLib.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\build\$(Platform)\$(Configuration)\</IntDir>
+    <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <!-- ソースは UTF-8。日本語リテラルを正しく扱うために必須 -->
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(DxLibDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- DxLib は静的 CRT を要求する -->
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <Optimization>Disabled</Optimization>
+      <FunctionLevelLinking>false</FunctionLevelLinking>
+      <IntrinsicFunctions>false</IntrinsicFunctions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>false</EnableCOMDATFolding>
+      <OptimizeReferences>false</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(DxLibLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>if exist "$(ProjectDir)..\assets" xcopy "$(ProjectDir)..\assets" "$(OutDir)assets\" /E /I /Y /D</Command>
+      <Message>assets を出力先へコピー</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <!-- ソースは UTF-8。日本語リテラルを正しく扱うために必須 -->
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(DxLibDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- DxLib は静的 CRT を要求する -->
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(DxLibLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>if exist "$(ProjectDir)..\assets" xcopy "$(ProjectDir)..\assets" "$(OutDir)assets\" /E /I /Y /D</Command>
+      <Message>assets を出力先へコピー</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <!-- ソースは UTF-8。日本語リテラルを正しく扱うために必須 -->
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(DxLibDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- DxLib は静的 CRT を要求する -->
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <Optimization>Disabled</Optimization>
+      <FunctionLevelLinking>false</FunctionLevelLinking>
+      <IntrinsicFunctions>false</IntrinsicFunctions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>false</EnableCOMDATFolding>
+      <OptimizeReferences>false</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(DxLibLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>if exist "$(ProjectDir)..\assets" xcopy "$(ProjectDir)..\assets" "$(OutDir)assets\" /E /I /Y /D</Command>
+      <Message>assets を出力先へコピー</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <!-- ソースは UTF-8。日本語リテラルを正しく扱うために必須 -->
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(DxLibDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- DxLib は静的 CRT を要求する -->
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(DxLibLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>if exist "$(ProjectDir)..\assets" xcopy "$(ProjectDir)..\assets" "$(OutDir)assets\" /E /I /Y /D</Command>
+      <Message>assets を出力先へコピー</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\Common\MathUtil.cpp" />
+    <ClCompile Include="src\Common\StringUtil.cpp" />
+    <ClCompile Include="src\Common\Types.cpp" />
+    <ClCompile Include="src\Core\Application.cpp" />
+    <ClCompile Include="src\Core\Camera.cpp" />
+    <ClCompile Include="src\Core\FontManager.cpp" />
+    <ClCompile Include="src\Core\GameConfig.cpp" />
+    <ClCompile Include="src\Core\Input.cpp" />
+    <ClCompile Include="src\Core\ResourceManager.cpp" />
+    <ClCompile Include="src\Core\SceneManager.cpp" />
+    <ClCompile Include="src\Game\Actor.cpp" />
+    <ClCompile Include="src\Game\ActorAssets.cpp" />
+    <ClCompile Include="src\Game\Boss.cpp" />
+    <ClCompile Include="src\Game\Combat.cpp" />
+    <ClCompile Include="src\Game\Enemy.cpp" />
+    <ClCompile Include="src\Game\EnemyDatabase.cpp" />
+    <ClCompile Include="src\Game\Equipment.cpp" />
+    <ClCompile Include="src\Game\GameContext.cpp" />
+    <ClCompile Include="src\Game\Inventory.cpp" />
+    <ClCompile Include="src\Game\ItemDatabase.cpp" />
+    <ClCompile Include="src\Game\Player.cpp" />
+    <ClCompile Include="src\Game\PlayerData.cpp" />
+    <ClCompile Include="src\Game\QuestDatabase.cpp" />
+    <ClCompile Include="src\Game\Stage.cpp" />
+    <ClCompile Include="src\Game\Stats.cpp" />
+    <ClCompile Include="src\Game\SwordSkill.cpp" />
+    <ClCompile Include="src\Graphics\Animation.cpp" />
+    <ClCompile Include="src\Graphics\CharacterArt.cpp" />
+    <ClCompile Include="src\Graphics\DrawUtil.cpp" />
+    <ClCompile Include="src\Scenes\HomeScene.cpp" />
+    <ClCompile Include="src\Scenes\QuestScene.cpp" />
+    <ClCompile Include="src\Scenes\ResultScene.cpp" />
+    <ClCompile Include="src\Scenes\TitleScene.cpp" />
+    <ClCompile Include="src\UI\BattleHud.cpp" />
+    <ClCompile Include="src\UI\BattleMenu.cpp" />
+    <ClCompile Include="src\UI\EquipPanel.cpp" />
+    <ClCompile Include="src\UI\QuestPanel.cpp" />
+    <ClCompile Include="src\UI\SettingsPanel.cpp" />
+    <ClCompile Include="src\UI\UIWidgets.cpp" />
+    <ClCompile Include="src\UI\UpgradePanel.cpp" />
+    <ClCompile Include="src\main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\Common\MathUtil.h" />
+    <ClInclude Include="src\Common\StringUtil.h" />
+    <ClInclude Include="src\Common\Types.h" />
+    <ClInclude Include="src\Core\Application.h" />
+    <ClInclude Include="src\Core\Camera.h" />
+    <ClInclude Include="src\Core\DxInclude.h" />
+    <ClInclude Include="src\Core\FontManager.h" />
+    <ClInclude Include="src\Core\GameConfig.h" />
+    <ClInclude Include="src\Core\Input.h" />
+    <ClInclude Include="src\Core\ResourceManager.h" />
+    <ClInclude Include="src\Core\Scene.h" />
+    <ClInclude Include="src\Core\SceneManager.h" />
+    <ClInclude Include="src\Game\Actor.h" />
+    <ClInclude Include="src\Game\ActorAssets.h" />
+    <ClInclude Include="src\Game\Boss.h" />
+    <ClInclude Include="src\Game\Combat.h" />
+    <ClInclude Include="src\Game\Enemy.h" />
+    <ClInclude Include="src\Game\EnemyDatabase.h" />
+    <ClInclude Include="src\Game\Equipment.h" />
+    <ClInclude Include="src\Game\GameContext.h" />
+    <ClInclude Include="src\Game\Inventory.h" />
+    <ClInclude Include="src\Game\ItemDatabase.h" />
+    <ClInclude Include="src\Game\Player.h" />
+    <ClInclude Include="src\Game\PlayerData.h" />
+    <ClInclude Include="src\Game\QuestDatabase.h" />
+    <ClInclude Include="src\Game\Stage.h" />
+    <ClInclude Include="src\Game\Stats.h" />
+    <ClInclude Include="src\Game\SwordSkill.h" />
+    <ClInclude Include="src\Game\WeaponType.h" />
+    <ClInclude Include="src\Graphics\Animation.h" />
+    <ClInclude Include="src\Graphics\CharacterArt.h" />
+    <ClInclude Include="src\Graphics\DrawUtil.h" />
+    <ClInclude Include="src\Scenes\HomeScene.h" />
+    <ClInclude Include="src\Scenes\QuestScene.h" />
+    <ClInclude Include="src\Scenes\ResultScene.h" />
+    <ClInclude Include="src\Scenes\TitleScene.h" />
+    <ClInclude Include="src\UI\BattleHud.h" />
+    <ClInclude Include="src\UI\BattleMenu.h" />
+    <ClInclude Include="src\UI\EquipPanel.h" />
+    <ClInclude Include="src\UI\QuestPanel.h" />
+    <ClInclude Include="src\UI\SettingsPanel.h" />
+    <ClInclude Include="src\UI\UIWidgets.h" />
+    <ClInclude Include="src\UI\UpgradePanel.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>
