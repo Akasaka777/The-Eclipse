@@ -266,9 +266,9 @@ void HomeScene::DrawFieldGuide(const GameContext& context) const
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 38.0f, palette::kTextDim,
                "移動 : A / D   ジャンプ : SPACE");
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 62.0f, palette::kTextDim,
-               "攻撃 : 左クリック   回避 : SHIFT");
+               "攻撃 : 左クリック   ガード : 右クリック長押し");
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 86.0f, palette::kTextDim,
-               "タブ : 1〜4 キー もしくはクリック");
+               "回避 : SHIFT   パリィ : ガード中に左クリック");
 }
 
 void HomeScene::DrawPlayerSummary(const GameContext& context) const

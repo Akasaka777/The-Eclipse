@@ -26,6 +26,7 @@ struct QuestResult
     int         floorCount = 0;
     int         enemiesDefeated = 0;
     int         maxCombo = 0;
+    int         parryCount = 0;
     int         totalDamage = 0;
     int         damageTaken = 0;
     int         expGained = 0;

@@ -54,6 +54,8 @@ public:
     // 直接ダメージ（トゲ等）
     virtual int ApplyDirectDamage(int damage, float knockbackX, CombatSystem& combat);
     virtual void OnDeath(CombatSystem& combat);
+    // パリィ成功時などに行動を中断させる（既定では何もしない）
+    virtual void Stagger(float duration) { (void)duration; }
 
     void ApplyPhysics(float dt, const Stage& stage);
     void UpdateTimers(float dt);

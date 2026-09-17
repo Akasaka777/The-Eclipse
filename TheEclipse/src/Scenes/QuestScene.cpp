@@ -20,6 +20,9 @@ namespace {
 constexpr float kScreenW = static_cast<float>(config::kScreenWidth);
 constexpr float kScreenH = static_cast<float>(config::kScreenHeight);
 constexpr float kComboHold = 2.4f;
+constexpr float kParryHitStop = 0.22f;
+constexpr float kParryStaggerEnemy = 1.0f;
+constexpr float kParryStaggerBoss = 1.2f;
 
 } // namespace
 
@@ -44,6 +47,7 @@ void QuestScene::OnEnter(GameContext& context)
     colGained_ = 0;
     combo_ = 0;
     maxCombo_ = 0;
+    parryCount_ = 0;
     comboTimer_ = 0.0f;
     questTime_ = 0.0f;
     hitStop_ = 0.0f;
@@ -285,6 +289,33 @@ void QuestScene::UpdateActors(float dt, GameContext& context)
     (void)context;
 }
 
+Actor* QuestScene::FindActorById(int actorId)
+{
+    for (std::unique_ptr<Enemy>& enemy : enemies_) {
+        if (enemy->id == actorId) return enemy.get();
+    }
+    if (boss_ && boss_->id == actorId) return boss_.get();
+    return nullptr;
+}
+
+void QuestScene::HandleParrySuccess()
+{
+    int sourceId = -1;
+    if (!player_.ConsumeParrySignal(&sourceId)) return;
+
+    ++parryCount_;
+    hitStop_ = math::MaxF(hitStop_, kParryHitStop);
+    camera_.Shake(24.0f, 0.32f);
+
+    // 攻撃してきた相手をよろけさせて反撃の隙を作る
+    if (Actor* attacker = FindActorById(sourceId)) {
+        const bool isBoss = (boss_ && attacker == boss_.get());
+        attacker->Stagger(isBoss ? kParryStaggerBoss : kParryStaggerEnemy);
+        combat_.AddPopup(Vec2(attacker->pos.x, attacker->pos.y - attacker->height - 30.0f),
+                         "体勢を崩した！", palette::kCritical, false);
+    }
+}
+
 void QuestScene::ResolveHitBoxes(GameContext& context)
 {
     for (HitBox& hitBox : combat_.HitBoxes()) {
@@ -316,6 +347,10 @@ void QuestScene::ResolveHitBoxes(GameContext& context)
 
             const int damage = player_.ApplyHit(hitBox, combat_);
             hitBox.MarkHit(player_.id);
+
+            // パリィが成立していれば被弾扱いにしない
+            HandleParrySuccess();
+
             if (damage > 0) {
                 damageTaken_ += damage;
                 combo_ = 0;
@@ -360,7 +395,29 @@ void QuestScene::ResolveProjectiles(GameContext& context)
             if (!player_.alive) continue;
             if (!hitBox.area.Intersects(player_.Bounds())) continue;
 
+            const bool parryActive = player_.IsParryActive();
             const int damage = player_.ApplyHit(hitBox, combat_);
+
+            if (parryActive && player_.ConsumeParrySignal()) {
+                // 受け流した弾はプレイヤーの攻撃として跳ね返す
+                ++parryCount_;
+                hitStop_ = math::MaxF(hitStop_, kParryHitStop * 0.6f);
+                camera_.Shake(16.0f, 0.24f);
+
+                projectile.velocity = Vec2(-projectile.velocity.x * 1.4f,
+                                           -projectile.velocity.y * 0.5f);
+                projectile.team = Team::Player;
+                projectile.sourceId = player_.id;
+                projectile.attack = player_.stats.attack;
+                projectile.damageMultiplier = 1.8f;
+                projectile.critRate = player_.stats.critRate;
+                projectile.critDamage = player_.stats.critDamage;
+                projectile.color = palette::kCritical;
+                projectile.life = math::MaxF(projectile.life, 2.0f);
+                combat_.AddImpact(projectile.pos, palette::kCritical, 18, 460.0f);
+                continue;
+            }
+
             projectile.active = false;
             combat_.AddImpact(projectile.pos, projectile.color, 12, 340.0f);
             if (damage > 0) {
@@ -450,6 +507,7 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
     result.floorCount = quest_ ? quest_->FloorCount() : 0;
     result.enemiesDefeated = enemiesDefeated_;
     result.maxCombo = maxCombo_;
+    result.parryCount = parryCount_;
     result.totalDamage = totalDamage_;
     result.damageTaken = damageTaken_;
 

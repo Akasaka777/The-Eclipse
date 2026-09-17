@@ -29,6 +29,13 @@ const ComboStep kCombo[3] = {
     { 0.54f, 0.17f, 1.85f, 1.55f, 380.0f, 260.0f, 0 },
 };
 
+// パリィ
+constexpr float kParryWindow = 0.18f;    // 受け流しの受付時間
+constexpr float kParryRecovery = 0.50f;  // 失敗時の硬直
+constexpr float kParrySuccessCooldown = 0.12f; // 成功時は素早く再発動できる
+constexpr float kParryMpGain = 14.0f;    // 成功時の MP 回復
+constexpr float kParryInvincible = 0.30f;
+
 constexpr float kDashDuration = 0.22f;
 constexpr float kDashSpeed = 1150.0f;
 constexpr float kDashCooldown = 0.85f;
@@ -83,6 +90,10 @@ void Player::Setup(const PlayerData& data)
     state_ = PlayerState::Normal;
     currentSkill_ = nullptr;
     comboIndex_ = 0;
+    parryWindow_ = 0.0f;
+    parryCooldown_ = 0.0f;
+    parryFlash_ = 0.0f;
+    parrySignal_ = false;
     alive = true;
     deathTimer = 0.0f;
 }
@@ -97,6 +108,10 @@ void Player::PlaceAt(const Vec2& position)
     attackTimer_ = 0.0f;
     dashTimer_ = 0.0f;
     guarding_ = false;
+    parryWindow_ = 0.0f;
+    parryCooldown_ = 0.0f;
+    parryFlash_ = 0.0f;
+    parrySignal_ = false;
     facing = 1;
     pose = PoseKind::Idle;
 }
@@ -169,6 +184,40 @@ bool Player::UseSkill(int index, CombatSystem& combat)
     return true;
 }
 
+bool Player::CanParry() const
+{
+    // ガード中かつ硬直が明けていること
+    return alive && guarding_ && parryCooldown_ <= 0.0f && parryWindow_ <= 0.0f
+        && state_ == PlayerState::Normal;
+}
+
+float Player::ParryWindowRatio() const
+{
+    return math::Clamp(parryWindow_ / kParryWindow, 0.0f, 1.0f);
+}
+
+bool Player::TryParry(CombatSystem& combat)
+{
+    if (!CanParry()) return false;
+
+    parryWindow_ = kParryWindow;
+    // 失敗した場合はそのまま硬直に移行する
+    parryCooldown_ = kParryWindow + kParryRecovery;
+
+    // 構えの演出
+    const Vec2 front(pos.x + static_cast<float>(facing) * 46.0f, pos.y - height * 0.55f);
+    combat.AddRing(front, 90.0f, palette::kAccent, 0.22f);
+    return true;
+}
+
+bool Player::ConsumeParrySignal(int* outSourceId)
+{
+    if (!parrySignal_) return false;
+    parrySignal_ = false;
+    if (outSourceId) *outSourceId = parrySourceId_;
+    return true;
+}
+
 void Player::Update(float dt, const Stage& stage, CombatSystem& combat,
                     const Input& input, bool controlEnabled)
 {
@@ -184,6 +233,9 @@ void Player::Update(float dt, const Stage& stage, CombatSystem& combat,
     if (comboResetTimer_ <= 0.0f && state_ != PlayerState::Attack) comboIndex_ = 0;
 
     dashCooldown_ = math::MaxF(0.0f, dashCooldown_ - dt);
+    parryWindow_ = math::MaxF(0.0f, parryWindow_ - dt);
+    parryCooldown_ = math::MaxF(0.0f, parryCooldown_ - dt);
+    parryFlash_ = math::MaxF(0.0f, parryFlash_ - dt);
     jumpBuffer_ = math::MaxF(0.0f, jumpBuffer_ - dt);
     coyoteTimer_ = onGround ? 0.12f : math::MaxF(0.0f, coyoteTimer_ - dt);
 
@@ -214,8 +266,14 @@ void Player::Update(float dt, const Stage& stage, CombatSystem& combat,
     // --- 攻撃 / スキル入力（先行入力） ----------------------------------------
     if (controlEnabled) {
         if (input.Pressed(GameAction::Attack)) {
-            if (state_ == PlayerState::Normal) StartAttack(combat);
-            else if (state_ == PlayerState::Attack) attackBuffered_ = true;
+            if (guarding_) {
+                // ガード中の攻撃ボタンはパリィ（攻撃には派生しない）
+                TryParry(combat);
+            } else if (state_ == PlayerState::Normal) {
+                StartAttack(combat);
+            } else if (state_ == PlayerState::Attack) {
+                attackBuffered_ = true;
+            }
         }
         const GameAction skillKeys[4] = { GameAction::Skill1, GameAction::Skill2,
                                           GameAction::Skill3, GameAction::Skill4 };
@@ -447,17 +505,39 @@ int Player::ApplyHit(const HitBox& hitBox, CombatSystem& combat)
 {
     if (!alive || IsInvincible()) return 0;
 
+    // 正面から来た攻撃かどうか（ガード / パリィの成立条件）
+    const bool fromFront = (hitBox.area.CenterX() > pos.x) == (facing > 0);
+
+    // --- パリィ判定（受付時間中に正面から攻撃を受けた） -------------------------
+    if (parryWindow_ > 0.0f && fromFront) {
+        parryWindow_ = 0.0f;
+        parryCooldown_ = kParrySuccessCooldown;
+        parryFlash_ = 0.45f;
+        parrySignal_ = true;
+        parrySourceId_ = hitBox.sourceId;
+
+        invincibleTimer = math::MaxF(invincibleTimer, kParryInvincible);
+        mp_ = math::MinF(maxMp_, mp_ + kParryMpGain);
+        velocity.x = 0.0f;
+
+        // 演出
+        const Vec2 front(pos.x + static_cast<float>(facing) * 52.0f, pos.y - height * 0.55f);
+        combat.AddPopup(Vec2(pos.x, pos.y - height - 40.0f), "PARRY!", palette::kCritical, true);
+        combat.AddRing(front, 260.0f, palette::kCritical, 0.35f);
+        combat.AddImpact(front, palette::kCritical, 26, 620.0f);
+        combat.AddSlash(front, facing, 130.0f, palette::kWhite, 4);
+        combat.AddHealNumber(Vec2(pos.x, pos.y - height * 1.1f), static_cast<int>(kParryMpGain));
+        return 0;
+    }
+
     DamageResult result = CalculateDamage(hitBox.attack, stats.defense, hitBox.damageMultiplier,
                                           hitBox.critRate, hitBox.critDamage);
 
     // ガード中は大幅に軽減し、のけぞりも短い
     bool guarded = false;
-    if (guarding_) {
-        const bool fromFront = (hitBox.area.CenterX() > pos.x) == (facing > 0);
-        if (fromFront) {
-            guarded = true;
-            result.value = math::MaxI(1, static_cast<int>(static_cast<float>(result.value) * 0.28f));
-        }
+    if (guarding_ && fromFront) {
+        guarded = true;
+        result.value = math::MaxI(1, static_cast<int>(static_cast<float>(result.value) * 0.28f));
     }
 
     const float direction = (hitBox.area.CenterX() <= pos.x) ? 1.0f : -1.0f;
@@ -468,6 +548,8 @@ int Player::ApplyHit(const HitBox& hitBox, CombatSystem& combat)
 
     if (!guarded) {
         hurtTimer = 0.28f;
+        // パリィに失敗して被弾した場合は受付も打ち切る
+        parryWindow_ = 0.0f;
         if (state_ != PlayerState::Skill) state_ = PlayerState::Hurt;
     }
 
@@ -497,13 +579,33 @@ void Player::OnDeath(CombatSystem& combat)
 void Player::Draw(const Camera& camera) const
 {
     DrawBody(camera);
+    if (!alive) return;
+
+    const Vec2 guardPos = camera.WorldToScreen(Vec2(pos.x + static_cast<float>(facing) * 40.0f,
+                                                    pos.y - height * 0.55f));
 
     // ガード中のシールドエフェクト
-    if (guarding_ && alive) {
-        const Vec2 screen = camera.WorldToScreen(Vec2(pos.x + static_cast<float>(facing) * 40.0f,
-                                                      pos.y - height * 0.55f));
-        draw::Circle(screen.x, screen.y, 62.0f, palette::kAccent, false, 3.0f, 170);
-        draw::Glow(screen.x, screen.y, 40.0f, palette::kAccent, 90, 3);
+    if (guarding_) {
+        const bool ready = parryCooldown_ <= 0.0f;
+        const ColorRGB shield = ready ? palette::kAccent : palette::kTextDisabled;
+        draw::Circle(guardPos.x, guardPos.y, 62.0f, shield, false, 3.0f, 170);
+        draw::Glow(guardPos.x, guardPos.y, 40.0f, shield, 90, 3);
+    }
+
+    // パリィ受付中：内側から閉じるリングでタイミングを示す
+    if (parryWindow_ > 0.0f) {
+        const float t = ParryWindowRatio();
+        draw::Circle(guardPos.x, guardPos.y, 40.0f + 46.0f * t, palette::kCritical, false, 4.0f, 230);
+        draw::Glow(guardPos.x, guardPos.y, 54.0f, palette::kCritical, 150, 4);
+    }
+
+    // パリィ成功：閃光
+    if (parryFlash_ > 0.0f) {
+        const float t = math::Clamp(parryFlash_ / 0.45f, 0.0f, 1.0f);
+        draw::Glow(guardPos.x, guardPos.y, 120.0f * (1.3f - t), palette::kCritical,
+                   static_cast<int>(200.0f * t), 5);
+        draw::Circle(guardPos.x, guardPos.y, 150.0f * (1.0f - t), palette::kWhite, false,
+                     5.0f * t, static_cast<int>(230.0f * t));
     }
 }
 

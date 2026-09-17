@@ -47,6 +47,10 @@ private:
     void ResolveProjectiles(GameContext& context);
     void CleanupDead(GameContext& context);
     void UpdateFloorTransition(float dt, GameContext& context);
+    // パリィ成功時の共通処理（攻撃者をよろけさせる）
+    void HandleParrySuccess();
+    // ID からアクターを探す
+    Actor* FindActorById(int actorId);
     void FinishQuest(bool cleared, bool retired, GameContext& context);
 
     void DrawWorld(const GameContext& context);
@@ -93,6 +97,7 @@ private:
     bool  bossRewardGranted_ = false;
     int   combo_ = 0;
     int   maxCombo_ = 0;
+    int   parryCount_ = 0;
     float comboTimer_ = 0.0f;
 };
 

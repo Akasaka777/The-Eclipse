@@ -133,6 +133,26 @@ void BattleHud::DrawPlayerStatus(const Player& player, const PlayerData& data) c
     draw::TextShadow(FontSize::Tiny, mpBar.right - 8.0f, mpBar.top + 1.0f, palette::kText,
                      str::Format("%d / %d", static_cast<int>(player.Mp()), static_cast<int>(player.MaxMp())),
                      draw::TextAlign::Right);
+
+    // --- パリィ状態（ガード中のみ表示） ---------------------------------------
+    if (player.IsGuarding() || player.IsParryActive()) {
+        const Rect badge = Rect::FromXYWH(mpBar.right + 14.0f, mpBar.top - 4.0f, 96.0f, 28.0f);
+
+        ColorRGB color = palette::kAccent;
+        const char* label = "パリィ可";
+        if (player.IsParryActive()) {
+            color = palette::kCritical;
+            label = "受付中";
+        } else if (player.ParryCooldown() > 0.0f) {
+            color = palette::kTextDisabled;
+            label = "硬直";
+        }
+
+        draw::FillRect(badge, color.Scaled(0.35f), 220);
+        draw::StrokeRect(badge, color, 2.0f, 235);
+        draw::Text(FontSize::Tiny, badge.CenterX(), badge.top + 5.0f, palette::kText, label,
+                   draw::TextAlign::Center);
+    }
 }
 
 void BattleHud::DrawBossStatus(const Boss& boss) const

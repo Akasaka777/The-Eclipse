@@ -51,6 +51,16 @@ public:
     float MaxMp() const { return maxMp_; }
     float MpRatio() const;
 
+    // --- パリィ -------------------------------------------------------------
+    // ガード中に攻撃ボタンを押すと受け流しの受付時間が発生する
+    bool  TryParry(CombatSystem& combat);
+    bool  CanParry() const;
+    bool  IsParryActive() const { return parryWindow_ > 0.0f; }
+    float ParryWindowRatio() const;
+    float ParryCooldown() const { return parryCooldown_; }
+    // パリィ成功をシーンへ 1 度だけ通知する（攻撃者の ID を受け取る）
+    bool  ConsumeParrySignal(int* outSourceId = nullptr);
+
     const SwordSkill* Skill(int index) const;
     float SkillCooldown(int index) const;
     float SkillCooldownRatio(int index) const;
@@ -102,6 +112,13 @@ private:
 
     bool  guarding_ = false;
     bool  justAttacked_ = false;
+
+    // パリィ
+    float parryWindow_ = 0.0f;    // 受付の残り時間
+    float parryCooldown_ = 0.0f;  // 再発動までの硬直
+    float parryFlash_ = 0.0f;     // 成功演出の残り時間
+    bool  parrySignal_ = false;   // シーンへ未通知の成功があるか
+    int   parrySourceId_ = -1;    // 受け流した攻撃の発生元
     float jumpBuffer_ = 0.0f;
     float coyoteTimer_ = 0.0f;
     float afterImageTimer_ = 0.0f;

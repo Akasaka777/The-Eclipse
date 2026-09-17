@@ -30,6 +30,7 @@ public:
 
     int  ApplyDirectDamage(int damage, float knockbackX, CombatSystem& combat) override;
     void OnDeath(CombatSystem& combat) override;
+    void Stagger(float duration) override;
 
     // 死亡演出が終わり、リストから除去してよいか
     bool IsRemovable() const;
@@ -53,6 +54,7 @@ private:
     float baseY_ = 0.0f;      // 初期の浮遊高度
     float hoverY_ = 0.0f;     // 現在の浮遊高度（戦闘中はプレイヤーへ寄る）
     float powerScale_ = 1.0f;
+    float staggerDuration_ = 0.3f;  // のけぞりの長さ（パリィ時に延長される）
     float healthBarTimer_ = 0.0f;
 };
 

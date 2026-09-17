@@ -184,6 +184,19 @@ int Boss::ApplyDirectDamage(int damage, float knockbackX, CombatSystem& combat)
     return dealt;
 }
 
+void Boss::Stagger(float duration)
+{
+    // 登場演出中とフェーズ変化中は中断できない
+    if (!alive || state_ == BossState::Intro || state_ == BossState::PhaseShift) return;
+
+    state_ = BossState::Recover;
+    stateTimer_ = 0.0f;
+    recoverTime_ = math::MaxF(recoverTime_, duration);
+    staggered_ = true;
+    velocity.x = -static_cast<float>(facing) * 120.0f;
+    actionName_ = "よろけ";
+}
+
 void Boss::OnDeath(CombatSystem& combat)
 {
     combat.AddImpact(Vec2(pos.x, pos.y - height * 0.5f), art.trim, 60, 800.0f);
@@ -516,6 +529,7 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
         if (stateTimer_ >= recoverTime_) {
             state_ = BossState::Idle;
             stateTimer_ = 0.0f;
+            staggered_ = false;
         }
         break;
     }
@@ -537,6 +551,9 @@ void Boss::UpdatePose()
         break;
     case BossState::PhaseShift:
         pose = PoseKind::Guard;
+        break;
+    case BossState::Recover:
+        pose = staggered_ ? PoseKind::Hurt : PoseKind::Idle;
         break;
     case BossState::Move:
         pose = PoseKind::Run;

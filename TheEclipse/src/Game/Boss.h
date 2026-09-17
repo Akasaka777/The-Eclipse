@@ -91,6 +91,7 @@ public:
 
     int  ApplyDirectDamage(int damage, float knockbackX, CombatSystem& combat) override;
     void OnDeath(CombatSystem& combat) override;
+    void Stagger(float duration) override;
 
     const BossDef* Def() const { return def_; }
     int   Phase() const { return phase_; }
@@ -110,6 +111,7 @@ private:
 
     const BossDef* def_ = nullptr;
     BossState state_ = BossState::Intro;
+    bool  staggered_ = false;   // よろけ中（反撃のチャンス）
     BossAttackKind currentKind_ = BossAttackKind::Swipe;
     std::string actionName_;
 

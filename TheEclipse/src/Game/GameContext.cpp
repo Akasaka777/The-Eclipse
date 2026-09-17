@@ -24,6 +24,10 @@ const char* QuestResult::Rank() const
     if (maxCombo >= 30) score += 2;
     else if (maxCombo >= 15) score += 1;
 
+    // パリィを決められていれば加点
+    if (parryCount >= 10) score += 2;
+    else if (parryCount >= 3) score += 1;
+
     if (score >= 7) return "S";
     if (score >= 5) return "A";
     if (score >= 3) return "B";

@@ -135,6 +135,7 @@ void ResultScene::DrawStats(const GameContext& context) const
         { "到達フロア",     str::Format("%d / %d", math::MaxI(result.floorsCleared, 0), result.floorCount) },
         { "撃破数",         str::Format("%d 体", result.enemiesDefeated) },
         { "最大コンボ",     str::Format("%d HIT", result.maxCombo) },
+        { "パリィ成功",     str::Format("%d 回", result.parryCount) },
         { "与ダメージ",     str::Comma(result.totalDamage) },
         { "被ダメージ",     str::Comma(result.damageTaken) },
     };
@@ -151,7 +152,7 @@ void ResultScene::DrawStats(const GameContext& context) const
         draw::TextAlpha(FontSize::Normal, panel.left + 36.0f, y, palette::kTextDim, row.label, alpha);
         draw::TextAlpha(FontSize::Normal, panel.right - 36.0f, y, palette::kText, row.value, alpha,
                         draw::TextAlign::Right);
-        y += 62.0f;
+        y += 56.0f;
         ++index;
     }
 

@@ -82,6 +82,19 @@ int Enemy::ApplyDirectDamage(int damage, float knockbackX, CombatSystem& combat)
     return dealt;
 }
 
+void Enemy::Stagger(float duration)
+{
+    if (!alive) return;
+
+    state_ = EnemyState::Hurt;
+    stateTimer_ = 0.0f;
+    staggerDuration_ = math::MaxF(0.3f, duration);
+    // よろけ明けはすぐに攻撃できないようにする
+    attackCooldown_ = math::MaxF(attackCooldown_, duration * 0.6f);
+    velocity.x = -static_cast<float>(facing) * 180.0f;
+    healthBarTimer_ = 3.0f;
+}
+
 void Enemy::OnDeath(CombatSystem& combat)
 {
     Actor::OnDeath(combat);
@@ -174,9 +187,10 @@ void Enemy::Update(float dt, const Stage& stage, CombatSystem& combat,
     }
     case EnemyState::Hurt: {
         velocity.x *= 0.9f;
-        if (stateTimer_ >= 0.3f) {
+        if (stateTimer_ >= staggerDuration_) {
             state_ = EnemyState::Chase;
             stateTimer_ = 0.0f;
+            staggerDuration_ = 0.3f;
         }
         break;
     }
