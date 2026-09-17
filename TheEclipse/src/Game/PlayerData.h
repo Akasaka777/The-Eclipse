@@ -39,11 +39,25 @@ public:
     WeaponType CurrentWeaponType() const { return inventory_.CurrentWeaponType(); }
 
     // --- スキル構成 ----------------------------------------------------------
-    // 武器種に合わせてロードアウトを組み直す
+    // 武器種に合わせてロードアウトを組み直す（未解放スキルは外れる）
     void RefreshSkillLoadout();
     const SwordSkill* SkillAt(int slotIndex) const;
-    void SetSkillAt(int slotIndex, int skillId);
+    // スロットへ装備（未解放・武器種違いは失敗）
+    bool SetSkillAt(int slotIndex, int skillId);
+    void ClearSkillSlot(int slotIndex);
+    bool IsSkillEquipped(int skillId) const;
+    // 装備中のスロット番号（未装備なら -1）
+    int  SkillSlotOf(int skillId) const;
     const int* SkillLoadout() const { return skillLoadout_; }
+
+    // --- スキルツリー ---------------------------------------------------------
+    int  SkillPoints() const { return skillPoints_; }
+    void AddSkillPoints(int amount);
+    bool IsSkillUnlocked(int skillId) const;
+    // 前提スキルを満たしているか（ポイント不足でも true）
+    bool IsSkillReachable(int skillId) const;
+    bool CanUnlockSkill(int skillId) const;
+    bool UnlockSkill(int skillId);
 
     // --- クエスト進行 --------------------------------------------------------
     bool IsQuestCleared(int questId) const;
@@ -55,6 +69,8 @@ private:
     int exp_ = 0;
     Inventory inventory_;
     int skillLoadout_[4] = { 0, 0, 0, 0 };
+    int skillPoints_ = 3;
+    std::vector<int> unlockedSkills_;
     std::vector<int> clearedQuests_;
 };
 

@@ -545,7 +545,14 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
     inventory.AddItems(result.drops);
     inventory.AddCol(col);
     inventory.AddMaterial(result.materialGained);
+    const int spBefore = context.player.SkillPoints();
     result.levelsGained = context.player.AddExp(exp);
+
+    // 初回クリアでスキルポイントを追加で付与
+    if (cleared && quest_ && result.firstClear) {
+        context.player.AddSkillPoints(2);
+    }
+    result.skillPointsGained = context.player.SkillPoints() - spBefore;
 
     if (cleared && quest_) context.player.MarkQuestCleared(quest_->id);
 }

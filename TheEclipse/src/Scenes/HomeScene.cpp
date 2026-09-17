@@ -30,21 +30,25 @@ struct TabDef
 
 const TabDef kTabs[] = {
     { HomeTab::Equipment, "装備" },
+    { HomeTab::Skill,     "スキル" },
     { HomeTab::Quest,     "クエスト" },
     { HomeTab::Upgrade,   "強化" },
     { HomeTab::Settings,  "設定" },
 };
 
+constexpr int kTabCount = static_cast<int>(sizeof(kTabs) / sizeof(kTabs[0]));
+
 } // namespace
 
 HomeScene::HomeScene()
 {
-    const float buttonWidth = 300.0f;
-    const float spacing = 24.0f;
-    const float totalWidth = buttonWidth * 4.0f + spacing * 3.0f;
+    const float buttonWidth = 270.0f;
+    const float spacing = 20.0f;
+    const float totalWidth = buttonWidth * static_cast<float>(kTabCount)
+                           + spacing * static_cast<float>(kTabCount - 1);
     const float startX = (kScreenW - totalWidth) * 0.5f;
 
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < kTabCount; ++i) {
         const Rect rect = Rect::FromXYWH(startX + (buttonWidth + spacing) * static_cast<float>(i),
                                          kScreenH - kTabBarHeight + 18.0f, buttonWidth, 68.0f);
         ui::Button button(rect, kTabs[i].label, FontSize::Medium);
@@ -91,13 +95,14 @@ void HomeScene::OnEnter(GameContext& context)
 
 bool HomeScene::AnyPanelOpen() const
 {
-    return equipPanel_.IsOpen() || questPanel_.IsOpen() || upgradePanel_.IsOpen()
-        || settingsPanel_.IsOpen();
+    return equipPanel_.IsOpen() || skillPanel_.IsOpen() || questPanel_.IsOpen()
+        || upgradePanel_.IsOpen() || settingsPanel_.IsOpen();
 }
 
 void HomeScene::CloseAllTabs()
 {
     equipPanel_.Close();
+    skillPanel_.Close();
     questPanel_.Close();
     upgradePanel_.Close();
     settingsPanel_.Close();
@@ -111,6 +116,7 @@ void HomeScene::OpenTab(HomeTab tab, GameContext& context)
 
     switch (tab) {
     case HomeTab::Equipment: equipPanel_.Open(); break;
+    case HomeTab::Skill:     skillPanel_.Open(context); break;
     case HomeTab::Quest:     questPanel_.Open(context); break;
     case HomeTab::Upgrade:   upgradePanel_.Open(); break;
     case HomeTab::Settings:  settingsPanel_.Open(context.settings); break;
@@ -130,6 +136,9 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
         player_.Setup(context.player);
         player_.FullHeal();
         if (equipPanel_.CloseRequested()) activeTab_ = HomeTab::None;
+    } else if (skillPanel_.IsOpen()) {
+        skillPanel_.Update(dt, input, context);
+        if (skillPanel_.CloseRequested()) activeTab_ = HomeTab::None;
     } else if (questPanel_.IsOpen()) {
         questPanel_.Update(dt, input, context);
         if (questPanel_.StartRequested()) {
@@ -162,9 +171,11 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
     if (!panelOpen) {
         const GameAction keys[4] = { GameAction::Skill1, GameAction::Skill2,
                                      GameAction::Skill3, GameAction::Skill4 };
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < 4 && i < kTabCount; ++i) {
             if (input.Pressed(keys[i])) OpenTab(kTabs[i].tab, context);
         }
+        // 5 番目以降は生キーで受け付ける
+        if (kTabCount >= 5 && input.KeyPressed(KEY_INPUT_5)) OpenTab(kTabs[4].tab, context);
         if (input.Pressed(GameAction::Menu)) OpenTab(HomeTab::Settings, context);
     }
 
@@ -200,12 +211,13 @@ void HomeScene::Draw(GameContext& context)
 
     DrawFieldGuide(context);
     DrawPlayerSummary(context);
-    DrawTabBar();
+    DrawTabBar(context);
 
     // --- パネル -------------------------------------------------------------
     if (AnyPanelOpen()) {
         ui::DrawDimOverlay(160);
         equipPanel_.Draw(context);
+        skillPanel_.Draw(context);
         questPanel_.Draw(context);
         upgradePanel_.Draw(context);
         settingsPanel_.Draw();
@@ -268,7 +280,7 @@ void HomeScene::DrawFieldGuide(const GameContext& context) const
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 62.0f, palette::kTextDim,
                "攻撃 : 左クリック   ガード : 右クリック長押し");
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 86.0f, palette::kTextDim,
-               "回避 : SHIFT   パリィ : ガード中に左クリック");
+               "回避 : SHIFT   パリィ : ガード中に左クリック   タブ : 1〜5");
 }
 
 void HomeScene::DrawPlayerSummary(const GameContext& context) const
@@ -300,14 +312,29 @@ void HomeScene::DrawPlayerSummary(const GameContext& context) const
                            WeaponTypeName(data.CurrentWeaponType())));
 }
 
-void HomeScene::DrawTabBar() const
+void HomeScene::DrawTabBar(const GameContext& context) const
 {
     const Rect bar = Rect::FromXYWH(0.0f, kScreenH - kTabBarHeight, kScreenW, kTabBarHeight);
     draw::GradientRectV(bar, palette::kPanel.Scaled(0.9f), palette::kPanelDark, 240, 10);
     draw::Line(bar.left, bar.top, bar.right, bar.top, palette::kAccent, 2.0f, 200);
 
-    for (const ui::Button& button : tabButtons_) {
-        button.Draw();
+    for (int i = 0; i < static_cast<int>(tabButtons_.size()); ++i) {
+        tabButtons_[static_cast<size_t>(i)].Draw();
+
+        // 未使用のスキルポイントがあればスキルタブに知らせる
+        if (kTabs[i].tab != HomeTab::Skill) continue;
+        const int points = context.player.SkillPoints();
+        if (points <= 0) continue;
+
+        const Rect rect = tabButtons_[static_cast<size_t>(i)].GetRect();
+        const float pulse = 0.75f + 0.25f * std::sin(time_ * 4.0f);
+        const float cx = rect.right - 16.0f;
+        const float cy = rect.top + 4.0f;
+        draw::Glow(cx, cy, 22.0f * pulse, palette::kExp, 120, 3);
+        draw::Circle(cx, cy, 17.0f, palette::kExp, true, 1.0f, 255);
+        draw::Circle(cx, cy, 17.0f, palette::kBlack, false, 2.0f, 255);
+        draw::Text(FontSize::Tiny, cx, cy - 9.0f, palette::kBlack,
+                   str::Format("%d", points), draw::TextAlign::Center);
     }
 }
 

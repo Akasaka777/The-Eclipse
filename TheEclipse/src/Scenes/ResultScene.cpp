@@ -188,6 +188,10 @@ void ResultScene::DrawRewards(const GameContext& context) const
 
     draw::Text(FontSize::Small, panel.left + 32.0f, y, palette::kTextDim,
                str::Format("強化結晶  +%d", result.materialGained));
+    if (result.skillPointsGained > 0) {
+        draw::Text(FontSize::Small, panel.left + 280.0f, y, palette::kExp,
+                   str::Format("スキルポイント  +%d", result.skillPointsGained));
+    }
     if (result.firstClear) {
         draw::Text(FontSize::Small, panel.right - 32.0f, y, palette::kAccentWarm,
                    "初回クリアボーナス獲得！", draw::TextAlign::Right);

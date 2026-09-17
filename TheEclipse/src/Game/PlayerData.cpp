@@ -29,6 +29,10 @@ void PlayerData::SetupNewGame()
             inventory_.Equip(item.uid);
         }
     }
+    // 各武器の起点スキルは最初から使える
+    for (int id : SkillDatabase::Instance().StarterSkillIds()) {
+        if (!IsSkillUnlocked(id)) unlockedSkills_.push_back(id);
+    }
     RefreshSkillLoadout();
 }
 
@@ -49,6 +53,9 @@ int PlayerData::AddExp(int amount)
         ++gained;
     }
     if (level_ >= 99) exp_ = 0;
+
+    // レベルアップ 1 回につきスキルポイント 1
+    if (gained > 0) AddSkillPoints(gained);
     return gained;
 }
 
@@ -78,47 +85,120 @@ void PlayerData::RefreshSkillLoadout()
     const SkillDatabase& database = SkillDatabase::Instance();
     const WeaponType weapon = CurrentWeaponType();
 
-    // 現在の武器種に合わないスキルは外す
-    for (int i = 0; i < 4; ++i) {
+    // 現在の武器種に合わない、または未解放のスキルは外す
+    for (int i = 0; i < kSkillSlotCount; ++i) {
         const SwordSkill* skill = database.Find(skillLoadout_[i]);
-        if (!skill || skill->weapon != weapon) skillLoadout_[i] = 0;
+        if (!skill || skill->weapon != weapon || !IsSkillUnlocked(skill->id)) {
+            skillLoadout_[i] = 0;
+        }
     }
 
-    // 空きスロットを既定スキルで埋める
-    const std::vector<int> defaults = database.DefaultLoadout(weapon);
-    for (int i = 0; i < 4; ++i) {
+    // 空きスロットを解放済みスキルで埋める
+    for (int i = 0; i < kSkillSlotCount; ++i) {
         if (skillLoadout_[i] != 0) continue;
-        for (int candidate : defaults) {
-            if (candidate == 0) continue;
-            bool used = false;
-            for (int j = 0; j < 4; ++j) {
-                if (skillLoadout_[j] == candidate) { used = true; break; }
-            }
-            if (!used) {
-                skillLoadout_[i] = candidate;
+        for (const SwordSkill* candidate : database.ForWeapon(weapon)) {
+            if (!IsSkillUnlocked(candidate->id)) continue;
+            if (IsSkillEquipped(candidate->id)) continue;
+            skillLoadout_[i] = candidate->id;
+            break;
+        }
+    }
+}
+
+void PlayerData::AddSkillPoints(int amount)
+{
+    skillPoints_ = math::MaxI(0, skillPoints_ + amount);
+}
+
+bool PlayerData::IsSkillUnlocked(int skillId) const
+{
+    if (skillId == 0) return false;
+    return std::find(unlockedSkills_.begin(), unlockedSkills_.end(), skillId) != unlockedSkills_.end();
+}
+
+bool PlayerData::IsSkillReachable(int skillId) const
+{
+    const SwordSkill* skill = SkillDatabase::Instance().Find(skillId);
+    if (!skill) return false;
+    if (skill->requiredSkillId == 0) return true;
+    return IsSkillUnlocked(skill->requiredSkillId);
+}
+
+bool PlayerData::CanUnlockSkill(int skillId) const
+{
+    const SwordSkill* skill = SkillDatabase::Instance().Find(skillId);
+    if (!skill) return false;
+    if (IsSkillUnlocked(skillId)) return false;
+    if (!IsSkillReachable(skillId)) return false;
+    return skillPoints_ >= skill->unlockCost;
+}
+
+bool PlayerData::UnlockSkill(int skillId)
+{
+    if (!CanUnlockSkill(skillId)) return false;
+
+    const SwordSkill* skill = SkillDatabase::Instance().Find(skillId);
+    skillPoints_ -= skill->unlockCost;
+    unlockedSkills_.push_back(skillId);
+
+    // 同じ武器種で空きスロットがあれば自動で装備する
+    if (skill->weapon == CurrentWeaponType()) {
+        for (int i = 0; i < kSkillSlotCount; ++i) {
+            if (skillLoadout_[i] == 0) {
+                skillLoadout_[i] = skillId;
                 break;
             }
         }
     }
+    return true;
+}
+
+bool PlayerData::IsSkillEquipped(int skillId) const
+{
+    return SkillSlotOf(skillId) >= 0;
+}
+
+int PlayerData::SkillSlotOf(int skillId) const
+{
+    if (skillId == 0) return -1;
+    for (int i = 0; i < kSkillSlotCount; ++i) {
+        if (skillLoadout_[i] == skillId) return i;
+    }
+    return -1;
 }
 
 const SwordSkill* PlayerData::SkillAt(int slotIndex) const
 {
-    if (slotIndex < 0 || slotIndex >= 4) return nullptr;
+    if (slotIndex < 0 || slotIndex >= kSkillSlotCount) return nullptr;
     return SkillDatabase::Instance().Find(skillLoadout_[slotIndex]);
 }
 
-void PlayerData::SetSkillAt(int slotIndex, int skillId)
+bool PlayerData::SetSkillAt(int slotIndex, int skillId)
 {
-    if (slotIndex < 0 || slotIndex >= 4) return;
+    if (slotIndex < 0 || slotIndex >= kSkillSlotCount) return false;
+    if (skillId == 0) {
+        skillLoadout_[slotIndex] = 0;
+        return true;
+    }
 
-    // 同じスキルが他スロットにあれば入れ替える
-    for (int i = 0; i < 4; ++i) {
-        if (i != slotIndex && skillLoadout_[i] == skillId) {
-            skillLoadout_[i] = skillLoadout_[slotIndex];
-        }
+    const SwordSkill* skill = SkillDatabase::Instance().Find(skillId);
+    if (!skill) return false;
+    if (!IsSkillUnlocked(skillId)) return false;
+    if (skill->weapon != CurrentWeaponType()) return false;
+
+    // 既に他スロットにある場合は入れ替える
+    const int existing = SkillSlotOf(skillId);
+    if (existing >= 0 && existing != slotIndex) {
+        skillLoadout_[existing] = skillLoadout_[slotIndex];
     }
     skillLoadout_[slotIndex] = skillId;
+    return true;
+}
+
+void PlayerData::ClearSkillSlot(int slotIndex)
+{
+    if (slotIndex < 0 || slotIndex >= kSkillSlotCount) return;
+    skillLoadout_[slotIndex] = 0;
 }
 
 bool PlayerData::IsQuestCleared(int questId) const

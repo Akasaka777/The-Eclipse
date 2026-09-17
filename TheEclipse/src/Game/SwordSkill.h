@@ -46,8 +46,21 @@ struct SwordSkill
     int         effectStyle = 0;     // 0:縦 1:横 2:突き 3:連撃 4:回転
     std::vector<SkillStrike> strikes;
 
+    // --- スキルツリー上の位置 -------------------------------------------------
+    int  column = 0;          // 0 = 攻撃系統 / 1 = 機動・範囲系統
+    int  tier = 1;            // 1〜3（上から下へ）
+    int  unlockCost = 1;      // 解放に必要なスキルポイント（0 は初期解放）
+    int  requiredSkillId = 0; // 前提スキル（0 なら無し）
+
     float TotalMultiplier() const;
+    bool  IsStarter() const { return unlockCost <= 0; }
 };
+
+// ツリーの段数と系統数
+constexpr int kSkillTreeColumns = 2;
+constexpr int kSkillTreeTiers = 3;
+// 装備できるスキル数
+constexpr int kSkillSlotCount = 4;
 
 //------------------------------------------------------------------------------
 // スキルのマスターデータ
@@ -62,6 +75,14 @@ public:
     std::vector<const SwordSkill*> ForWeapon(WeaponType weapon) const;
     // 武器種の既定ロードアウト（4つ）
     std::vector<int> DefaultLoadout(WeaponType weapon) const;
+
+    // --- スキルツリー ---------------------------------------------------------
+    // 系統・段の順に並んだツリー（column * kSkillTreeTiers + tier - 1 の順）
+    std::vector<const SwordSkill*> TreeForWeapon(WeaponType weapon) const;
+    // 指定位置のノード（無ければ nullptr）
+    const SwordSkill* NodeAt(WeaponType weapon, int column, int tier) const;
+    // 初期解放スキル（各武器の起点）
+    std::vector<int> StarterSkillIds() const;
 
 private:
     SkillDatabase();

@@ -12,6 +12,7 @@
 #include "UI/EquipPanel.h"
 #include "UI/QuestPanel.h"
 #include "UI/SettingsPanel.h"
+#include "UI/SkillPanel.h"
 #include "UI/UIWidgets.h"
 #include "UI/UpgradePanel.h"
 
@@ -26,6 +27,7 @@ enum class HomeTab
 {
     None,
     Equipment, // 装備
+    Skill,     // スキルツリー
     Quest,     // クエスト選択
     Upgrade,   // 装備アップグレード
     Settings   // 設定
@@ -48,7 +50,7 @@ private:
 
     void DrawField(const GameContext& context);
     void DrawPlayerSummary(const GameContext& context) const;
-    void DrawTabBar() const;
+    void DrawTabBar(const GameContext& context) const;
     void DrawFieldGuide(const GameContext& context) const;
 
     Stage        stage_;
@@ -60,6 +62,7 @@ private:
     HomeTab activeTab_ = HomeTab::None;
 
     ui::EquipPanel    equipPanel_;
+    ui::SkillPanel    skillPanel_;
     ui::QuestPanel    questPanel_;
     ui::UpgradePanel  upgradePanel_;
     ui::SettingsPanel settingsPanel_;

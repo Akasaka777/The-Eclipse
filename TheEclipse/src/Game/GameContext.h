@@ -33,6 +33,7 @@ struct QuestResult
     int         colGained = 0;
     int         materialGained = 0;
     int         levelsGained = 0;
+    int         skillPointsGained = 0;
     bool        firstClear = false;
     std::vector<EquipmentItem> drops;
 
