@@ -36,6 +36,8 @@ struct QuestResult
     int         skillPointsGained = 0;
     bool        firstClear = false;
     std::vector<EquipmentItem> drops;
+    // 耐久力が尽きて消滅した装備
+    std::vector<std::string> brokenItems;
 
     void Reset();
     // S / A / B / C 評価

@@ -202,10 +202,115 @@ bool Inventory::TryUpgrade(int uid, bool& outSuccess)
     material_ -= cost.material;
 
     if (math::RandChance(cost.successRate)) {
+        // 強化で最大耐久力が伸びるため、消耗の度合い（比率）を保つ
+        const float ratio = item->DurabilityRatio();
         item->upgradeLevel += 1;
+        item->durability = item->MaxDurability() * ratio;
         outSuccess = true;
     }
     return true;
+}
+
+//------------------------------------------------------------------------------
+// 耐久力
+//------------------------------------------------------------------------------
+void Inventory::ApplyWear(EquipSlot slot, float amount)
+{
+    const int uid = EquippedUid(slot);
+    if (uid == 0) return;
+
+    EquipmentItem* item = FindByUid(uid);
+    if (item) item->Wear(amount);
+}
+
+void Inventory::ApplyArmorWear(float amount)
+{
+    for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {
+        const EquipSlot slot = static_cast<EquipSlot>(i);
+        if (slot == EquipSlot::Weapon) continue;   // 武器は攻撃時に摩耗する
+        ApplyWear(slot, amount);
+    }
+}
+
+std::vector<std::string> Inventory::DestroyBrokenItems()
+{
+    std::vector<std::string> destroyed;
+
+    for (size_t i = 0; i < items_.size();) {
+        if (!items_[i].IsBroken()) {
+            ++i;
+            continue;
+        }
+
+        const EquipmentItem broken = items_[i];
+        // 装備中なら外してから消す
+        for (int slot = 0; slot < static_cast<int>(EquipSlot::Count); ++slot) {
+            if (equippedUid_[slot] == broken.uid) equippedUid_[slot] = 0;
+        }
+        items_.erase(items_.begin() + static_cast<long>(i));
+        destroyed.push_back(broken.DisplayName());
+    }
+    return destroyed;
+}
+
+bool Inventory::HasWornEquipment() const
+{
+    for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {
+        const EquipmentItem* item = Equipped(static_cast<EquipSlot>(i));
+        if (item && item->IsWorn()) return true;
+    }
+    return false;
+}
+
+int Inventory::RepairCost(int uid) const
+{
+    const EquipmentItem* item = FindByUid(uid);
+    if (!item) return 0;
+
+    const float missing = item->MaxDurability() - item->durability;
+    if (missing <= 0.0f) return 0;
+
+    // レアリティが高いほど修理費も高い
+    const float unit = 8.0f + 4.0f * static_cast<float>(static_cast<int>(item->rarity));
+    return math::MaxI(1, static_cast<int>(missing * unit));
+}
+
+bool Inventory::Repair(int uid)
+{
+    EquipmentItem* item = FindByUid(uid);
+    if (!item) return false;
+
+    const int cost = RepairCost(uid);
+    if (cost <= 0) return false;
+    if (col_ < cost) return false;
+
+    col_ -= cost;
+    item->RestoreDurability();
+    return true;
+}
+
+int Inventory::RepairAllCost() const
+{
+    int total = 0;
+    for (const EquipmentItem& item : items_) {
+        total += RepairCost(item.uid);
+    }
+    return total;
+}
+
+int Inventory::RepairAll()
+{
+    int repaired = 0;
+    for (EquipmentItem& item : items_) {
+        const int cost = RepairCost(item.uid);
+        if (cost <= 0) continue;
+        if (col_ < cost) continue;
+
+        col_ -= cost;
+        item.RestoreDurability();
+        ++repaired;
+    }
+    return repaired;
 }
 
 int Inventory::SellValue(int uid) const
@@ -213,7 +318,9 @@ int Inventory::SellValue(int uid) const
     const EquipmentItem* item = FindByUid(uid);
     if (!item) return 0;
     const float rarityFactor = 1.0f + static_cast<float>(item->rarity) * 1.2f;
-    return static_cast<int>((60.0f + item->Power() * 0.9f) * rarityFactor);
+    // 傷んだ装備は買い叩かれる
+    const float condition = 0.4f + 0.6f * item->DurabilityRatio();
+    return math::MaxI(1, static_cast<int>((60.0f + item->Power() * 0.9f) * rarityFactor * condition));
 }
 
 bool Inventory::Sell(int uid)

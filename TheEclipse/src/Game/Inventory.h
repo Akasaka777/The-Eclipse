@@ -6,6 +6,7 @@
 #include "Game/Equipment.h"
 #include "Graphics/CharacterArt.h"
 
+#include <string>
 #include <vector>
 
 namespace ecl {
@@ -54,6 +55,23 @@ public:
     UpgradeCost CalcUpgradeCost(int uid) const;
     // 戻り値 : 強化に成功したか（失敗時も素材は消費）
     bool TryUpgrade(int uid, bool& outSuccess);
+
+    // --- 耐久力 -------------------------------------------------------------
+    // 装備中のスロットの装備を摩耗させる
+    void ApplyWear(EquipSlot slot, float amount);
+    // 装備中の防具すべてを摩耗させる
+    void ApplyArmorWear(float amount);
+    // 耐久力が尽きた装備を消滅させる（消えた装備名を返す）
+    std::vector<std::string> DestroyBrokenItems();
+    // 装備中に耐久力が残りわずかなものがあるか
+    bool HasWornEquipment() const;
+
+    // 修理費用（0 なら修理不要）
+    int  RepairCost(int uid) const;
+    bool Repair(int uid);
+    // 所持品すべての修理費用と一括修理
+    int  RepairAllCost() const;
+    int  RepairAll();
 
     // --- 売却 ---------------------------------------------------------------
     int  SellValue(int uid) const;

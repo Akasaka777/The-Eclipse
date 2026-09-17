@@ -1,6 +1,8 @@
 #include "Game/Equipment.h"
 
+#include "Common/MathUtil.h"
 #include "Common/StringUtil.h"
+#include "Core/GameConfig.h"
 
 namespace ecl {
 
@@ -80,6 +82,46 @@ std::string EquipmentItem::DisplayName() const
 {
     if (upgradeLevel <= 0) return name;
     return str::Format("%s +%d", name.c_str(), upgradeLevel);
+}
+
+float EquipmentItem::MaxDurability() const
+{
+    return 100.0f + 20.0f * static_cast<float>(static_cast<int>(rarity))
+         + 4.0f * static_cast<float>(upgradeLevel);
+}
+
+float EquipmentItem::DurabilityRatio() const
+{
+    const float max = MaxDurability();
+    if (max <= 0.0f) return 0.0f;
+    return math::Clamp(durability / max, 0.0f, 1.0f);
+}
+
+int EquipmentItem::DurabilityDisplay() const
+{
+    if (durability <= 0.0f) return 0;
+    // 1 未満でも「残っている」ことが分かるように切り上げる
+    return math::MaxI(1, static_cast<int>(durability + 0.999f));
+}
+
+void EquipmentItem::Wear(float amount)
+{
+    if (amount <= 0.0f) return;
+    durability = math::MaxF(0.0f, durability - amount);
+}
+
+void EquipmentItem::RestoreDurability()
+{
+    durability = MaxDurability();
+}
+
+ColorRGB EquipmentItem::DurabilityColor() const
+{
+    const float ratio = DurabilityRatio();
+    if (ratio <= 0.0f) return palette::kDanger;
+    if (ratio <= 0.25f) return palette::kDanger;
+    if (ratio <= 0.55f) return palette::kAccentWarm;
+    return palette::kHp;
 }
 
 int IssueItemUid()

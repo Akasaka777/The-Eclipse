@@ -233,8 +233,8 @@
     <ClCompile Include="src\UI\QuestPanel.cpp" />
     <ClCompile Include="src\UI\SettingsPanel.cpp" />
     <ClCompile Include="src\UI\SkillPanel.cpp" />
+    <ClCompile Include="src\UI\SmithPanel.cpp" />
     <ClCompile Include="src\UI\UIWidgets.cpp" />
-    <ClCompile Include="src\UI\UpgradePanel.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -281,8 +281,8 @@
     <ClInclude Include="src\UI\QuestPanel.h" />
     <ClInclude Include="src\UI\SettingsPanel.h" />
     <ClInclude Include="src\UI\SkillPanel.h" />
+    <ClInclude Include="src\UI\SmithPanel.h" />
     <ClInclude Include="src\UI\UIWidgets.h" />
-    <ClInclude Include="src\UI\UpgradePanel.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

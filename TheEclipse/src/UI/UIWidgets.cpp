@@ -285,8 +285,19 @@ void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, boo
 
     DrawRarityBadge(Rect(rect.right - 62.0f, rect.top + 8.0f, rect.right - 12.0f, rect.top + 34.0f),
                     item.rarity);
-    draw::Text(FontSize::Small, rect.right - 12.0f, rect.top + 38.0f, palette::kTextDim,
+    draw::Text(FontSize::Tiny, rect.right - 12.0f, rect.top + 38.0f, palette::kTextDim,
                str::Format("戦力 %d", item.Power()), draw::TextAlign::Right);
+
+    // --- 耐久力 ---------------------------------------------------------------
+    const Rect durabilityBar(rect.right - 200.0f, rect.bottom - 16.0f, rect.right - 12.0f,
+                             rect.bottom - 8.0f);
+    draw::FillRect(durabilityBar, palette::kPanelDark, 255);
+    draw::Bar(durabilityBar, item.DurabilityRatio(), item.DurabilityColor(),
+              ColorRGB(38, 40, 50));
+    draw::Text(FontSize::Tiny, durabilityBar.left - 8.0f, durabilityBar.top - 7.0f,
+               item.DurabilityColor(),
+               str::Format("耐久 %d/%d", item.DurabilityDisplay(), item.MaxDurabilityDisplay()),
+               draw::TextAlign::Right);
 
     if (equipped) {
         draw::FillRect(Rect(rect.left + 6.0f, rect.top, rect.left + 68.0f, rect.top + 22.0f),

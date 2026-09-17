@@ -1,5 +1,6 @@
 //==============================================================================
-// UpgradePanel.h : 装備強化タブ
+// SmithPanel.h : 鍛冶屋タブ
+//   装備の強化と、耐久力の修理を行う。
 //==============================================================================
 #pragma once
 
@@ -13,10 +14,10 @@
 namespace ecl {
 namespace ui {
 
-class UpgradePanel
+class SmithPanel
 {
 public:
-    UpgradePanel();
+    SmithPanel();
 
     void Open();
     void Close() { open_ = false; }
@@ -30,10 +31,14 @@ public:
 private:
     void Layout();
     std::vector<const EquipmentItem*> SortedItems(const GameContext& context) const;
+    // 一括修理の費用などをまとめて表示する
+    void DrawRepairSummary(const GameContext& context) const;
 
     Rect   window_;
     Button closeButton_;
     Button upgradeButton_;
+    Button repairButton_;
+    Button repairAllButton_;
     Button filterButton_;
 
     int   selectedUid_ = 0;

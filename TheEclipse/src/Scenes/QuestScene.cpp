@@ -25,6 +25,12 @@ constexpr float kParryHitStop = 0.22f;
 constexpr float kParryStaggerEnemy = 1.0f;
 constexpr float kParryStaggerBoss = 1.2f;
 
+// --- 装備の摩耗量 -------------------------------------------------------------
+// 攻撃を当てるたびに武器が、被弾するたびに防具が消耗する
+constexpr float kWeaponWearPerHit = 0.30f;
+constexpr float kArmorWearPerHit = 0.28f;
+constexpr float kShieldWearPerGuard = 0.45f;
+
 } // namespace
 
 QuestScene::QuestScene() = default;
@@ -49,6 +55,9 @@ void QuestScene::OnEnter(GameContext& context)
     combo_ = 0;
     maxCombo_ = 0;
     parryCount_ = 0;
+    weaponWear_ = 0.0f;
+    armorWear_ = 0.0f;
+    shieldWear_ = 0.0f;
     comboTimer_ = 0.0f;
     questTime_ = 0.0f;
     hitStop_ = 0.0f;
@@ -455,6 +464,7 @@ void QuestScene::ResolveHitBoxes(GameContext& context)
                 ++combo_;
                 comboTimer_ = kComboHold;
                 maxCombo_ = math::MaxI(maxCombo_, combo_);
+                weaponWear_ += kWeaponWearPerHit;
 
                 hitStop_ = math::MaxF(hitStop_, hitBox.hitStop);
                 camera_.Shake(hitBox.hitStop * 90.0f, 0.18f);
@@ -478,6 +488,9 @@ void QuestScene::ResolveHitBoxes(GameContext& context)
                 damageTaken_ += damage;
                 combo_ = 0;
                 comboTimer_ = 0.0f;
+                armorWear_ += kArmorWearPerHit;
+                // ガードで受け止めた場合は盾が余分に消耗する
+                if (player_.IsGuarding()) shieldWear_ += kShieldWearPerGuard;
                 hitStop_ = math::MaxF(hitStop_, 0.04f);
                 camera_.Shake(14.0f, 0.22f);
             }
@@ -550,6 +563,7 @@ void QuestScene::ResolveProjectiles(GameContext& context)
             if (damage > 0) {
                 damageTaken_ += damage;
                 combo_ = 0;
+                armorWear_ += kArmorWearPerHit;
                 camera_.Shake(10.0f, 0.18f);
             }
         } else {
@@ -668,8 +682,18 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
     result.colGained = col;
     result.materialGained = enemiesDefeated_ / 2 + (cleared ? 6 : 1);
 
-    // --- プレイヤーへ反映 -----------------------------------------------------
+    // --- 装備の消耗を反映 -----------------------------------------------------
     Inventory& inventory = context.player.GetInventory();
+    inventory.ApplyWear(EquipSlot::Weapon, weaponWear_);
+    inventory.ApplyArmorWear(armorWear_);
+    inventory.ApplyWear(EquipSlot::Shield, shieldWear_);
+    result.brokenItems = inventory.DestroyBrokenItems();
+    if (!result.brokenItems.empty()) {
+        // 壊れた装備を外した分、スキル構成を組み直す
+        context.player.RefreshSkillLoadout();
+    }
+
+    // --- プレイヤーへ反映 -----------------------------------------------------
     inventory.AddItems(result.drops);
     inventory.AddCol(col);
     inventory.AddMaterial(result.materialGained);

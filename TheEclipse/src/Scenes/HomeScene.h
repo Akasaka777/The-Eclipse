@@ -14,7 +14,7 @@
 #include "UI/SettingsPanel.h"
 #include "UI/SkillPanel.h"
 #include "UI/UIWidgets.h"
-#include "UI/UpgradePanel.h"
+#include "UI/SmithPanel.h"
 
 #include <vector>
 
@@ -29,7 +29,7 @@ enum class HomeTab
     Equipment, // 装備
     Skill,     // スキルツリー
     Quest,     // クエスト選択
-    Upgrade,   // 装備アップグレード
+    Smith,     // 鍛冶屋（強化・修理）
     Settings   // 設定
 };
 
@@ -64,7 +64,7 @@ private:
     ui::EquipPanel    equipPanel_;
     ui::SkillPanel    skillPanel_;
     ui::QuestPanel    questPanel_;
-    ui::UpgradePanel  upgradePanel_;
+    ui::SmithPanel    smithPanel_;
     ui::SettingsPanel settingsPanel_;
 
     float time_ = 0.0f;

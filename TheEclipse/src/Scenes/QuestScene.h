@@ -102,6 +102,11 @@ private:
     int   combo_ = 0;
     int   maxCombo_ = 0;
     int   parryCount_ = 0;
+
+    // 装備の摩耗（クエスト終了時にまとめて反映する）
+    float weaponWear_ = 0.0f;
+    float armorWear_ = 0.0f;
+    float shieldWear_ = 0.0f;   // ガードで受け止めた分の追加消耗
     float comboTimer_ = 0.0f;
 
     // デバッグ

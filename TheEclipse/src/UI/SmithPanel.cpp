@@ -1,4 +1,4 @@
-#include "UI/UpgradePanel.h"
+#include "UI/SmithPanel.h"
 
 #include "Common/MathUtil.h"
 #include "Common/StringUtil.h"
@@ -16,25 +16,31 @@ constexpr int   kVisibleRows = 9;
 constexpr float kRowHeight = 66.0f;
 } // namespace
 
-UpgradePanel::UpgradePanel()
+SmithPanel::SmithPanel()
 {
     Layout();
 }
 
-void UpgradePanel::Layout()
+void SmithPanel::Layout()
 {
     window_ = Rect::FromXYWH(200.0f, 100.0f, 1520.0f, 880.0f);
 
-    upgradeButton_ = Button(Rect::FromXYWH(window_.right - 420.0f, window_.bottom - 92.0f,
-                                           240.0f, 62.0f), "強化する");
+    const float buttonY = window_.bottom - 92.0f;
+    upgradeButton_ = Button(Rect::FromXYWH(window_.right - 820.0f, buttonY, 200.0f, 62.0f),
+                            "強化する");
     upgradeButton_.SetAccent(palette::kAccentWarm);
-    closeButton_ = Button(Rect::FromXYWH(window_.right - 160.0f, window_.bottom - 92.0f,
-                                         120.0f, 62.0f), "閉じる");
+    repairButton_ = Button(Rect::FromXYWH(window_.right - 600.0f, buttonY, 200.0f, 62.0f),
+                           "修理する");
+    repairButton_.SetAccent(palette::kHp);
+    repairAllButton_ = Button(Rect::FromXYWH(window_.right - 380.0f, buttonY, 200.0f, 62.0f),
+                              "すべて修理");
+    repairAllButton_.SetAccent(palette::kHp);
+    closeButton_ = Button(Rect::FromXYWH(window_.right - 160.0f, buttonY, 120.0f, 62.0f), "閉じる");
     filterButton_ = Button(Rect::FromXYWH(window_.left + 40.0f, window_.top + 74.0f, 220.0f, 44.0f),
                            "表示 : すべて", FontSize::Small);
 }
 
-void UpgradePanel::Open()
+void SmithPanel::Open()
 {
     open_ = true;
     closeRequested_ = false;
@@ -44,7 +50,7 @@ void UpgradePanel::Open()
     message_.clear();
 }
 
-std::vector<const EquipmentItem*> UpgradePanel::SortedItems(const GameContext& context) const
+std::vector<const EquipmentItem*> SmithPanel::SortedItems(const GameContext& context) const
 {
     const Inventory& inventory = context.player.GetInventory();
 
@@ -64,7 +70,7 @@ std::vector<const EquipmentItem*> UpgradePanel::SortedItems(const GameContext& c
     return items;
 }
 
-void UpgradePanel::Update(float dt, const Input& input, GameContext& context)
+void SmithPanel::Update(float dt, const Input& input, GameContext& context)
 {
     if (!open_) return;
     closeRequested_ = false;
@@ -115,17 +121,45 @@ void UpgradePanel::Update(float dt, const Input& input, GameContext& context)
         }
     }
 
+    // --- 修理 ---------------------------------------------------------------
+    const int repairCost = inventory.RepairCost(selectedUid_);
+    repairButton_.SetEnabled(repairCost > 0 && inventory.Col() >= repairCost);
+    if (repairButton_.Update(input, dt) && repairButton_.Enabled()) {
+        if (inventory.Repair(selectedUid_)) {
+            lastSuccess_ = true;
+            resultTimer_ = 1.6f;
+            message_ = str::Format("修理しました（-%s col）", str::Comma(repairCost).c_str());
+        }
+    }
+
+    const int repairAllCost = inventory.RepairAllCost();
+    repairAllButton_.SetEnabled(repairAllCost > 0 && inventory.Col() > 0);
+    if (repairAllButton_.Update(input, dt) && repairAllButton_.Enabled()) {
+        const int before = inventory.Col();
+        const int repaired = inventory.RepairAll();
+        if (repaired > 0) {
+            lastSuccess_ = true;
+            resultTimer_ = 1.6f;
+            message_ = str::Format("%d 点を修理しました（-%s col）", repaired,
+                                   str::Comma(before - inventory.Col()).c_str());
+        } else {
+            message_ = "col が足りません";
+            resultTimer_ = 1.6f;
+            lastSuccess_ = false;
+        }
+    }
+
     if (closeButton_.Update(input, dt) || input.Pressed(GameAction::Cancel)) {
         closeRequested_ = true;
         open_ = false;
     }
 }
 
-void UpgradePanel::Draw(const GameContext& context) const
+void SmithPanel::Draw(const GameContext& context) const
 {
     if (!open_) return;
 
-    DrawWindow(window_, "装備アップグレード");
+    DrawWindow(window_, "鍛冶屋");
 
     const Inventory& inventory = context.player.GetInventory();
 
@@ -176,7 +210,10 @@ void UpgradePanel::Draw(const GameContext& context) const
         draw::Text(FontSize::Normal, detail.CenterX(), detail.CenterY(), palette::kTextDisabled,
                    "強化する装備を選択してください", draw::TextAlign::Center);
         upgradeButton_.Draw();
+        repairButton_.Draw();
+        repairAllButton_.Draw();
         closeButton_.Draw();
+        DrawRepairSummary(context);
         return;
     }
 
@@ -188,6 +225,29 @@ void UpgradePanel::Draw(const GameContext& context) const
                            item->IsWeapon() ? WeaponTypeName(item->weaponType) : EquipSlotName(item->slot),
                            item->upgradeLevel, item->MaxUpgrade()));
     y += 44.0f;
+
+    // --- 耐久力 ---------------------------------------------------------------
+    {
+        draw::Text(FontSize::Small, detail.left + 24.0f, y, palette::kTextDim, "耐久力");
+        const Rect bar(detail.left + 140.0f, y + 4.0f, detail.right - 160.0f, y + 20.0f);
+        draw::FillRect(bar, palette::kPanelDark, 255);
+        draw::Bar(bar, item->DurabilityRatio(), item->DurabilityColor(), ColorRGB(38, 40, 50));
+        draw::StrokeRect(bar, palette::kBorder.Scaled(0.7f), 1.0f, 160);
+        draw::Text(FontSize::Small, detail.right - 24.0f, y, item->DurabilityColor(),
+                   str::Format("%d / %d", item->DurabilityDisplay(), item->MaxDurabilityDisplay()),
+                   draw::TextAlign::Right);
+        y += 34.0f;
+
+        const int cost = inventory.RepairCost(item->uid);
+        if (cost > 0) {
+            draw::Text(FontSize::Tiny, detail.left + 24.0f, y,
+                       inventory.Col() >= cost ? palette::kTextDim : palette::kDanger,
+                       str::Format("修理費用  %s col", str::Comma(cost).c_str()));
+        } else {
+            draw::Text(FontSize::Tiny, detail.left + 24.0f, y, palette::kHp, "修理の必要はありません");
+        }
+        y += 34.0f;
+    }
 
     // 強化段階のゲージ
     {
@@ -269,7 +329,34 @@ void UpgradePanel::Draw(const GameContext& context) const
     }
 
     upgradeButton_.Draw();
+    repairButton_.Draw();
+    repairAllButton_.Draw();
     closeButton_.Draw();
+    DrawRepairSummary(context);
+}
+
+void SmithPanel::DrawRepairSummary(const GameContext& context) const
+{
+    const Inventory& inventory = context.player.GetInventory();
+    const int allCost = inventory.RepairAllCost();
+
+    const Rect info(window_.left + 40.0f, window_.bottom - 92.0f, window_.right - 840.0f,
+                    window_.bottom - 30.0f);
+    draw::FillRect(info, palette::kPanelDark, 190);
+    draw::StrokeRect(info, palette::kBorder.Scaled(0.6f), 1.0f, 150);
+
+    if (allCost > 0) {
+        draw::Text(FontSize::Small, info.left + 14.0f, info.top + 6.0f, palette::kTextDim,
+                   "すべて修理");
+        draw::Text(FontSize::Small, info.right - 14.0f, info.top + 6.0f,
+                   inventory.Col() >= allCost ? palette::kText : palette::kDanger,
+                   str::Format("%s col", str::Comma(allCost).c_str()), draw::TextAlign::Right);
+        draw::Text(FontSize::Tiny, info.left + 14.0f, info.top + 34.0f, palette::kTextDim,
+                   "耐久力が 0 になった装備は失われます");
+    } else {
+        draw::Text(FontSize::Small, info.left + 14.0f, info.CenterY() - 10.0f, palette::kHp,
+                   "すべての装備が万全の状態です");
+    }
 }
 
 } // namespace ui

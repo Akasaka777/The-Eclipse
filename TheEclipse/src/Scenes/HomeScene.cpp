@@ -33,7 +33,7 @@ const TabDef kTabs[] = {
     { HomeTab::Equipment, "装備" },
     { HomeTab::Skill,     "スキル" },
     { HomeTab::Quest,     "クエスト" },
-    { HomeTab::Upgrade,   "強化" },
+    { HomeTab::Smith,     "鍛冶屋" },
     { HomeTab::Settings,  "設定" },
 };
 
@@ -103,7 +103,7 @@ void HomeScene::OnEnter(GameContext& context)
 bool HomeScene::AnyPanelOpen() const
 {
     return equipPanel_.IsOpen() || skillPanel_.IsOpen() || questPanel_.IsOpen()
-        || upgradePanel_.IsOpen() || settingsPanel_.IsOpen();
+        || smithPanel_.IsOpen() || settingsPanel_.IsOpen();
 }
 
 void HomeScene::CloseAllTabs()
@@ -111,7 +111,7 @@ void HomeScene::CloseAllTabs()
     equipPanel_.Close();
     skillPanel_.Close();
     questPanel_.Close();
-    upgradePanel_.Close();
+    smithPanel_.Close();
     settingsPanel_.Close();
     activeTab_ = HomeTab::None;
 }
@@ -125,7 +125,7 @@ void HomeScene::OpenTab(HomeTab tab, GameContext& context)
     case HomeTab::Equipment: equipPanel_.Open(); break;
     case HomeTab::Skill:     skillPanel_.Open(context); break;
     case HomeTab::Quest:     questPanel_.Open(context); break;
-    case HomeTab::Upgrade:   upgradePanel_.Open(); break;
+    case HomeTab::Smith:     smithPanel_.Open(); break;
     case HomeTab::Settings:  settingsPanel_.Open(context.settings); break;
     default: break;
     }
@@ -155,11 +155,11 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
             activeTab_ = HomeTab::None;
         }
         if (questPanel_.CloseRequested()) activeTab_ = HomeTab::None;
-    } else if (upgradePanel_.IsOpen()) {
-        upgradePanel_.Update(dt, input, context);
+    } else if (smithPanel_.IsOpen()) {
+        smithPanel_.Update(dt, input, context);
         player_.Setup(context.player);
         player_.FullHeal();
-        if (upgradePanel_.CloseRequested()) activeTab_ = HomeTab::None;
+        if (smithPanel_.CloseRequested()) activeTab_ = HomeTab::None;
     } else if (settingsPanel_.IsOpen()) {
         settingsPanel_.Update(dt, input, context);
         camera_.SetShakeEnabled(context.settings.screenShake);
@@ -230,7 +230,7 @@ void HomeScene::Draw(GameContext& context)
         equipPanel_.Draw(context);
         skillPanel_.Draw(context);
         questPanel_.Draw(context);
-        upgradePanel_.Draw(context);
+        smithPanel_.Draw(context);
         settingsPanel_.Draw();
     }
 
@@ -327,6 +327,14 @@ void HomeScene::DrawPlayerSummary(const GameContext& context) const
     draw::Text(FontSize::Small, panel.left + 24.0f, panel.top + 112.0f, palette::kTextDim,
                str::Format("戦力 %d ／ 武器 %s", data.Power(),
                            WeaponTypeName(data.CurrentWeaponType())));
+
+    // 耐久力が残りわずかな装備があれば知らせる
+    if (data.GetInventory().HasWornEquipment()) {
+        const float pulse = 0.6f + 0.4f * std::sin(time_ * 4.0f);
+        draw::Text(FontSize::Small, panel.right - 24.0f, panel.top + 112.0f, palette::kDanger,
+                   "装備の耐久力が低下", draw::TextAlign::Right);
+        draw::StrokeRect(panel, palette::kDanger, 2.0f, static_cast<int>(180.0f * pulse));
+    }
 }
 
 void HomeScene::DrawTabBar(const GameContext& context) const
@@ -337,6 +345,20 @@ void HomeScene::DrawTabBar(const GameContext& context) const
 
     for (int i = 0; i < static_cast<int>(tabButtons_.size()); ++i) {
         tabButtons_[static_cast<size_t>(i)].Draw();
+
+        // 鍛冶屋: 修理が必要なら注意を促す
+        if (kTabs[i].tab == HomeTab::Smith) {
+            if (!context.player.GetInventory().HasWornEquipment()) continue;
+            const Rect rect = tabButtons_[static_cast<size_t>(i)].GetRect();
+            const float pulse = 0.75f + 0.25f * std::sin(time_ * 4.0f);
+            const float cx = rect.right - 16.0f;
+            const float cy = rect.top + 4.0f;
+            draw::Glow(cx, cy, 22.0f * pulse, palette::kDanger, 120, 3);
+            draw::Circle(cx, cy, 17.0f, palette::kDanger, true, 1.0f, 255);
+            draw::Circle(cx, cy, 17.0f, palette::kBlack, false, 2.0f, 255);
+            draw::Text(FontSize::Tiny, cx, cy - 9.0f, palette::kText, "!", draw::TextAlign::Center);
+            continue;
+        }
 
         // 未使用のスキルポイントがあればスキルタブに知らせる
         if (kTabs[i].tab != HomeTab::Skill) continue;

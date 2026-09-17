@@ -206,8 +206,27 @@ void ResultScene::DrawRewards(const GameContext& context) const
                str::Format("ドロップ装備  %d 個", static_cast<int>(result.drops.size())));
     y += 42.0f;
 
+    // --- 耐久力が尽きて壊れた装備 ---------------------------------------------
+    if (!result.brokenItems.empty()) {
+        const float pulse = 0.65f + 0.35f * std::sin(time_ * 5.0f);
+        const Rect notice(panel.left + 28.0f, y - 6.0f, panel.right - 28.0f,
+                          y + 30.0f + 26.0f * static_cast<float>(result.brokenItems.size()));
+        draw::FillRect(notice, palette::kDanger.Scaled(0.30f), 210);
+        draw::StrokeRect(notice, palette::kDanger, 2.0f, static_cast<int>(220.0f * pulse));
+        draw::Text(FontSize::Small, notice.left + 12.0f, notice.top + 6.0f, palette::kDanger,
+                   "耐久力が尽きて失われた装備");
+
+        float noticeY = notice.top + 32.0f;
+        for (const std::string& name : result.brokenItems) {
+            draw::Text(FontSize::Small, notice.left + 26.0f, noticeY, palette::kText,
+                       str::Format("・%s", name.c_str()));
+            noticeY += 26.0f;
+        }
+        y = notice.bottom + 14.0f;
+    }
+
     if (result.drops.empty()) {
-        draw::Text(FontSize::Normal, panel.CenterX(), y + 60.0f, palette::kTextDisabled,
+        draw::Text(FontSize::Normal, panel.CenterX(), y + 40.0f, palette::kTextDisabled,
                    "ドロップはありませんでした", draw::TextAlign::Center);
         return;
     }

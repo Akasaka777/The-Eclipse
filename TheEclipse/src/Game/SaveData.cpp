@@ -24,7 +24,7 @@ namespace ecl {
 namespace {
 
 // セーブ形式のバージョン（構造を変えたら上げる）
-constexpr int kSaveVersion = 1;
+constexpr int kSaveVersion = 2;
 
 std::string g_lastError;
 
@@ -122,14 +122,14 @@ bool SaveSystem::Save(const GameContext& context)
 
     // --- 所持品 -------------------------------------------------------------
     //   item <uid> <templateId> <rarity> <upgradeLevel> <攻撃> <防御> <HP> <MP>
-    //        <クリ率> <クリ倍率> <MP回復> <移動> <攻撃速度>
+    //        <クリ率> <クリ倍率> <MP回復> <移動> <攻撃速度> <耐久力>
     for (const EquipmentItem& item : inventory.Items()) {
         const Stats& base = item.baseStats;
         file << "item " << item.uid << ' ' << item.templateId << ' '
              << static_cast<int>(item.rarity) << ' ' << item.upgradeLevel << ' '
              << base.attack << ' ' << base.defense << ' ' << base.maxHp << ' ' << base.maxMp << ' '
              << base.critRate << ' ' << base.critDamage << ' ' << base.mpRegen << ' '
-             << base.moveSpeed << ' ' << base.attackSpeed << "\n";
+             << base.moveSpeed << ' ' << base.attackSpeed << ' ' << item.durability << "\n";
     }
 
     // --- 装備中 -------------------------------------------------------------
@@ -248,6 +248,15 @@ bool SaveSystem::Load(GameContext& context)
             item.baseStats.mpRegen = ToFloat(arg(11));
             item.baseStats.moveSpeed = ToFloat(arg(12));
             item.baseStats.attackSpeed = (tokens.size() > 13) ? ToFloat(arg(13)) : 0.0f;
+
+            // 耐久力（旧バージョンのセーブには含まれないため満タン扱い）
+            if (tokens.size() > 14) {
+                item.durability = ToFloat(arg(14), item.MaxDurability());
+            } else {
+                item.RestoreDurability();
+            }
+            // 壊れた状態では保存されない想定だが、念のため最低 1 は残す
+            if (item.durability <= 0.0f) item.durability = 1.0f;
 
             // 高レアリティのスキン補正を再適用
             if (static_cast<int>(item.rarity) >= static_cast<int>(Rarity::SR)) {

@@ -233,6 +233,7 @@ EquipmentItem ItemDatabase::Create(int templateId, Rarity rarity) const
     item.baseStats.critRate = tmpl->base.critRate * (1.0f + (rarityMul - 1.0f) * 0.45f);
     item.baseStats.attackSpeed = tmpl->base.attackSpeed * (1.0f + (rarityMul - 1.0f) * 0.30f);
 
+    item.RestoreDurability();
     return item;
 }
 

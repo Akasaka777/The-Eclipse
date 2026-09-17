@@ -87,6 +87,7 @@ struct EquipmentItem
     int         upgradeLevel = 0;
     Stats       baseStats;        // +0 時点の能力値
     EquipSkin   skin;             // 見た目
+    float       durability = -1.0f; // 現在の耐久力（負値なら生成時に最大値で初期化）
 
     bool  IsValid() const { return uid != 0; }
     bool  IsWeapon() const { return slot == EquipSlot::Weapon; }
@@ -96,6 +97,22 @@ struct EquipmentItem
     std::string DisplayName() const;
     int   Power() const { return TotalStats().Power(); }
     int   MaxUpgrade() const { return RarityMaxUpgrade(rarity); }
+
+    // --- 耐久力 ---------------------------------------------------------------
+    // レアリティが高く、強化するほど長持ちする
+    float MaxDurability() const;
+    float DurabilityRatio() const;
+    // 表示用（切り上げ）
+    int   DurabilityDisplay() const;
+    int   MaxDurabilityDisplay() const { return static_cast<int>(MaxDurability()); }
+    bool  IsBroken() const { return durability <= 0.0f; }
+    // 残り 25% 以下
+    bool  IsWorn() const { return DurabilityRatio() <= 0.25f; }
+    // 耐久力を減らす（0 未満にはならない）
+    void  Wear(float amount);
+    void  RestoreDurability();
+    // 耐久力の状態に応じた表示色
+    ColorRGB DurabilityColor() const;
 };
 
 // 所持品用の一意 ID を発行
