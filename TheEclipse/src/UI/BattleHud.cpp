@@ -22,11 +22,8 @@ constexpr float kSkillBarBottom = 1030.0f;
 
 BattleHud::BattleHud()
 {
-    menuButton_ = Button(Rect::FromXYWH(kScreenW - 190.0f, 24.0f, 160.0f, 52.0f), "MENU",
-                         FontSize::Normal);
-
     // 右下にスキルアイコンを 4 つ並べる
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < kSkillSlotCount; ++i) {
         const float x = kScreenW - 40.0f - kSkillIconSize * static_cast<float>(4 - i)
                       - 14.0f * static_cast<float>(3 - i);
         skillRects_[i] = Rect::FromXYWH(x, kSkillBarBottom - kSkillIconSize, kSkillIconSize, kSkillIconSize);
@@ -37,7 +34,6 @@ void BattleHud::Reset()
 {
     hpDelay_ = 1.0f;
     bossHpDelay_ = 1.0f;
-    menuClicked_ = false;
     clickedSkill_ = -1;
     time_ = 0.0f;
 }
@@ -45,7 +41,6 @@ void BattleHud::Reset()
 void BattleHud::Update(float dt, const Player& player, const Boss* boss, const Input& input)
 {
     time_ += dt;
-    menuClicked_ = menuButton_.Update(input, dt);
     clickedSkill_ = -1;
 
     // HP バーの減少残像
@@ -61,7 +56,7 @@ void BattleHud::Update(float dt, const Player& player, const Boss* boss, const I
     const float mouseX = static_cast<float>(input.MouseX());
     const float mouseY = static_cast<float>(input.MouseY());
     if (input.MouseClicked(MouseButton::Left)) {
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < kSkillSlotCount; ++i) {
             if (skillRects_[i].Contains(mouseX, mouseY)) {
                 clickedSkill_ = i;
                 break;
@@ -79,10 +74,8 @@ void BattleHud::Draw(const Player& player, const PlayerData& data, const Boss* b
     DrawFloorInfo(info);
     DrawCombo(info);
 
-    menuButton_.Draw();
-
     if (info.showFps) {
-        draw::Text(FontSize::Small, kScreenW - 30.0f, 86.0f, palette::kTextDim,
+        draw::Text(FontSize::Small, kScreenW - 30.0f, 30.0f, palette::kTextDim,
                    str::Format("FPS %.1f", GetFPS()), draw::TextAlign::Right);
     }
 }
@@ -192,7 +185,7 @@ void BattleHud::DrawBossStatus(const Boss& boss) const
 
 void BattleHud::DrawSkillBar(const Player& player) const
 {
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < kSkillSlotCount; ++i) {
         const Rect rect = skillRects_[i];
         const SwordSkill* skill = player.Skill(i);
 
@@ -251,7 +244,7 @@ void BattleHud::DrawSkillBar(const Player& player) const
 
     // 操作ヒント
     draw::Text(FontSize::Tiny, skillRects_[0].left, skillRects_[0].top - 26.0f, palette::kTextDim,
-               "1〜4 / クリックでソードスキル");
+               "1〜4 / クリックでソードスキル     ESC : メニュー");
 }
 
 void BattleHud::DrawFloorInfo(const HudInfo& info) const

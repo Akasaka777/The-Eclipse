@@ -21,6 +21,7 @@ struct ItemTemplate
     WeaponType  weaponType = WeaponType::OneHandSword;
     int         tier = 1; // 1〜3（出現フロアの目安）
     Stats       base;
+    EquipSkin   skin;
 };
 
 class ItemDatabase

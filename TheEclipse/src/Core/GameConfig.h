@@ -23,6 +23,16 @@ constexpr float kGravity = 2800.0f;      // px/s^2
 constexpr float kMaxFallSpeed = 1800.0f; // px/s
 constexpr float kJumpVelocity = -1150.0f;
 
+// --- 奥行き（ベルトスクロール）----------------------------------------------
+// z = 0 が最も手前、値が大きいほど奥。1 z = 画面上 1px の持ち上げ。
+constexpr float kDefaultFieldDepth = 220.0f;
+// 奥に行くほど小さく描画する（最奥での倍率）
+constexpr float kFarScale = 0.82f;
+// 奥行き方向の移動速度（横移動に対する倍率）
+constexpr float kDepthMoveRate = 0.62f;
+// 攻撃が当たる奥行きの許容幅
+constexpr float kHitDepthRange = 58.0f;
+
 constexpr const char* kWindowTitle = "The Eclipse";
 constexpr const char* kAssetRoot = "assets";
 
@@ -66,6 +76,8 @@ struct GameSettings
     bool screenShake = true;
     bool showFps = false;
     bool fullScreen = false;
+    // 開発者向けの表示と操作を有効にする
+    bool debugMode = false;
 };
 
 } // namespace ecl

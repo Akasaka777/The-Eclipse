@@ -63,6 +63,12 @@ public:
     bool IsQuestCleared(int questId) const;
     void MarkQuestCleared(int questId);
 
+    // --- セーブデータの復元 ---------------------------------------------------
+    void RestoreProgress(int level, int exp, int skillPoints,
+                         const std::vector<int>& unlockedSkills,
+                         const std::vector<int>& clearedQuests,
+                         const int skillLoadout[4]);
+
 private:
     std::string name_ = "プレイヤー";
     int level_ = 1;

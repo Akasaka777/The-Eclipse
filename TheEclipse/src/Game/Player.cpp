@@ -66,8 +66,10 @@ void Player::Setup(const PlayerData& data)
     mp_ = maxMp_;
 
     weapon_ = data.CurrentWeaponType();
+
+    // 装備スキンから見た目を組み立てる
+    art = data.GetInventory().BuildAppearance();
     art.weapon = weapon_;
-    art.hasShield = data.GetInventory().Equipped(EquipSlot::Shield) != nullptr;
 
     attackSpeedFactor_ = math::MaxF(0.4f, WeaponSpeedScale(weapon_) * (1.0f + stats.attackSpeed));
 
@@ -75,17 +77,6 @@ void Player::Setup(const PlayerData& data)
         skills_[i] = data.SkillAt(i);
         cooldowns_[i] = 0.0f;
     }
-
-    // 装備の見た目を武器種で少し変える
-    switch (weapon_) {
-    case WeaponType::Dagger: art.main = ColorRGB(58, 46, 76); break;
-    case WeaponType::Rapier: art.main = ColorRGB(44, 62, 88); break;
-    case WeaponType::Spear:  art.main = ColorRGB(52, 66, 62); break;
-    case WeaponType::OneHandMace: art.main = ColorRGB(70, 58, 48); break;
-    default: art.main = ColorRGB(48, 58, 84); break;
-    }
-
-    animator.SetSet(ActorAssets::Instance().PlayerSet());
 
     state_ = PlayerState::Normal;
     currentSkill_ = nullptr;
@@ -259,7 +250,7 @@ void Player::Update(float dt, const Stage& stage, CombatSystem& combat,
         break;
     case PlayerState::Normal:
     default:
-        UpdateNormal(dt, combat, input, controlEnabled);
+        UpdateNormal(dt, combat, input, controlEnabled, stage);
         break;
     }
 
@@ -296,8 +287,11 @@ void Player::Update(float dt, const Stage& stage, CombatSystem& combat,
     }
 }
 
-void Player::UpdateNormal(float dt, CombatSystem& combat, const Input& input, bool controlEnabled)
+void Player::UpdateNormal(float dt, CombatSystem& combat, const Input& input, bool controlEnabled,
+                          const Stage& stage)
 {
+    depthMoving_ = false;
+
     if (!controlEnabled) {
         velocity.x *= 0.82f;
         guarding_ = false;
@@ -315,6 +309,17 @@ void Player::UpdateNormal(float dt, CombatSystem& combat, const Input& input, bo
     } else {
         // フレームレートに依存しない減速
         velocity.x *= 1.0f - math::DampFactor(onGround ? 20.0f : 5.0f, dt);
+    }
+
+    // --- 奥行き移動（接地時のみ） --------------------------------------------
+    if (onGround && !guarding_) {
+        float depthAxis = 0.0f;
+        if (input.Down(GameAction::MoveUp)) depthAxis += 1.0f;   // 奥へ
+        if (input.Down(GameAction::MoveDown)) depthAxis -= 1.0f; // 手前へ
+        if (depthAxis != 0.0f) {
+            MoveDepth(depthAxis * stats.moveSpeed * config::kDepthMoveRate * dt, stage);
+            depthMoving_ = true;
+        }
     }
 
     // ジャンプ（先行入力＋コヨーテタイム）
@@ -401,6 +406,8 @@ void Player::SpawnComboHitBox(CombatSystem& combat)
     hitBox.critRate = stats.critRate;
     hitBox.critDamage = stats.critDamage;
     hitBox.knockback = step.knockback;
+    hitBox.z = z;
+    hitBox.zRange = config::kHitDepthRange;
     hitBox.hitStop = (comboIndex_ == 2) ? 0.07f : 0.035f;
     hitBox.life = 0.09f;
     hitBox.color = art.trim;
@@ -452,6 +459,9 @@ void Player::SpawnSkillStrike(const SkillStrike& strike, CombatSystem& combat)
     hitBox.critRate = stats.critRate;
     hitBox.critDamage = stats.critDamage;
     hitBox.knockback = strike.knockback;
+    hitBox.z = z;
+    // 回転系のスキルは奥行き方向にも広く当たる
+    hitBox.zRange = config::kHitDepthRange * ((currentSkill_->effectStyle == 4) ? 2.2f : 1.0f);
     hitBox.hitStop = strike.hitStop;
     hitBox.launch = strike.launch;
     hitBox.life = 0.10f;

@@ -105,16 +105,22 @@ bool Stage::ReachedGate(float x) const
     return gateOpen_ && x >= GateX() - 40.0f;
 }
 
-float Stage::LandingY(float x, float halfWidth, float prevBottom, float newBottom) const
+float Stage::ClampZ(float z) const
+{
+    return math::Clamp(z, 0.0f, def_.depth);
+}
+
+float Stage::LandingY(float x, float halfWidth, float prevBottom, float newBottom, float z) const
 {
     float best = kFarInf;
 
-    // 地面
-    if (newBottom >= def_.groundY) best = def_.groundY;
+    // 地面（奥にいるほど画面上では高い位置になる）
+    const float ground = GroundYAt(z);
+    if (newBottom >= ground) best = ground;
 
-    // 足場（上から乗る）
+    // 足場（上からのみ乗れる。奥行き全体に伸びているものとして扱う）
     for (const Platform& platform : def_.platforms) {
-        const float top = platform.rect.top;
+        const float top = platform.rect.top - z;
         const float shrink = halfWidth * 0.5f;
         if (x + shrink < platform.rect.left || x - shrink > platform.rect.right) continue;
         if (prevBottom > top + 8.0f) continue;   // 既に足場より下にいる
@@ -135,6 +141,7 @@ void Stage::DrawBackground(const Camera& camera) const
     DrawSky(camera);
     DrawFarLayer(camera);
     DrawMidLayer(camera);
+    DrawDepthField(camera);
     DrawGround(camera);
     DrawPlatforms(camera);
 }
@@ -271,6 +278,40 @@ void Stage::DrawMidLayer(const Camera& camera) const
     }
 }
 
+void Stage::DrawDepthField(const Camera& camera) const
+{
+    if (def_.depth <= 0.0f) return;
+
+    const ThemeColors colors = ColorsFor(def_.theme);
+    const float nearY = def_.groundY - camera.ViewTop();
+    const float farY = nearY - def_.depth;
+    const float screenW = static_cast<float>(config::kScreenWidth);
+
+    // 奥（暗い）→ 手前（明るい）のグラデーションで歩行可能な床を示す
+    draw::GradientRectV(Rect(0.0f, farY, screenW, nearY),
+                        colors.ground.Scaled(0.55f), colors.ground.Scaled(1.05f), 255, 18);
+
+    // 奥行きの目安になる横線
+    const int lines = 5;
+    for (int i = 1; i < lines; ++i) {
+        const float t = static_cast<float>(i) / static_cast<float>(lines);
+        const float y = nearY - def_.depth * t;
+        draw::Line(0.0f, y, screenW, y, colors.groundEdge, 1.0f, 40);
+    }
+
+    // 最奥の縁
+    draw::Line(0.0f, farY, screenW, farY, colors.groundEdge, 2.0f, 150);
+
+    // 奥行きを感じさせる縦のガイド（手前ほど間隔が広い）
+    const float viewLeft = camera.ViewLeft();
+    const float tile = 220.0f;
+    const float offset = std::fmod(viewLeft, tile);
+    for (int i = 0; i <= static_cast<int>(screenW / tile) + 1; ++i) {
+        const float x = static_cast<float>(i) * tile - offset;
+        draw::Line(x, nearY, x + 26.0f, farY, colors.groundEdge, 1.0f, 28);
+    }
+}
+
 void Stage::DrawGround(const Camera& camera) const
 {
     const ThemeColors colors = ColorsFor(def_.theme);
@@ -309,11 +350,19 @@ void Stage::DrawPlatforms(const Camera& camera) const
     const ThemeColors colors = ColorsFor(def_.theme);
 
     for (const Platform& platform : def_.platforms) {
-        if (!camera.IsVisible(platform.rect)) continue;
+        if (!camera.IsVisible(platform.rect.Offset(0.0f, -def_.depth).Expanded(def_.depth))) continue;
         const Rect screen = camera.WorldToScreen(platform.rect);
 
-        draw::GradientRectV(screen, colors.ground.Scaled(1.35f), colors.ground.Scaled(0.7f), 255, 10);
-        draw::Line(screen.left, screen.top, screen.right, screen.top, colors.groundEdge, 3.0f, 255);
+        // 上面（奥行き方向へ伸びる面）
+        const float top = screen.top;
+        const float farTop = top - def_.depth;
+        draw::GradientRectV(Rect(screen.left, farTop, screen.right, top),
+                            colors.ground.Scaled(0.85f), colors.ground.Scaled(1.45f), 255, 10);
+        draw::Line(screen.left, farTop, screen.right, farTop, colors.groundEdge, 2.0f, 200);
+
+        // 手前の側面
+        draw::GradientRectV(screen, colors.ground.Scaled(1.15f), colors.ground.Scaled(0.55f), 255, 8);
+        draw::Line(screen.left, top, screen.right, top, colors.groundEdge, 3.0f, 255);
         draw::StrokeRect(screen, colors.ground.Scaled(0.5f), 1.0f, 200);
     }
 }

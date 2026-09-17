@@ -25,7 +25,7 @@ public:
     void Setup(const EnemyDef& def, const Vec2& position, float powerScale);
 
     void Update(float dt, const Stage& stage, CombatSystem& combat,
-                const Vec2& playerPos, bool playerAlive);
+                const Vec2& playerPos, bool playerAlive, float playerZ);
     void Draw(const Camera& camera) const;
 
     int  ApplyDirectDamage(int damage, float knockbackX, CombatSystem& combat) override;

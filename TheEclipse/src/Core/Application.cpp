@@ -6,6 +6,7 @@
 #include "Core/GameConfig.h"
 #include "Core/Input.h"
 #include "Core/ResourceManager.h"
+#include "Game/SaveData.h"
 
 namespace ecl {
 
@@ -84,6 +85,9 @@ void Application::Run()
 
 void Application::Finalize()
 {
+    // 終了時にも保存しておく
+    SaveSystem::Save(context_);
+
     ResourceManager::Instance().ReleaseAll();
     FontManager::Instance().Finalize();
     DxLib_End();

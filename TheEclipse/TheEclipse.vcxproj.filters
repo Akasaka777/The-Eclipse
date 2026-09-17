@@ -26,6 +26,7 @@
     <ClCompile Include="src\Game\Player.cpp" />
     <ClCompile Include="src\Game\PlayerData.cpp" />
     <ClCompile Include="src\Game\QuestDatabase.cpp" />
+    <ClCompile Include="src\Game\SaveData.cpp" />
     <ClCompile Include="src\Game\Stage.cpp" />
     <ClCompile Include="src\Game\Stats.cpp" />
     <ClCompile Include="src\Game\SwordSkill.cpp" />
@@ -72,6 +73,7 @@
     <ClInclude Include="src\Game\Player.h" />
     <ClInclude Include="src\Game\PlayerData.h" />
     <ClInclude Include="src\Game\QuestDatabase.h" />
+    <ClInclude Include="src\Game\SaveData.h" />
     <ClInclude Include="src\Game\Stage.h" />
     <ClInclude Include="src\Game\Stats.h" />
     <ClInclude Include="src\Game\SwordSkill.h" />

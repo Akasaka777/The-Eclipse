@@ -32,9 +32,11 @@ struct EnemySpawn
     float x = 0.0f;
     float y = -1.0f;  // 負値なら地面に配置
     int   enemyId = 0;
+    float z = -1.0f;  // 負値なら奥行きの中からランダム
 
     EnemySpawn() = default;
-    EnemySpawn(float x_, int enemyId_, float y_ = -1.0f) : x(x_), y(y_), enemyId(enemyId_) {}
+    EnemySpawn(float x_, int enemyId_, float y_ = -1.0f, float z_ = -1.0f)
+        : x(x_), y(y_), enemyId(enemyId_), z(z_) {}
 };
 
 //------------------------------------------------------------------------------
@@ -55,7 +57,8 @@ struct FloorDef
 {
     std::string name = "FLOOR";
     float       width = 4200.0f;
-    float       groundY = 880.0f;
+    float       groundY = 880.0f;   // 最も手前（z = 0）の地面
+    float       depth = 220.0f;     // 奥行きの幅
     StageTheme  theme = StageTheme::Forest;
     std::vector<Platform>   platforms;
     std::vector<EnemySpawn> spawns;
@@ -74,10 +77,15 @@ public:
     const FloorDef& Def() const { return def_; }
     float Width() const { return def_.width; }
     float GroundY() const { return def_.groundY; }
+    float Depth() const { return def_.depth; }
+    // 指定の奥行きにおける地面の Y
+    float GroundYAt(float z) const { return def_.groundY - z; }
+    // 奥行きを移動可能範囲へ収める
+    float ClampZ(float z) const;
     bool  IsBossFloor() const { return def_.bossId >= 0; }
 
     // 着地する Y 座標を返す（着地しない場合は非常に大きな値）
-    float LandingY(float x, float halfWidth, float prevBottom, float newBottom) const;
+    float LandingY(float x, float halfWidth, float prevBottom, float newBottom, float z) const;
     // 移動可能な X 範囲にクランプ
     float ClampX(float x, float halfWidth) const;
 
@@ -96,6 +104,8 @@ private:
     void DrawFarLayer(const Camera& camera) const;
     void DrawMidLayer(const Camera& camera) const;
     void DrawGround(const Camera& camera) const;
+    // 奥行きを示す床の帯
+    void DrawDepthField(const Camera& camera) const;
     void DrawPlatforms(const Camera& camera) const;
     void DrawGate(const Camera& camera) const;
 

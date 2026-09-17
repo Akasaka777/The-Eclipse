@@ -22,6 +22,8 @@ private:
     ui::Button exitButton_;
     float time_ = 0.0f;
     bool  exitRequested_ = false;
+    bool  loadAttempted_ = false;
+    bool  hasSaveData_ = false;
 };
 
 } // namespace ecl

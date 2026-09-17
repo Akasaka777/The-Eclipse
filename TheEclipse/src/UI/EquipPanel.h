@@ -5,7 +5,6 @@
 
 #include "Core/Input.h"
 #include "Game/GameContext.h"
-#include "Game/SwordSkill.h"
 #include "UI/UIWidgets.h"
 
 #include <vector>
@@ -31,14 +30,8 @@ private:
     void Layout();
     void DrawSlotColumn(const GameContext& context) const;
     void DrawItemList(const GameContext& context) const;
-    void DrawSkillList(const GameContext& context) const;
     void DrawComparison(const GameContext& context) const;
-    void DrawSkillDetail(const GameContext& context) const;
 
-    // スキルスロットを選択中か
-    bool SkillMode() const { return skillSlot_ >= 0; }
-    // 現在の武器で使える解放済みスキル
-    std::vector<const SwordSkill*> AvailableSkills(const GameContext& context) const;
 
     Rect   window_;
     Button closeButton_;
@@ -46,13 +39,9 @@ private:
     Button unequipButton_;
     Button sellButton_;
     std::vector<Button> slotButtons_;
-    std::vector<Button> skillSlotButtons_;
 
     EquipSlot selectedSlot_ = EquipSlot::Weapon;
-    // 0 以上ならスキルスロットを選択中（装備スロットの選択より優先）
-    int  skillSlot_ = -1;
     int  selectedUid_ = 0;
-    int  selectedSkillId_ = 0;
     int  scroll_ = 0;
     bool open_ = false;
     bool closeRequested_ = false;

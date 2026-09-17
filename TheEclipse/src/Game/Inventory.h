@@ -4,6 +4,7 @@
 #pragma once
 
 #include "Game/Equipment.h"
+#include "Graphics/CharacterArt.h"
 
 #include <vector>
 
@@ -25,6 +26,9 @@ class Inventory
 public:
     void AddItem(const EquipmentItem& item);
     void AddItems(const std::vector<EquipmentItem>& items);
+    // セーブデータの読み込み用
+    void Clear();
+    void SetCurrency(int col, int material);
 
     std::vector<EquipmentItem>&       Items() { return items_; }
     const std::vector<EquipmentItem>& Items() const { return items_; }
@@ -43,6 +47,8 @@ public:
     // 装備中の合計ステータス
     Stats EquippedStats() const;
     WeaponType CurrentWeaponType() const;
+    // 装備中のスキンからキャラクターの見た目を組み立てる
+    ActorArt BuildAppearance() const;
 
     // --- 強化 ---------------------------------------------------------------
     UpgradeCost CalcUpgradeCost(int uid) const;

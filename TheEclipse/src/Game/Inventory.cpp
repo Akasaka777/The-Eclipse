@@ -17,6 +17,18 @@ void Inventory::AddItems(const std::vector<EquipmentItem>& items)
     for (const EquipmentItem& item : items) AddItem(item);
 }
 
+void Inventory::Clear()
+{
+    items_.clear();
+    for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) equippedUid_[i] = 0;
+}
+
+void Inventory::SetCurrency(int col, int material)
+{
+    col_ = math::MaxI(0, col);
+    material_ = math::MaxI(0, material);
+}
+
 EquipmentItem* Inventory::FindByUid(int uid)
 {
     for (EquipmentItem& item : items_) {
@@ -99,6 +111,57 @@ WeaponType Inventory::CurrentWeaponType() const
     const EquipmentItem* weapon = Equipped(EquipSlot::Weapon);
     if (!weapon) return WeaponType::OneHandSword;
     return weapon->weaponType;
+}
+
+ActorArt Inventory::BuildAppearance() const
+{
+    ActorArt art;
+    art.style = ArtStyle::Humanoid;
+    art.weapon = CurrentWeaponType();
+
+    // 既定（素の状態）
+    art.main = ColorRGB(48, 58, 84);
+    art.accent = ColorRGB(226, 234, 248);
+    art.trim = ColorRGB(64, 206, 255);
+    art.helmetColor = ColorRGB(226, 234, 248);
+    art.shieldColor = ColorRGB(120, 130, 150);
+    art.weaponColor = ColorRGB(226, 234, 248);
+
+    const EquipmentItem* weapon = Equipped(EquipSlot::Weapon);
+    const EquipmentItem* head = Equipped(EquipSlot::Head);
+    const EquipmentItem* body = Equipped(EquipSlot::Body);
+    const EquipmentItem* shield = Equipped(EquipSlot::Shield);
+
+    art.hasWeapon = (weapon != nullptr);
+    art.hasShield = (shield != nullptr);
+
+    // 体装備が全体の色を決める
+    if (body && body->skin.shape != SkinShape::None) {
+        art.main = body->skin.primary;
+        art.accent = body->skin.secondary;
+        art.trim = body->skin.glow;
+        art.hasCape = body->skin.hasCape;
+        if (body->skin.shape == SkinShape::Eclipse) art.glowing = true;
+    }
+    // 頭装備
+    if (head && head->skin.shape != SkinShape::None) {
+        art.helmetColor = head->skin.primary;
+        art.hasHelmet = head->skin.hasHelmet;
+        if (!body) art.trim = head->skin.glow;
+    }
+    // 盾
+    if (shield && shield->skin.shape != SkinShape::None) {
+        art.shieldColor = shield->skin.primary;
+    }
+    // 武器（刀身の色と発光）
+    if (weapon && weapon->skin.shape != SkinShape::None) {
+        art.weaponColor = weapon->skin.secondary;
+        if (weapon->skin.shape == SkinShape::Eclipse) {
+            art.glowing = true;
+            art.trim = weapon->skin.glow;
+        }
+    }
+    return art;
 }
 
 UpgradeCost Inventory::CalcUpgradeCost(int uid) const

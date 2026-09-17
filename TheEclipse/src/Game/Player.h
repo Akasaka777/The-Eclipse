@@ -38,6 +38,8 @@ public:
 
     void Update(float dt, const Stage& stage, CombatSystem& combat,
                 const Input& input, bool controlEnabled);
+    // 奥行き方向へ移動中か（演出用）
+    bool IsMovingDepth() const { return depthMoving_; }
     void Draw(const Camera& camera) const;
 
     int  ApplyHit(const HitBox& hitBox, CombatSystem& combat) override;
@@ -73,7 +75,8 @@ public:
     WeaponType Weapon() const { return weapon_; }
 
 private:
-    void UpdateNormal(float dt, CombatSystem& combat, const Input& input, bool controlEnabled);
+    void UpdateNormal(float dt, CombatSystem& combat, const Input& input, bool controlEnabled,
+                      const Stage& stage);
     void UpdateAttack(float dt, CombatSystem& combat, const Input& input);
     void UpdateSkill(float dt, CombatSystem& combat);
     void UpdateDash(float dt);
@@ -112,6 +115,7 @@ private:
 
     bool  guarding_ = false;
     bool  justAttacked_ = false;
+    bool  depthMoving_ = false;
 
     // パリィ
     float parryWindow_ = 0.0f;    // 受付の残り時間

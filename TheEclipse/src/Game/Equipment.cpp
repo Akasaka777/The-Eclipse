@@ -87,4 +87,9 @@ int IssueItemUid()
     return g_nextUid++;
 }
 
+void ReserveItemUid(int nextUid)
+{
+    if (nextUid > g_nextUid) g_nextUid = nextUid;
+}
+
 } // namespace ecl

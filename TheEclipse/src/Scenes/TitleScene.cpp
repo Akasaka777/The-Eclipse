@@ -7,6 +7,7 @@
 #include "Core/Input.h"
 #include "Core/SceneManager.h"
 #include "Game/GameContext.h"
+#include "Game/SaveData.h"
 #include "Graphics/DrawUtil.h"
 
 #include <cmath>
@@ -30,9 +31,15 @@ void TitleScene::OnEnter(GameContext& context)
 {
     time_ = 0.0f;
     exitRequested_ = false;
-    // 初回のみ初期装備を配る
-    if (context.player.GetInventory().Items().empty()) {
-        context.player.SetupNewGame();
+
+    // セーブデータがあれば読み込み、無ければ初期装備を配る
+    if (!loadAttempted_) {
+        loadAttempted_ = true;
+        if (SaveSystem::Exists() && SaveSystem::Load(context)) {
+            hasSaveData_ = true;
+        } else if (context.player.GetInventory().Items().empty()) {
+            context.player.SetupNewGame();
+        }
     }
 }
 
@@ -54,7 +61,6 @@ void TitleScene::Update(float dt, GameContext& context, SceneManager& manager)
 
 void TitleScene::Draw(GameContext& context)
 {
-    (void)context;
 
     // --- 背景 ---------------------------------------------------------------
     draw::GradientRectV(Rect(0.0f, 0.0f, kScreenW, kScreenH), ColorRGB(6, 8, 16),
@@ -88,6 +94,11 @@ void TitleScene::Draw(GameContext& context)
     startButton_.Draw();
     exitButton_.Draw();
 
+    if (hasSaveData_) {
+        draw::Text(FontSize::Small, kScreenW * 0.5f, 660.0f, palette::kHp,
+                   str::Format("セーブデータを読み込みました（Lv %d）", context.player.Level()),
+                   draw::TextAlign::Center);
+    }
     draw::Text(FontSize::Tiny, kScreenW * 0.5f, kScreenH - 60.0f, palette::kTextDim,
                "ENTER / クリックで開始   横スクロール 2D アクション RPG プロトタイプ",
                draw::TextAlign::Center);

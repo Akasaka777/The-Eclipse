@@ -86,7 +86,7 @@ public:
     void Setup(const BossDef& def, const Vec2& position, float powerScale);
 
     void Update(float dt, const Stage& stage, CombatSystem& combat,
-                const Vec2& playerPos, bool playerAlive);
+                const Vec2& playerPos, bool playerAlive, float playerZ);
     void Draw(const Camera& camera) const;
 
     int  ApplyDirectDamage(int damage, float knockbackX, CombatSystem& combat) override;
@@ -104,6 +104,8 @@ private:
     void StartWindup(BossAttackKind kind);
     void ExecuteAttack(CombatSystem& combat);
     void UpdateAttackPhase(float dt, CombatSystem& combat, const Vec2& playerPos);
+    // プレイヤーの奥行きへ寄せる
+    void TrackDepth(float dt, float playerZ, const Stage& stage);
     void CheckPhaseShift(CombatSystem& combat);
     void SpawnMeleeHit(CombatSystem& combat, float reachScale, float heightScale,
                        float damageMultiplier, float knockback, bool launch);

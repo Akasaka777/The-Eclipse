@@ -280,6 +280,8 @@ void Boss::SpawnMeleeHit(CombatSystem& combat, float reachScale, float heightSca
     hitBox.critRate = stats.critRate;
     hitBox.critDamage = stats.critDamage;
     hitBox.knockback = knockback;
+    hitBox.z = z;
+    hitBox.zRange = config::kHitDepthRange * 1.2f;
     hitBox.life = 0.16f;
     hitBox.launch = launch;
     hitBox.color = art.trim;
@@ -307,6 +309,8 @@ void Boss::ExecuteAttack(CombatSystem& combat)
         hitBox.critRate = stats.critRate;
         hitBox.critDamage = stats.critDamage;
         hitBox.knockback = 480.0f;
+        hitBox.z = z;
+        hitBox.zRange = config::kHitDepthRange * 1.2f;
         hitBox.life = attackTime_;
         hitBox.multiHit = true;
         hitBox.hitInterval = 0.45f;
@@ -333,6 +337,7 @@ void Boss::ExecuteAttack(CombatSystem& combat)
             projectile.critRate = stats.critRate;
             projectile.critDamage = stats.critDamage;
             projectile.knockback = 280.0f;
+            projectile.z = z;
             projectile.life = 3.0f;
             projectile.kind = 2;
             projectile.color = art.trim;
@@ -356,6 +361,7 @@ void Boss::ExecuteAttack(CombatSystem& combat)
         hitBox.critDamage = stats.critDamage;
         hitBox.knockback = 520.0f;
         hitBox.launch = true;
+        hitBox.ignoreDepth = true;   // 咆哮は奥行き全域を巻き込む
         hitBox.life = 0.2f;
         hitBox.color = art.trim;
         combat.AddHitBox(hitBox);
@@ -397,6 +403,7 @@ void Boss::UpdateAttackPhase(float dt, CombatSystem& combat, const Vec2& playerP
                 wave.critRate = stats.critRate;
                 wave.critDamage = stats.critDamage;
                 wave.knockback = 320.0f;
+                wave.z = z;
                 wave.life = 1.6f;
                 wave.kind = 1;
                 wave.color = art.trim;
@@ -432,8 +439,17 @@ void Boss::UpdateAttackPhase(float dt, CombatSystem& combat, const Vec2& playerP
     (void)dt;
 }
 
+void Boss::TrackDepth(float dt, float playerZ, const Stage& stage)
+{
+    const float gap = playerZ - z;
+    if (math::Abs(gap) <= 6.0f) return;
+
+    const float step = def_->moveSpeed * config::kDepthMoveRate * speedBoost_ * dt;
+    MoveDepth(math::Clamp(gap, -step, step), stage);
+}
+
 void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
-                  const Vec2& playerPos, bool playerAlive)
+                  const Vec2& playerPos, bool playerAlive, float playerZ)
 {
     if (!def_) return;
 
@@ -480,6 +496,7 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
     case BossState::Idle: {
         velocity.x *= 0.86f;
         FaceTowards(playerPos.x);
+        TrackDepth(dt, playerZ, stage);
         if (!playerAlive) break;
 
         // 少し間を置いてから次の行動を決める
@@ -497,6 +514,7 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
     }
     case BossState::Move: {
         FaceTowards(playerPos.x);
+        TrackDepth(dt, playerZ, stage);
         velocity.x = static_cast<float>(facing) * def_->moveSpeed * speedBoost_;
         if (stateTimer_ >= 0.9f || distance < 220.0f) {
             state_ = BossState::Idle;
@@ -506,7 +524,10 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
     }
     case BossState::Windup: {
         velocity.x *= 0.85f;
-        if (stateTimer_ < windupTime_ * 0.5f) FaceTowards(playerPos.x);
+        if (stateTimer_ < windupTime_ * 0.5f) {
+            FaceTowards(playerPos.x);
+            TrackDepth(dt, playerZ, stage);
+        }
         if (stateTimer_ >= windupTime_) {
             state_ = BossState::Attack;
             stateTimer_ = 0.0f;

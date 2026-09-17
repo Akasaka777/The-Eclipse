@@ -29,6 +29,9 @@ struct HitBox
     Rect     area;
     Team     team = Team::Player;
     int      sourceId = -1;
+    float    z = 0.0f;               // 判定の奥行き中心
+    float    zRange = 58.0f;         // 奥行きの許容幅（大きいほど当てやすい）
+    bool     ignoreDepth = false;    // true なら奥行きを無視して全域に当たる
     float    attack = 0.0f;
     float    damageMultiplier = 1.0f;
     float    critRate = 0.0f;
@@ -56,6 +59,7 @@ struct Projectile
 {
     Vec2     pos;
     Vec2     velocity;
+    float    z = 0.0f;
     float    radius = 16.0f;
     Team     team = Team::Enemy;
     int      sourceId = -1;
@@ -153,6 +157,7 @@ public:
     // --- アクセス -----------------------------------------------------------
     std::vector<HitBox>&     HitBoxes() { return hitBoxes_; }
     std::vector<Projectile>& Projectiles() { return projectiles_; }
+    size_t HitBoxCount() const { return hitBoxes_.size(); }
 
     // --- 描画 ---------------------------------------------------------------
     void DrawBehindActors(const Camera& camera) const;

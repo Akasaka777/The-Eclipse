@@ -68,6 +68,7 @@ private:
     ui::SettingsPanel settingsPanel_;
 
     float time_ = 0.0f;
+    float saveNoticeTimer_ = 0.0f;
     bool  startQuest_ = false;
 };
 

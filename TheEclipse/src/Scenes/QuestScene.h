@@ -61,6 +61,10 @@ private:
     int  AliveEnemyCount() const;
     bool BossAlive() const;
 
+    // --- デバッグモード -------------------------------------------------------
+    void UpdateDebug(const Input& input, GameContext& context);
+    void DrawDebugOverlay(const GameContext& context) const;
+
     const QuestDef* quest_ = nullptr;
     Stage  stage_;
     Player player_;
@@ -99,6 +103,12 @@ private:
     int   maxCombo_ = 0;
     int   parryCount_ = 0;
     float comboTimer_ = 0.0f;
+
+    // デバッグ
+    bool  debugInvincible_ = false;
+    bool  debugShowHitBoxes_ = false;
+    std::string debugMessage_;
+    float debugMessageTimer_ = 0.0f;
 };
 
 } // namespace ecl

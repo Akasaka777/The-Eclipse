@@ -83,6 +83,8 @@ public:
     const SwordSkill* NodeAt(WeaponType weapon, int column, int tier) const;
     // 初期解放スキル（各武器の起点）
     std::vector<int> StarterSkillIds() const;
+    // 全スキル
+    const std::vector<SwordSkill>& AllSkills() const { return skills_; }
 
 private:
     SkillDatabase();

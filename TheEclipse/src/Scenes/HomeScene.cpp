@@ -8,6 +8,7 @@
 #include "Core/SceneManager.h"
 #include "Game/GameContext.h"
 #include "Game/QuestDatabase.h"
+#include "Game/SaveData.h"
 #include "Graphics/DrawUtil.h"
 
 #include <cmath>
@@ -62,6 +63,7 @@ void HomeScene::BuildField()
     field.name = "HOME";
     field.width = kFieldWidth;
     field.groundY = 880.0f;
+    field.depth = config::kDefaultFieldDepth;
     field.theme = StageTheme::Home;
     field.platforms = {
         Platform(620.0f, 700.0f, 300.0f, 28.0f),
@@ -77,7 +79,9 @@ void HomeScene::OnEnter(GameContext& context)
     BuildField();
 
     player_.Setup(context.player);
-    player_.PlaceAt(Vec2(360.0f, stage_.GroundY()));
+    const float startZ = stage_.Depth() * 0.5f;
+    player_.PlaceAt(Vec2(360.0f, stage_.GroundYAt(startZ)));
+    player_.z = startZ;
     player_.FullHeal();
 
     camera_.Reset();
@@ -91,6 +95,9 @@ void HomeScene::OnEnter(GameContext& context)
     CloseAllTabs();
     startQuest_ = false;
     time_ = 0.0f;
+
+    // ホームに戻ったタイミングで自動セーブ
+    saveNoticeTimer_ = SaveSystem::Save(context) ? 2.6f : 0.0f;
 }
 
 bool HomeScene::AnyPanelOpen() const
@@ -127,6 +134,7 @@ void HomeScene::OpenTab(HomeTab tab, GameContext& context)
 void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
 {
     time_ += dt;
+    saveNoticeTimer_ = math::MaxF(0.0f, saveNoticeTimer_ - dt);
     const Input& input = Input::Instance();
 
     // --- パネル操作 ----------------------------------------------------------
@@ -187,7 +195,9 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
     // ゲートに触れたらクエスト選択を開く
     if (!panelOpen && !startQuest_ && player_.pos.x > kGateX - 60.0f) {
         OpenTab(HomeTab::Quest, context);
-        player_.PlaceAt(Vec2(kGateX - 160.0f, stage_.GroundY()));
+        const float z = player_.z;
+        player_.PlaceAt(Vec2(kGateX - 160.0f, stage_.GroundYAt(z)));
+        player_.z = z;
     }
 
     const float lookAhead = static_cast<float>(player_.facing) * 120.0f;
@@ -197,6 +207,7 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
     // --- 出撃 ---------------------------------------------------------------
     if (startQuest_ && !manager.IsTransitioning()) {
         startQuest_ = false;
+        SaveSystem::Save(context);   // 出撃前にも保存しておく
         manager.RequestChange(SceneId::Quest);
     }
 }
@@ -221,6 +232,12 @@ void HomeScene::Draw(GameContext& context)
         questPanel_.Draw(context);
         upgradePanel_.Draw(context);
         settingsPanel_.Draw();
+    }
+
+    if (saveNoticeTimer_ > 0.0f) {
+        const int alpha = static_cast<int>(math::Clamp(saveNoticeTimer_ / 0.8f, 0.0f, 1.0f) * 255.0f);
+        draw::TextAlpha(FontSize::Small, kScreenW - 30.0f, kScreenH - kTabBarHeight - 40.0f,
+                        palette::kHp, "セーブしました", alpha, draw::TextAlign::Right);
     }
 
     if (context.settings.showFps) {
@@ -276,7 +293,7 @@ void HomeScene::DrawFieldGuide(const GameContext& context) const
     draw::StrokeRect(hint, palette::kBorder.Scaled(0.6f), 1.0f, 150);
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 12.0f, palette::kAccent, "操作");
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 38.0f, palette::kTextDim,
-               "移動 : A / D   ジャンプ : SPACE");
+               "移動 : A / D   奥行き : W / S   ジャンプ : SPACE");
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 62.0f, palette::kTextDim,
                "攻撃 : 左クリック   ガード : 右クリック長押し");
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 86.0f, palette::kTextDim,

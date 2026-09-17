@@ -25,6 +25,30 @@ Vec2 Actor::Center() const
     return Vec2(pos.x, pos.y - height * 0.5f);
 }
 
+float Actor::DepthScale() const
+{
+    const float ratio = math::Clamp(z / config::kDefaultFieldDepth, 0.0f, 1.0f);
+    return math::Lerp(1.0f, config::kFarScale, ratio);
+}
+
+void Actor::MoveDepth(float delta, const Stage& stage)
+{
+    if (delta == 0.0f) return;
+
+    const float newZ = math::Clamp(z + delta, 0.0f, stage.Depth());
+    const float applied = newZ - z;
+    if (applied == 0.0f) return;
+
+    z = newZ;
+    // 奥へ進むほど画面上では持ち上がる（地面からの高さは保つ）
+    pos.y -= applied;
+}
+
+bool Actor::WithinDepth(float otherZ, float range) const
+{
+    return math::Abs(z - otherZ) <= range;
+}
+
 float Actor::HpRatio() const
 {
     if (maxHp <= 0.0f) return 0.0f;
@@ -91,7 +115,7 @@ void Actor::ApplyPhysics(float dt, const Stage& stage)
 
     pos += velocity * dt;
 
-    const float landing = stage.LandingY(pos.x, halfWidth, prevBottom, pos.y);
+    const float landing = stage.LandingY(pos.x, halfWidth, prevBottom, pos.y, z);
     if (velocity.y >= 0.0f && pos.y >= landing) {
         pos.y = landing;
         velocity.y = 0.0f;
@@ -123,12 +147,14 @@ void Actor::DrawBody(const Camera& camera, int alpha) const
     const Rect bounds = Bounds();
     if (!camera.IsVisible(bounds, 200.0f)) return;
 
-    const Rect screen = camera.WorldToScreen(bounds);
+    // 奥にいるほど小さく描く（足元を基準に縮める）
+    const float scale = DepthScale();
+    const Vec2 feet = camera.WorldToScreen(Vec2(pos.x, pos.y));
+    const Rect screen = Rect::FromFoot(feet.x, feet.y, halfWidth * scale, height * scale);
 
     // 影
     if (alive || DeathPhase() < 1.0f) {
-        const Vec2 shadow = camera.WorldToScreen(Vec2(pos.x, pos.y));
-        DrawActorShadow(shadow.x, shadow.y, halfWidth * 2.2f,
+        DrawActorShadow(feet.x, feet.y, halfWidth * 2.2f * scale,
                         static_cast<int>(90.0f * (alive ? 1.0f : 1.0f - DeathPhase())));
     }
 
@@ -144,7 +170,15 @@ void Actor::DrawBody(const Camera& camera, int alpha) const
     if (bodyAlpha <= 0) return;
 
     const float phase = alive ? animator.Phase() : DeathPhase();
-    DrawActor(screen, facing, pose, phase, art, &animator, bodyAlpha, flashTimer / 0.18f);
+
+    // 奥にいるほどわずかに暗くして距離感を出す
+    ActorArt shaded = art;
+    const float depthRatio = math::Clamp(z / config::kDefaultFieldDepth, 0.0f, 1.0f);
+    const float shade = 1.0f - depthRatio * 0.18f;
+    shaded.main = shaded.main.Scaled(shade);
+    shaded.accent = shaded.accent.Scaled(shade);
+
+    DrawActor(screen, facing, pose, phase, shaded, &animator, bodyAlpha, flashTimer / 0.18f);
 }
 
 } // namespace ecl

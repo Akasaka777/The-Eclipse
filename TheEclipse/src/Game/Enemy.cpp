@@ -19,6 +19,7 @@ void Enemy::Setup(const EnemyDef& def, const Vec2& position, float powerScale)
     pos = position;
     baseY_ = position.y;
     hoverY_ = position.y;
+    z = 0.0f;
     velocity = Vec2(0.0f, 0.0f);
     halfWidth = def.halfWidth;
     height = def.height;
@@ -102,7 +103,7 @@ void Enemy::OnDeath(CombatSystem& combat)
 }
 
 void Enemy::Update(float dt, const Stage& stage, CombatSystem& combat,
-                   const Vec2& playerPos, bool playerAlive)
+                   const Vec2& playerPos, bool playerAlive, float playerZ)
 {
     if (!def_) return;
 
@@ -122,7 +123,10 @@ void Enemy::Update(float dt, const Stage& stage, CombatSystem& combat,
 
     const float distanceX = playerPos.x - pos.x;
     const float distance = math::Abs(distanceX);
+    // 近くにいる間は名前と HP を表示し続ける
+    if (playerAlive && distance < 560.0f) healthBarTimer_ = math::MaxF(healthBarTimer_, 0.8f);
     const float verticalGap = math::Abs(playerPos.y - pos.y);
+    const float depthGap = playerZ - z;
 
     switch (state_) {
     case EnemyState::Idle: {
@@ -140,7 +144,15 @@ void Enemy::Update(float dt, const Stage& stage, CombatSystem& combat,
         }
         FaceTowards(playerPos.x);
 
-        const bool inRange = distance <= def_->attackRange && verticalGap < height * 1.4f;
+        // 奥行きも合っていないと攻撃できない
+        const bool inDepth = math::Abs(depthGap) <= config::kHitDepthRange * 0.8f;
+        const bool inRange = distance <= def_->attackRange && verticalGap < height * 1.4f && inDepth;
+
+        // プレイヤーの奥行きに寄せる
+        if (math::Abs(depthGap) > 6.0f) {
+            const float step = def_->moveSpeed * config::kDepthMoveRate * dt;
+            MoveDepth(math::Clamp(depthGap, -step, step), stage);
+        }
         if (inRange && attackCooldown_ <= 0.0f) {
             state_ = EnemyState::Windup;
             stateTimer_ = 0.0f;
@@ -234,6 +246,7 @@ void Enemy::SpawnAttack(CombatSystem& combat)
         projectile.critRate = stats.critRate;
         projectile.critDamage = stats.critDamage;
         projectile.knockback = def_->knockback;
+        projectile.z = z;
         projectile.life = 2.6f;
         projectile.color = def_->trim;
         combat.AddProjectile(projectile);
@@ -254,6 +267,8 @@ void Enemy::SpawnAttack(CombatSystem& combat)
     hitBox.critRate = stats.critRate;
     hitBox.critDamage = stats.critDamage;
     hitBox.knockback = def_->knockback;
+    hitBox.z = z;
+    hitBox.zRange = config::kHitDepthRange;
     hitBox.life = 0.14f;
     hitBox.hitStop = 0.04f;
     hitBox.color = def_->trim;
@@ -297,11 +312,19 @@ void Enemy::Draw(const Camera& camera) const
 
     DrawBody(camera);
 
-    // HP バー（被弾から数秒間だけ表示）
-    if (alive && healthBarTimer_ > 0.0f && HpRatio() < 1.0f) {
-        const Vec2 screen = camera.WorldToScreen(Vec2(pos.x, pos.y - height - 14.0f));
-        const Rect bar = Rect::FromCenter(screen.x, screen.y, 84.0f, 8.0f);
+    // 名前と HP バー（被弾から数秒間だけ表示）
+    if (alive && healthBarTimer_ > 0.0f) {
+        const float scale = DepthScale();
+        const Vec2 screen = camera.WorldToScreen(Vec2(pos.x, pos.y - height * scale - 14.0f));
+        const Rect bar = Rect::FromCenter(screen.x, screen.y, 96.0f, 8.0f);
         const int alpha = static_cast<int>(math::Clamp(healthBarTimer_, 0.0f, 1.0f) * 255.0f);
+
+        // 名前は HP バーの真上に置く
+        draw::TextAlpha(FontSize::Tiny, bar.CenterX() + 1.0f, bar.top - 25.0f, palette::kBlack,
+                        def_->name, math::ClampInt(alpha * 3 / 4, 0, 255), draw::TextAlign::Center);
+        draw::TextAlpha(FontSize::Tiny, bar.CenterX(), bar.top - 26.0f, def_->trim,
+                        def_->name, alpha, draw::TextAlign::Center);
+
         draw::FillRect(bar.Expanded(2.0f), palette::kBlack, math::ClampInt(alpha * 3 / 4, 0, 255));
         draw::Bar(bar, HpRatio(), palette::kHpLoss, ColorRGB(40, 40, 48), -1.0f,
                   palette::kHpLoss, alpha);

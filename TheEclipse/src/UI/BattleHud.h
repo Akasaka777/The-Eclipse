@@ -9,6 +9,7 @@
 #include "Game/Boss.h"
 #include "Game/Player.h"
 #include "Game/PlayerData.h"
+#include "Game/SwordSkill.h"
 #include "UI/UIWidgets.h"
 
 #include <string>
@@ -41,7 +42,6 @@ public:
     void Draw(const Player& player, const PlayerData& data, const Boss* boss, const HudInfo& info) const;
 
     // クリック結果（Update 後に参照）
-    bool MenuClicked() const { return menuClicked_; }
     int  ClickedSkillIndex() const { return clickedSkill_; }
 
 private:
@@ -51,11 +51,9 @@ private:
     void DrawFloorInfo(const HudInfo& info) const;
     void DrawCombo(const HudInfo& info) const;
 
-    Button menuButton_;
-    Rect   skillRects_[4];
+    Rect   skillRects_[kSkillSlotCount];
     float  hpDelay_ = 1.0f;
     float  bossHpDelay_ = 1.0f;
-    bool   menuClicked_ = false;
     int    clickedSkill_ = -1;
     float  time_ = 0.0f;
 };

@@ -48,6 +48,31 @@ enum class EquipSlot
 const char* EquipSlotName(EquipSlot slot);
 
 //------------------------------------------------------------------------------
+// 装備スキン（見た目）
+//   素材が用意されていれば assets/skins/<spriteFolder> を優先して使用し、
+//   無ければ色と形状の指定で代替描画に反映する。
+//------------------------------------------------------------------------------
+enum class SkinShape
+{
+    None,      // 見た目を変えない
+    Light,     // 軽装（布・革）
+    Heavy,     // 重装（金属）
+    Mystic,    // 魔導・ローブ
+    Eclipse    // 蝕（漆黒＋発光）
+};
+
+struct EquipSkin
+{
+    SkinShape   shape = SkinShape::None;
+    ColorRGB    primary = ColorRGB(70, 90, 130);   // 主色（体装備など）
+    ColorRGB    secondary = ColorRGB(220, 230, 245); // 差し色
+    ColorRGB    glow = ColorRGB(64, 206, 255);     // 発光色
+    const char* spriteFolder = "";                 // assets/skins/<folder>
+    bool        hasCape = false;                   // マント
+    bool        hasHelmet = false;                 // 兜（頭部形状の変化）
+};
+
+//------------------------------------------------------------------------------
 // 装備品
 //------------------------------------------------------------------------------
 struct EquipmentItem
@@ -61,6 +86,7 @@ struct EquipmentItem
     Rarity      rarity = Rarity::N;
     int         upgradeLevel = 0;
     Stats       baseStats;        // +0 時点の能力値
+    EquipSkin   skin;             // 見た目
 
     bool  IsValid() const { return uid != 0; }
     bool  IsWeapon() const { return slot == EquipSlot::Weapon; }
@@ -74,5 +100,7 @@ struct EquipmentItem
 
 // 所持品用の一意 ID を発行
 int IssueItemUid();
+// ロード後に ID の重複を避けるため、次に発行する ID を予約する
+void ReserveItemUid(int nextUid);
 
 } // namespace ecl

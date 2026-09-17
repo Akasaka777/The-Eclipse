@@ -29,13 +29,21 @@ enum class ArtStyle
 struct ActorArt
 {
     ArtStyle style = ArtStyle::Humanoid;
-    ColorRGB main = ColorRGB(70, 90, 130);
-    ColorRGB accent = ColorRGB(220, 230, 245);
-    ColorRGB trim = ColorRGB(64, 206, 255);
+    ColorRGB main = ColorRGB(70, 90, 130);      // 体装備の色
+    ColorRGB accent = ColorRGB(220, 230, 245);  // 差し色
+    ColorRGB trim = ColorRGB(64, 206, 255);     // 発光
     WeaponType weapon = WeaponType::OneHandSword;
     bool hasWeapon = true;
     bool hasShield = false;
     float scale = 1.0f;
+
+    // --- 装備スキンによる見た目の変化 -----------------------------------------
+    ColorRGB helmetColor = ColorRGB(220, 230, 245); // 頭部の色
+    ColorRGB shieldColor = ColorRGB(120, 130, 150); // 盾の色
+    ColorRGB weaponColor = ColorRGB(226, 234, 248); // 刀身の色
+    bool hasHelmet = false;   // 兜（頭部を角張らせる）
+    bool hasCape = false;     // マント
+    bool glowing = false;     // 発光する装備（蝕系）
 };
 
 // 画面座標の矩形に収めてキャラクターを描画する

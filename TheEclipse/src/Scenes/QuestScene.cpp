@@ -11,6 +11,7 @@
 #include "Graphics/DrawUtil.h"
 #include "UI/UIWidgets.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace ecl {
@@ -71,7 +72,9 @@ void QuestScene::LoadFloor(int index, GameContext& context)
     boss_.reset();
     combat_.Clear();
 
-    player_.PlaceAt(Vec2(220.0f, stage_.GroundY()));
+    const float playerZ = stage_.Depth() * 0.5f;
+    player_.PlaceAt(Vec2(220.0f, stage_.GroundYAt(playerZ)));
+    player_.z = playerZ;
 
     camera_.Reset();
     camera_.SetWorldBounds(0.0f, stage_.Width(), 0.0f, kScreenH);
@@ -85,8 +88,10 @@ void QuestScene::LoadFloor(int index, GameContext& context)
         const BossDef* def = BossDatabase::Instance().Find(floor.bossId);
         if (def) {
             boss_.reset(new Boss());
-            boss_->Setup(*def, Vec2(stage_.Width() - 600.0f, stage_.GroundY()),
+            const float bossZ = stage_.Depth() * 0.5f;
+            boss_->Setup(*def, Vec2(stage_.Width() - 600.0f, stage_.GroundYAt(bossZ)),
                          quest_->enemyPowerScale);
+            boss_->z = bossZ;
             bannerMain_ = def->name;
             bannerSub_ = def->title;
             bannerTimer_ = 2.6f;
@@ -113,9 +118,14 @@ void QuestScene::SpawnFloorEnemies(const GameContext& context)
         const EnemyDef* def = database.Find(spawn.enemyId);
         if (!def) continue;
 
-        const float y = (spawn.y > 0.0f) ? spawn.y : stage_.GroundY();
+        // 奥行きは指定が無ければフィールド内でばらけさせる
+        const float spawnZ = (spawn.z >= 0.0f) ? stage_.ClampZ(spawn.z)
+                                               : math::RandFloat(0.0f, stage_.Depth());
+        const float baseY = (spawn.y > 0.0f) ? spawn.y : stage_.GroundY();
+
         std::unique_ptr<Enemy> enemy(new Enemy());
-        enemy->Setup(*def, Vec2(spawn.x, y), quest_->enemyPowerScale);
+        enemy->Setup(*def, Vec2(spawn.x, baseY - spawnZ), quest_->enemyPowerScale);
+        enemy->z = spawnZ;
         enemies_.push_back(std::move(enemy));
     }
 }
@@ -152,7 +162,7 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
     }
 
     hud_.Update(dt, player_, boss_.get(), input);
-    if (hud_.MenuClicked() || (input.Pressed(GameAction::Menu) && phase_ != Phase::Finished)) {
+    if (input.Pressed(GameAction::Menu) && phase_ != Phase::Finished) {
         menu_.Open();
         return;
     }
@@ -169,6 +179,9 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
         camera_.Update(dt);
         return;
     }
+
+    UpdateDebug(input, context);
+    debugMessageTimer_ = math::MaxF(0.0f, debugMessageTimer_ - dt);
 
     phaseTimer_ += dt;
     bannerTimer_ = math::MaxF(0.0f, bannerTimer_ - dt);
@@ -272,6 +285,113 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
     camera_.Update(dt);
 }
 
+void QuestScene::UpdateDebug(const Input& input, GameContext& context)
+{
+    if (!context.settings.debugMode) {
+        debugInvincible_ = false;
+        debugShowHitBoxes_ = false;
+        return;
+    }
+
+    auto notify = [this](const std::string& text) {
+        debugMessage_ = text;
+        debugMessageTimer_ = 2.0f;
+    };
+
+    // F1 : 無敵の切り替え
+    if (input.KeyPressed(KEY_INPUT_F1)) {
+        debugInvincible_ = !debugInvincible_;
+        notify(debugInvincible_ ? "無敵 ON" : "無敵 OFF");
+    }
+    // F2 : フロアの敵を殲滅（ボス含む）
+    if (input.KeyPressed(KEY_INPUT_F2)) {
+        int killed = 0;
+        for (std::unique_ptr<Enemy>& enemy : enemies_) {
+            if (!enemy->alive) continue;
+            enemy->ApplyDirectDamage(static_cast<int>(enemy->hp) + 1, 0.0f, combat_);
+            ++killed;
+        }
+        if (boss_ && boss_->alive) {
+            boss_->ApplyDirectDamage(static_cast<int>(boss_->hp) + 1, 0.0f, combat_);
+            ++killed;
+        }
+        notify(str::Format("敵を殲滅しました（%d 体）", killed));
+    }
+    // F3 : HP / MP 全回復
+    if (input.KeyPressed(KEY_INPUT_F3)) {
+        player_.FullHeal();
+        notify("HP / MP を全回復しました");
+    }
+    // F4 : 当たり判定の表示
+    if (input.KeyPressed(KEY_INPUT_F4)) {
+        debugShowHitBoxes_ = !debugShowHitBoxes_;
+        notify(debugShowHitBoxes_ ? "判定表示 ON" : "判定表示 OFF");
+    }
+    // F5 : col と素材、スキルポイントを追加
+    if (input.KeyPressed(KEY_INPUT_F5)) {
+        context.player.GetInventory().AddCol(10000);
+        context.player.GetInventory().AddMaterial(50);
+        context.player.AddSkillPoints(5);
+        notify("col +10000 / 強化結晶 +50 / SP +5");
+    }
+
+    if (debugInvincible_ && player_.alive) {
+        player_.invincibleTimer = math::MaxF(player_.invincibleTimer, 0.5f);
+    }
+}
+
+void QuestScene::DrawDebugOverlay(const GameContext& context) const
+{
+    if (!context.settings.debugMode) return;
+
+    if (debugShowHitBoxes_) {
+        combat_.DrawDebugHitBoxes(camera_);
+
+        // アクターの当たり判定も表示
+        auto drawBounds = [this](const Actor& actor, const ColorRGB& color) {
+            const Rect screen = camera_.WorldToScreen(actor.Bounds());
+            draw::StrokeRect(screen, color, 1.0f, 150);
+            const Vec2 feet = camera_.WorldToScreen(Vec2(actor.pos.x, actor.pos.y));
+            draw::Line(feet.x - 14.0f, feet.y, feet.x + 14.0f, feet.y, color, 2.0f, 200);
+        };
+        drawBounds(player_, ColorRGB(120, 255, 180));
+        for (const std::unique_ptr<Enemy>& enemy : enemies_) drawBounds(*enemy, ColorRGB(255, 140, 140));
+        if (boss_) drawBounds(*boss_, ColorRGB(255, 100, 100));
+    }
+
+    // --- 情報パネル ---------------------------------------------------------
+    const Rect panel = Rect::FromXYWH(28.0f, 254.0f, 420.0f, 196.0f);
+    draw::FillRect(panel, palette::kBlack, 170);
+    draw::StrokeRect(panel, palette::kAccentWarm, 1.0f, 200);
+    draw::Text(FontSize::Small, panel.left + 12.0f, panel.top + 8.0f, palette::kAccentWarm,
+               "DEBUG MODE");
+
+    float y = panel.top + 38.0f;
+    const char* stateNames[] = { "Normal", "Attack", "Skill", "Dash", "Hurt", "Dead" };
+    draw::Text(FontSize::Tiny, panel.left + 12.0f, y, palette::kText,
+               str::Format("pos %.0f, %.0f   z %.0f   state %s", player_.pos.x, player_.pos.y,
+                           player_.z, stateNames[static_cast<int>(player_.State())]));
+    y += 24.0f;
+    draw::Text(FontSize::Tiny, panel.left + 12.0f, y, palette::kText,
+               str::Format("敵 %d 体   判定 %d 個   ヒットストップ %.2f",
+                           AliveEnemyCount(), static_cast<int>(combat_.HitBoxCount()), hitStop_));
+    y += 24.0f;
+    draw::Text(FontSize::Tiny, panel.left + 12.0f, y, palette::kText,
+               str::Format("無敵 %s   判定表示 %s", debugInvincible_ ? "ON" : "OFF",
+                           debugShowHitBoxes_ ? "ON" : "OFF"));
+    y += 24.0f;
+    draw::Text(FontSize::Tiny, panel.left + 12.0f, y, palette::kTextDim,
+               "F1 無敵 / F2 殲滅 / F3 全回復");
+    y += 20.0f;
+    draw::Text(FontSize::Tiny, panel.left + 12.0f, y, palette::kTextDim,
+               "F4 判定表示 / F5 col・SP 追加");
+
+    if (debugMessageTimer_ > 0.0f) {
+        draw::Text(FontSize::Small, panel.left + 12.0f, panel.bottom + 8.0f, palette::kAccentWarm,
+                   debugMessage_);
+    }
+}
+
 void QuestScene::UpdateActors(float dt, GameContext& context)
 {
     const Input& input = Input::Instance();
@@ -281,10 +401,10 @@ void QuestScene::UpdateActors(float dt, GameContext& context)
     player_.Update(dt, stage_, combat_, input, controlEnabled && !menu_.IsOpen());
 
     for (std::unique_ptr<Enemy>& enemy : enemies_) {
-        enemy->Update(dt, stage_, combat_, player_.pos, player_.alive);
+        enemy->Update(dt, stage_, combat_, player_.pos, player_.alive, player_.z);
     }
     if (boss_) {
-        boss_->Update(dt, stage_, combat_, player_.pos, player_.alive);
+        boss_->Update(dt, stage_, combat_, player_.pos, player_.alive, player_.z);
     }
     (void)context;
 }
@@ -324,6 +444,8 @@ void QuestScene::ResolveHitBoxes(GameContext& context)
             auto hitActor = [&](Actor& target) {
                 if (!target.alive || hitBox.AlreadyHit(target.id)) return;
                 if (!hitBox.area.Intersects(target.Bounds())) return;
+                // 奥行きが離れていると当たらない
+                if (!hitBox.ignoreDepth && !target.WithinDepth(hitBox.z, hitBox.zRange)) return;
 
                 const int damage = target.ApplyHit(hitBox, combat_);
                 hitBox.MarkHit(target.id);
@@ -344,6 +466,7 @@ void QuestScene::ResolveHitBoxes(GameContext& context)
             // 敵の攻撃 → プレイヤー
             if (!player_.alive || hitBox.AlreadyHit(player_.id)) continue;
             if (!hitBox.area.Intersects(player_.Bounds())) continue;
+            if (!hitBox.ignoreDepth && !player_.WithinDepth(hitBox.z, hitBox.zRange)) continue;
 
             const int damage = player_.ApplyHit(hitBox, combat_);
             hitBox.MarkHit(player_.id);
@@ -371,7 +494,7 @@ void QuestScene::ResolveProjectiles(GameContext& context)
         if (!projectile.active) continue;
 
         // 地形との衝突
-        if (projectile.pos.y >= stage_.GroundY() || projectile.pos.x < 0.0f
+        if (projectile.pos.y >= stage_.GroundYAt(projectile.z) || projectile.pos.x < 0.0f
             || projectile.pos.x > stage_.Width()) {
             projectile.active = false;
             combat_.AddImpact(projectile.pos, projectile.color, 8, 260.0f);
@@ -383,6 +506,8 @@ void QuestScene::ResolveProjectiles(GameContext& context)
         hitBox.area = Rect::FromCenter(projectile.pos.x, projectile.pos.y,
                                        projectile.radius * 2.0f, projectile.radius * 2.0f);
         hitBox.team = projectile.team;
+        hitBox.z = projectile.z;
+        hitBox.zRange = config::kHitDepthRange;
         hitBox.sourceId = projectile.sourceId;
         hitBox.attack = projectile.attack;
         hitBox.damageMultiplier = projectile.damageMultiplier;
@@ -394,6 +519,8 @@ void QuestScene::ResolveProjectiles(GameContext& context)
         if (projectile.team == Team::Enemy) {
             if (!player_.alive) continue;
             if (!hitBox.area.Intersects(player_.Bounds())) continue;
+
+            if (!player_.WithinDepth(projectile.z, config::kHitDepthRange)) continue;
 
             const bool parryActive = player_.IsParryActive();
             const int damage = player_.ApplyHit(hitBox, combat_);
@@ -429,6 +556,7 @@ void QuestScene::ResolveProjectiles(GameContext& context)
             for (std::unique_ptr<Enemy>& enemy : enemies_) {
                 if (!enemy->alive) continue;
                 if (!hitBox.area.Intersects(enemy->Bounds())) continue;
+                if (!enemy->WithinDepth(projectile.z, config::kHitDepthRange)) continue;
 
                 const int damage = enemy->ApplyHit(hitBox, combat_);
                 projectile.active = false;
@@ -577,6 +705,8 @@ void QuestScene::Draw(GameContext& context)
 
     hud_.Draw(player_, context.player, boss_.get(), info);
 
+    DrawDebugOverlay(context);
+
     if (bannerTimer_ > 0.0f) DrawBanner();
     if (phase_ == Phase::Defeat) DrawDefeatOverlay();
     if (phase_ == Phase::Victory) DrawVictoryOverlay();
@@ -598,12 +728,30 @@ void QuestScene::DrawWorld(const GameContext& context)
     stage_.DrawBackground(camera_);
     combat_.DrawBehindActors(camera_);
 
+    // 奥にいるものから順に描く（手前が上に重なる）
+    struct Drawable
+    {
+        float z;
+        const Enemy* enemy;
+        const Boss* boss;
+        const Player* player;
+    };
+    std::vector<Drawable> drawables;
+    drawables.reserve(enemies_.size() + 2);
     for (const std::unique_ptr<Enemy>& enemy : enemies_) {
-        enemy->Draw(camera_);
+        drawables.push_back({ enemy->z, enemy.get(), nullptr, nullptr });
     }
-    if (boss_) boss_->Draw(camera_);
+    if (boss_) drawables.push_back({ boss_->z, nullptr, boss_.get(), nullptr });
+    drawables.push_back({ player_.z, nullptr, nullptr, &player_ });
 
-    player_.Draw(camera_);
+    std::sort(drawables.begin(), drawables.end(),
+              [](const Drawable& a, const Drawable& b) { return a.z > b.z; });
+
+    for (const Drawable& item : drawables) {
+        if (item.enemy) item.enemy->Draw(camera_);
+        else if (item.boss) item.boss->Draw(camera_);
+        else if (item.player) item.player->Draw(camera_);
+    }
 
     stage_.DrawForeground(camera_);
     combat_.DrawFrontOfActors(camera_, context.settings.showDamageNumbers);

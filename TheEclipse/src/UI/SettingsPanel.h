@@ -7,6 +7,8 @@
 #include "Game/GameContext.h"
 #include "UI/UIWidgets.h"
 
+#include <string>
+
 namespace ecl {
 namespace ui {
 
@@ -36,6 +38,13 @@ private:
     Toggle shakeToggle_;
     Toggle fpsToggle_;
     Toggle fullScreenToggle_;
+    Toggle debugToggle_;
+    Button deleteSaveButton_;
+
+    // セーブ削除の確認中か
+    bool   confirmingDelete_ = false;
+    std::string message_;
+    float  messageTimer_ = 0.0f;
 
     bool open_ = false;
     bool closeRequested_ = false;

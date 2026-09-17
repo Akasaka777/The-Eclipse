@@ -211,4 +211,24 @@ void PlayerData::MarkQuestCleared(int questId)
     if (!IsQuestCleared(questId)) clearedQuests_.push_back(questId);
 }
 
+void PlayerData::RestoreProgress(int level, int exp, int skillPoints,
+                                 const std::vector<int>& unlockedSkills,
+                                 const std::vector<int>& clearedQuests,
+                                 const int skillLoadout[4])
+{
+    level_ = math::ClampInt(level, 1, 99);
+    exp_ = math::MaxI(0, exp);
+    skillPoints_ = math::MaxI(0, skillPoints);
+    unlockedSkills_ = unlockedSkills;
+    clearedQuests_ = clearedQuests;
+
+    for (int i = 0; i < kSkillSlotCount; ++i) skillLoadout_[i] = skillLoadout[i];
+
+    // 起点スキルは必ず解放済みにしておく（データが壊れていても詰まないように）
+    for (int id : SkillDatabase::Instance().StarterSkillIds()) {
+        if (!IsSkillUnlocked(id)) unlockedSkills_.push_back(id);
+    }
+    RefreshSkillLoadout();
+}
+
 } // namespace ecl

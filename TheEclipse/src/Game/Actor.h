@@ -21,8 +21,10 @@ public:
     // --- 基本情報 -----------------------------------------------------------
     int   id = 0;
     Team  team = Team::Enemy;
-    Vec2  pos;              // 足元中心
+    Vec2  pos;              // 足元中心（y は奥行き補正済みの表示座標）
     Vec2  velocity;
+    float z = 0.0f;         // 奥行き（0 = 手前 / 大きいほど奥）
+    float depthVelocity = 0.0f;
     float halfWidth = 32.0f;
     float height = 150.0f;
     int   facing = 1;
@@ -46,6 +48,12 @@ public:
 
     Rect Bounds() const;
     Vec2 Center() const;
+    // 奥行きによる描画倍率
+    float DepthScale() const;
+    // 奥行きを変えつつ、地面からの高さを保つ
+    void MoveDepth(float delta, const Stage& stage);
+    // 攻撃判定が奥行き的に届くか
+    bool WithinDepth(float otherZ, float range) const;
     float HpRatio() const;
     bool IsInvincible() const { return invincibleTimer > 0.0f; }
 
