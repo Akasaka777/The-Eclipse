@@ -43,6 +43,7 @@ void EquipPanel::Open()
 {
     open_ = true;
     closeRequested_ = false;
+    equipmentChanged_ = false;
     selectedUid_ = 0;
     scroll_ = 0;
     message_.clear();
@@ -53,6 +54,7 @@ void EquipPanel::Update(float dt, const Input& input, GameContext& context)
 {
     if (!open_) return;
     closeRequested_ = false;
+    equipmentChanged_ = false;
     messageTimer_ = math::MaxF(0.0f, messageTimer_ - dt);
 
     Inventory& inventory = context.player.GetInventory();
@@ -96,11 +98,13 @@ void EquipPanel::Update(float dt, const Input& input, GameContext& context)
     const EquipmentItem* selected = inventory.FindByUid(selectedUid_);
     equipButton_.SetEnabled(selected != nullptr && !inventory.IsEquipped(selectedUid_));
     unequipButton_.SetEnabled(inventory.EquippedUid(selectedSlot_) != 0);
-    sellButton_.SetEnabled(selected != nullptr && !inventory.IsEquipped(selectedUid_));
+    sellButton_.SetEnabled(sellEnabled_ && selected != nullptr
+                           && !inventory.IsEquipped(selectedUid_));
 
     if (equipButton_.Update(input, dt) && equipButton_.Enabled()) {
         if (inventory.Equip(selectedUid_)) {
             context.player.RefreshSkillLoadout();
+            equipmentChanged_ = true;
             message_ = "装備を変更しました";
             messageTimer_ = 2.0f;
         }
@@ -108,10 +112,11 @@ void EquipPanel::Update(float dt, const Input& input, GameContext& context)
     if (unequipButton_.Update(input, dt) && unequipButton_.Enabled()) {
         inventory.Unequip(selectedSlot_);
         context.player.RefreshSkillLoadout();
+        equipmentChanged_ = true;
         message_ = "装備を外しました";
         messageTimer_ = 2.0f;
     }
-    if (sellButton_.Update(input, dt) && sellButton_.Enabled()) {
+    if (sellEnabled_ && sellButton_.Update(input, dt) && sellButton_.Enabled()) {
         const int value = inventory.SellValue(selectedUid_);
         if (inventory.Sell(selectedUid_)) {
             message_ = str::Format("売却しました（+%s col）", str::Comma(value).c_str());
@@ -137,7 +142,7 @@ void EquipPanel::Draw(const GameContext& context) const
 
     equipButton_.Draw();
     unequipButton_.Draw();
-    sellButton_.Draw();
+    if (sellEnabled_) sellButton_.Draw();
     closeButton_.Draw();
 
     if (messageTimer_ > 0.0f) {

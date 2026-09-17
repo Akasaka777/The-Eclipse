@@ -59,24 +59,12 @@ Player::Player()
 
 void Player::Setup(const PlayerData& data)
 {
-    stats = data.TotalStats();
-    maxHp = math::MaxF(1.0f, stats.maxHp);
-    maxMp_ = math::MaxF(1.0f, stats.maxMp);
+    ApplyEquipment(data);
+
     hp = maxHp;
     mp_ = maxMp_;
 
-    weapon_ = data.CurrentWeaponType();
-
-    // 装備スキンから見た目を組み立てる
-    art = data.GetInventory().BuildAppearance();
-    art.weapon = weapon_;
-
-    attackSpeedFactor_ = math::MaxF(0.4f, WeaponSpeedScale(weapon_) * (1.0f + stats.attackSpeed));
-
-    for (int i = 0; i < 4; ++i) {
-        skills_[i] = data.SkillAt(i);
-        cooldowns_[i] = 0.0f;
-    }
+    for (int i = 0; i < kSkillSlotCount; ++i) cooldowns_[i] = 0.0f;
 
     state_ = PlayerState::Normal;
     currentSkill_ = nullptr;
@@ -87,6 +75,41 @@ void Player::Setup(const PlayerData& data)
     parrySignal_ = false;
     alive = true;
     deathTimer = 0.0f;
+}
+
+void Player::RefreshEquipment(const PlayerData& data)
+{
+    ApplyEquipment(data);
+
+    // 装備が変わって最大値が下がっても、現在値は維持したまま収める
+    hp = math::Clamp(hp, 0.0f, maxHp);
+    mp_ = math::Clamp(mp_, 0.0f, maxMp_);
+
+    // 外れたスキルのクールダウンは持ち越さない
+    for (int i = 0; i < kSkillSlotCount; ++i) {
+        if (skills_[i] == nullptr) cooldowns_[i] = 0.0f;
+    }
+}
+
+void Player::ApplyEquipment(const PlayerData& data)
+{
+    stats = data.TotalStats();
+    maxHp = math::MaxF(1.0f, stats.maxHp);
+    maxMp_ = math::MaxF(1.0f, stats.maxMp);
+
+    weapon_ = data.CurrentWeaponType();
+
+    // 装備スキンから見た目を組み立てる
+    art = data.GetInventory().BuildAppearance();
+    art.weapon = weapon_;
+
+    attackSpeedFactor_ = math::MaxF(0.4f, WeaponSpeedScale(weapon_) * (1.0f + stats.attackSpeed));
+
+    for (int i = 0; i < kSkillSlotCount; ++i) {
+        skills_[i] = data.SkillAt(i);
+    }
+
+    animator.SetSet(ActorAssets::Instance().PlayerSet());
 }
 
 void Player::PlaceAt(const Vec2& position)

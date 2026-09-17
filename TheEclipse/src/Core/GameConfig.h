@@ -76,6 +76,8 @@ struct GameSettings
     bool screenShake = true;
     bool showFps = false;
     bool fullScreen = false;
+    // フルスクリーンで OS のカーソルが見えない場合の代替表示
+    bool softwareCursor = false;
     // 開発者向けの表示と操作を有効にする
     bool debugMode = false;
 };

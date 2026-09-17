@@ -46,6 +46,12 @@ private:
     void ResolveHitBoxes(GameContext& context);
     void ResolveProjectiles(GameContext& context);
     void CleanupDead(GameContext& context);
+    // 装備を消耗させ、壊れたらその場で反映する
+    void WearEquipment(GameContext& context, EquipSlot slot, float amount);
+    void WearArmor(GameContext& context, float amount);
+    // 壊れた装備を取り除き、プレイヤーへ反映する
+    void HandleBrokenEquipment(GameContext& context);
+    void DrawBreakNotice() const;
     void UpdateFloorTransition(float dt, GameContext& context);
     // パリィ成功時の共通処理（攻撃者をよろけさせる）
     void HandleParrySuccess();
@@ -103,10 +109,11 @@ private:
     int   maxCombo_ = 0;
     int   parryCount_ = 0;
 
-    // 装備の摩耗（クエスト終了時にまとめて反映する）
-    float weaponWear_ = 0.0f;
-    float armorWear_ = 0.0f;
-    float shieldWear_ = 0.0f;   // ガードで受け止めた分の追加消耗
+    // クエスト中に壊れた装備（リザルトで報告する）
+    std::vector<std::string> brokenItems_;
+    // 破損通知の表示
+    std::string breakNotice_;
+    float breakNoticeTimer_ = 0.0f;
     float comboTimer_ = 0.0f;
 
     // デバッグ

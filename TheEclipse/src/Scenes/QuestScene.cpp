@@ -55,9 +55,9 @@ void QuestScene::OnEnter(GameContext& context)
     combo_ = 0;
     maxCombo_ = 0;
     parryCount_ = 0;
-    weaponWear_ = 0.0f;
-    armorWear_ = 0.0f;
-    shieldWear_ = 0.0f;
+    brokenItems_.clear();
+    breakNotice_.clear();
+    breakNoticeTimer_ = 0.0f;
     comboTimer_ = 0.0f;
     questTime_ = 0.0f;
     hitStop_ = 0.0f;
@@ -162,6 +162,11 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
     if (menu_.IsOpen()) {
         menu_.Update(dt, input, context);
         camera_.SetShakeEnabled(context.settings.screenShake);
+
+        // メニューで装備を変えたら、その場で反映する
+        if (menu_.EquipmentChanged()) {
+            player_.RefreshEquipment(context.player);
+        }
         if (menu_.RetireConfirmed()) {
             FinishQuest(false, true, context);
             manager.RequestChange(SceneId::Result);
@@ -194,6 +199,7 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
 
     phaseTimer_ += dt;
     bannerTimer_ = math::MaxF(0.0f, bannerTimer_ - dt);
+    breakNoticeTimer_ = math::MaxF(0.0f, breakNoticeTimer_ - dt);
 
     if (phase_ == Phase::Battle || phase_ == Phase::FloorClear || phase_ == Phase::FloorIntro) {
         questTime_ += dt;
@@ -464,7 +470,7 @@ void QuestScene::ResolveHitBoxes(GameContext& context)
                 ++combo_;
                 comboTimer_ = kComboHold;
                 maxCombo_ = math::MaxI(maxCombo_, combo_);
-                weaponWear_ += kWeaponWearPerHit;
+                WearEquipment(context, EquipSlot::Weapon, kWeaponWearPerHit);
 
                 hitStop_ = math::MaxF(hitStop_, hitBox.hitStop);
                 camera_.Shake(hitBox.hitStop * 90.0f, 0.18f);
@@ -488,9 +494,9 @@ void QuestScene::ResolveHitBoxes(GameContext& context)
                 damageTaken_ += damage;
                 combo_ = 0;
                 comboTimer_ = 0.0f;
-                armorWear_ += kArmorWearPerHit;
+                WearArmor(context, kArmorWearPerHit);
                 // ガードで受け止めた場合は盾が余分に消耗する
-                if (player_.IsGuarding()) shieldWear_ += kShieldWearPerGuard;
+                if (player_.IsGuarding()) WearEquipment(context, EquipSlot::Shield, kShieldWearPerGuard);
                 hitStop_ = math::MaxF(hitStop_, 0.04f);
                 camera_.Shake(14.0f, 0.22f);
             }
@@ -563,7 +569,7 @@ void QuestScene::ResolveProjectiles(GameContext& context)
             if (damage > 0) {
                 damageTaken_ += damage;
                 combo_ = 0;
-                armorWear_ += kArmorWearPerHit;
+                WearArmor(context, kArmorWearPerHit);
                 camera_.Shake(10.0f, 0.18f);
             }
         } else {
@@ -584,6 +590,46 @@ void QuestScene::ResolveProjectiles(GameContext& context)
             }
         }
     }
+}
+
+void QuestScene::WearEquipment(GameContext& context, EquipSlot slot, float amount)
+{
+    Inventory& inventory = context.player.GetInventory();
+    inventory.ApplyWear(slot, amount);
+    HandleBrokenEquipment(context);
+}
+
+void QuestScene::WearArmor(GameContext& context, float amount)
+{
+    Inventory& inventory = context.player.GetInventory();
+    inventory.ApplyArmorWear(amount);
+    HandleBrokenEquipment(context);
+}
+
+void QuestScene::HandleBrokenEquipment(GameContext& context)
+{
+    Inventory& inventory = context.player.GetInventory();
+    const std::vector<std::string> broken = inventory.DestroyBrokenItems();
+    if (broken.empty()) return;
+
+    for (const std::string& name : broken) {
+        brokenItems_.push_back(name);
+        combat_.AddPopup(Vec2(player_.pos.x, player_.pos.y - player_.height - 40.0f),
+                         str::Format("%s が壊れた！", name.c_str()), palette::kDanger, true);
+    }
+
+    breakNotice_ = (broken.size() == 1)
+        ? str::Format("%s が壊れた！", broken[0].c_str())
+        : str::Format("%d 点の装備が壊れた！", static_cast<int>(broken.size()));
+    breakNoticeTimer_ = 3.0f;
+
+    // 装備が外れた状態をプレイヤーへ即座に反映する
+    context.player.RefreshSkillLoadout();
+    player_.RefreshEquipment(context.player);
+
+    camera_.Shake(20.0f, 0.4f);
+    combat_.AddImpact(Vec2(player_.pos.x, player_.pos.y - player_.height * 0.5f),
+                      palette::kDanger, 24, 480.0f);
 }
 
 void QuestScene::CleanupDead(GameContext& context)
@@ -682,18 +728,11 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
     result.colGained = col;
     result.materialGained = enemiesDefeated_ / 2 + (cleared ? 6 : 1);
 
-    // --- 装備の消耗を反映 -----------------------------------------------------
-    Inventory& inventory = context.player.GetInventory();
-    inventory.ApplyWear(EquipSlot::Weapon, weaponWear_);
-    inventory.ApplyArmorWear(armorWear_);
-    inventory.ApplyWear(EquipSlot::Shield, shieldWear_);
-    result.brokenItems = inventory.DestroyBrokenItems();
-    if (!result.brokenItems.empty()) {
-        // 壊れた装備を外した分、スキル構成を組み直す
-        context.player.RefreshSkillLoadout();
-    }
+    // クエスト中に壊れた装備（消耗と破棄は戦闘中に処理済み）
+    result.brokenItems = brokenItems_;
 
     // --- プレイヤーへ反映 -----------------------------------------------------
+    Inventory& inventory = context.player.GetInventory();
     inventory.AddItems(result.drops);
     inventory.AddCol(col);
     inventory.AddMaterial(result.materialGained);
@@ -731,6 +770,7 @@ void QuestScene::Draw(GameContext& context)
 
     DrawDebugOverlay(context);
 
+    if (breakNoticeTimer_ > 0.0f) DrawBreakNotice();
     if (bannerTimer_ > 0.0f) DrawBanner();
     if (phase_ == Phase::Defeat) DrawDefeatOverlay();
     if (phase_ == Phase::Victory) DrawVictoryOverlay();
@@ -792,6 +832,22 @@ void QuestScene::DrawWorld(const GameContext& context)
         draw::Triangle(Vec2(x + dir * 18.0f, y), Vec2(x - dir * 12.0f, y - 16.0f),
                        Vec2(x - dir * 12.0f, y + 16.0f), palette::kDanger, true, 180);
     }
+}
+
+void QuestScene::DrawBreakNotice() const
+{
+    const float t = math::Clamp(breakNoticeTimer_ / 0.6f, 0.0f, 1.0f);
+    const int alpha = static_cast<int>(t * 255.0f);
+    const float y = 460.0f;
+
+    const Rect band(kScreenW * 0.5f - 420.0f, y - 12.0f, kScreenW * 0.5f + 420.0f, y + 78.0f);
+    draw::FillRect(band, palette::kDanger.Scaled(0.35f), static_cast<int>(t * 200.0f));
+    draw::StrokeRect(band, palette::kDanger, 2.0f, alpha);
+
+    draw::TextAlpha(FontSize::Large, kScreenW * 0.5f, y, palette::kText, breakNotice_, alpha,
+                    draw::TextAlign::Center);
+    draw::TextAlpha(FontSize::Small, kScreenW * 0.5f, y + 48.0f, palette::kTextDim,
+                    "ESC → 装備 から替えの装備に変更できます", alpha, draw::TextAlign::Center);
 }
 
 void QuestScene::DrawBanner() const

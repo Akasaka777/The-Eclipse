@@ -19,6 +19,8 @@ public:
 private:
     float CalcDeltaTime();
     void  ApplyDisplaySettings();
+    // 設定に応じてソフトウェアカーソルを描画する
+    void  DrawSoftwareCursor();
 
     GameContext  context_;
     SceneManager sceneManager_;

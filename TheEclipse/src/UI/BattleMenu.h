@@ -5,6 +5,7 @@
 
 #include "Core/Input.h"
 #include "Game/GameContext.h"
+#include "UI/EquipPanel.h"
 #include "UI/SettingsPanel.h"
 #include "UI/UIWidgets.h"
 
@@ -25,17 +26,22 @@ public:
 
     // リタイアが確定したら true
     bool RetireConfirmed() const { return retireConfirmed_; }
+    // 装備が変更されたら true（このフレームのみ）
+    bool EquipmentChanged() const { return equipmentChanged_; }
 
 private:
     Rect   window_;
     Button resumeButton_;
+    Button equipButton_;
     Button settingsButton_;
     Button retireButton_;
     Button retireYesButton_;
     Button retireNoButton_;
     SettingsPanel settings_;
+    EquipPanel    equipment_;
 
     bool open_ = false;
+    bool equipmentChanged_ = false;
     bool confirmingRetire_ = false;
     bool retireConfirmed_ = false;
 };

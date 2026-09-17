@@ -25,6 +25,10 @@ public:
     void Draw(const GameContext& context) const;
 
     bool CloseRequested() const { return closeRequested_; }
+    // このフレームで装備が変化したか（戦闘中の反映に使う）
+    bool EquipmentChanged() const { return equipmentChanged_; }
+    // 売却ボタンを隠す（戦闘中は使わせない）
+    void SetSellEnabled(bool enabled) { sellEnabled_ = enabled; }
 
 private:
     void Layout();
@@ -45,6 +49,8 @@ private:
     int  scroll_ = 0;
     bool open_ = false;
     bool closeRequested_ = false;
+    bool equipmentChanged_ = false;
+    bool sellEnabled_ = true;
     std::string message_;
     float messageTimer_ = 0.0f;
 };

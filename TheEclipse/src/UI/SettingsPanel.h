@@ -29,6 +29,12 @@ public:
 
 private:
     void Layout();
+    void DrawKeyGuide() const;
+    void DrawSectionHeader(float x, float y, float width, const char* title) const;
+
+    // 左カラムの範囲
+    float columnLeft_ = 0.0f;
+    float columnRight_ = 0.0f;
 
     Rect   window_;
     Button closeButton_;
@@ -39,6 +45,7 @@ private:
     Toggle fpsToggle_;
     Toggle fullScreenToggle_;
     Toggle debugToggle_;
+    Toggle softwareCursorToggle_;
     Button deleteSaveButton_;
 
     // セーブ削除の確認中か

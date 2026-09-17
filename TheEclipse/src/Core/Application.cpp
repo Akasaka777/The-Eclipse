@@ -6,6 +6,7 @@
 #include "Core/GameConfig.h"
 #include "Core/Input.h"
 #include "Core/ResourceManager.h"
+#include "Graphics/DrawUtil.h"
 #include "Game/SaveData.h"
 
 namespace ecl {
@@ -32,6 +33,8 @@ bool Application::Initialize()
 
     SetDrawScreen(DX_SCREEN_BACK);
     SetBackgroundColor(8, 10, 18);
+    // マウスカーソルを表示する（既定では非表示のため、特にフルスクリーンで消える）
+    SetMouseDispFlag(TRUE);
 
     FontManager::Instance().Initialize();
     Input::Instance().Initialize();
@@ -61,6 +64,8 @@ void Application::ApplyDisplaySettings()
     fullScreenApplied_ = context_.settings.fullScreen;
     ChangeWindowMode(fullScreenApplied_ ? FALSE : TRUE);
     SetDrawScreen(DX_SCREEN_BACK);
+    // 画面モードを切り替えるとカーソル設定が戻ることがあるため再指定する
+    SetMouseDispFlag(TRUE);
 }
 
 void Application::Run()
@@ -75,12 +80,39 @@ void Application::Run()
 
         ClearDrawScreen();
         sceneManager_.Draw(context_);
+        DrawSoftwareCursor();
         ScreenFlip();
 
         ApplyDisplaySettings();
 
         if (context_.quitRequested) break;
     }
+}
+
+void Application::DrawSoftwareCursor()
+{
+    if (!context_.settings.softwareCursor) {
+        // OS のカーソルに任せる
+        SetMouseDispFlag(TRUE);
+        return;
+    }
+
+    // 自前で描く場合は OS のカーソルを隠して二重表示を防ぐ
+    SetMouseDispFlag(FALSE);
+
+    const Input& input = Input::Instance();
+    const float x = static_cast<float>(input.MouseX());
+    const float y = static_cast<float>(input.MouseY());
+
+    // 矢印型のカーソル（縁取りつきで背景に埋もれないようにする）
+    const Vec2 tip(x, y);
+    const Vec2 tail(x + 17.0f, y + 23.0f);
+    const Vec2 side(x + 3.0f, y + 26.0f);
+
+    draw::Triangle(Vec2(tip.x - 2.0f, tip.y - 2.0f), Vec2(tail.x + 2.0f, tail.y + 2.0f),
+                   Vec2(side.x - 2.0f, side.y + 2.0f), palette::kBlack, true, 220);
+    draw::Triangle(tip, tail, side, palette::kWhite, true, 255);
+    draw::Line(tip.x, tip.y, tail.x, tail.y, palette::kAccent, 1.0f, 200);
 }
 
 void Application::Finalize()

@@ -77,7 +77,7 @@ bool Slider::Update(const Input& input)
     const float mouseX = static_cast<float>(input.MouseX());
     const float mouseY = static_cast<float>(input.MouseY());
 
-    const Rect track = Rect(rect_.left + 220.0f, rect_.CenterY() - 8.0f, rect_.right - 90.0f,
+    const Rect track = Rect(rect_.left + labelWidth_, rect_.CenterY() - 8.0f, rect_.right - 76.0f,
                             rect_.CenterY() + 8.0f);
 
     if (input.MouseClicked(MouseButton::Left) && track.Expanded(12.0f).Contains(mouseX, mouseY)) {
@@ -98,11 +98,11 @@ bool Slider::Update(const Input& input)
 
 void Slider::Draw() const
 {
-    draw::Text(FontSize::Normal, rect_.left,
-               rect_.CenterY() - static_cast<float>(draw::TextHeight(FontSize::Normal)) * 0.5f,
+    draw::Text(fontSize_, rect_.left,
+               rect_.CenterY() - static_cast<float>(draw::TextHeight(fontSize_)) * 0.5f,
                palette::kText, label_);
 
-    const Rect track = Rect(rect_.left + 220.0f, rect_.CenterY() - 8.0f, rect_.right - 90.0f,
+    const Rect track = Rect(rect_.left + labelWidth_, rect_.CenterY() - 8.0f, rect_.right - 76.0f,
                             rect_.CenterY() + 8.0f);
     draw::FillRect(track, palette::kPanelDark, 255);
     draw::StrokeRect(track, palette::kBorder, 1.0f, 200);
@@ -116,8 +116,8 @@ void Slider::Draw() const
     draw::Circle(knobX, track.CenterY(), 13.0f, palette::kText, true, 1.0f, 255);
     draw::Circle(knobX, track.CenterY(), 13.0f, palette::kAccent, false, 2.0f, 255);
 
-    draw::Text(FontSize::Normal, rect_.right,
-               rect_.CenterY() - static_cast<float>(draw::TextHeight(FontSize::Normal)) * 0.5f,
+    draw::Text(fontSize_, rect_.right,
+               rect_.CenterY() - static_cast<float>(draw::TextHeight(fontSize_)) * 0.5f,
                palette::kTextDim, str::Format("%d", value_), draw::TextAlign::Right);
 }
 
@@ -131,8 +131,8 @@ Toggle::Toggle(const Rect& rect, const std::string& label, bool value)
 
 bool Toggle::Update(const Input& input)
 {
-    const Rect box(rect_.right - 96.0f, rect_.CenterY() - 18.0f, rect_.right - 16.0f,
-                   rect_.CenterY() + 18.0f);
+    const Rect box(rect_.right - 84.0f, rect_.CenterY() - 16.0f, rect_.right - 12.0f,
+                   rect_.CenterY() + 16.0f);
     hovered_ = box.Expanded(8.0f).Contains(static_cast<float>(input.MouseX()),
                                            static_cast<float>(input.MouseY()));
     if (hovered_ && input.MouseClicked(MouseButton::Left)) {
@@ -144,19 +144,20 @@ bool Toggle::Update(const Input& input)
 
 void Toggle::Draw() const
 {
-    draw::Text(FontSize::Normal, rect_.left,
-               rect_.CenterY() - static_cast<float>(draw::TextHeight(FontSize::Normal)) * 0.5f,
+    draw::Text(fontSize_, rect_.left,
+               rect_.CenterY() - static_cast<float>(draw::TextHeight(fontSize_)) * 0.5f,
                palette::kText, label_);
 
-    const Rect box(rect_.right - 96.0f, rect_.CenterY() - 18.0f, rect_.right - 16.0f,
-                   rect_.CenterY() + 18.0f);
+    const Rect box(rect_.right - 84.0f, rect_.CenterY() - 16.0f, rect_.right - 12.0f,
+                   rect_.CenterY() + 16.0f);
     const ColorRGB fill = value_ ? palette::kAccent.Scaled(0.55f) : palette::kPanelDark;
     draw::FillRect(box, fill, 255);
     draw::StrokeRect(box, hovered_ ? palette::kAccent : palette::kBorder, 2.0f, 255);
 
-    const float knobX = value_ ? box.right - 20.0f : box.left + 20.0f;
-    draw::Circle(knobX, box.CenterY(), 14.0f, value_ ? palette::kAccent : palette::kTextDim, true, 1.0f, 255);
-    draw::Text(FontSize::Tiny, box.CenterX(), box.top - 20.0f, palette::kTextDim,
+    const float knobX = value_ ? box.right - 18.0f : box.left + 18.0f;
+    draw::Circle(knobX, box.CenterY(), 12.0f, value_ ? palette::kAccent : palette::kTextDim, true, 1.0f, 255);
+    draw::Text(FontSize::Tiny, value_ ? box.left + 16.0f : box.right - 16.0f,
+               box.CenterY() - 8.0f, value_ ? palette::kAccent : palette::kTextDim,
                value_ ? "ON" : "OFF", draw::TextAlign::Center);
 }
 

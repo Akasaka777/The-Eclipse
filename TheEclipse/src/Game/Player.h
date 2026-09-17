@@ -31,6 +31,8 @@ public:
 
     // 装備・レベルを反映して初期化
     void Setup(const PlayerData& data);
+    // 戦闘中の装備変更・装備破損を反映する（HP / MP と位置は維持）
+    void RefreshEquipment(const PlayerData& data);
     // フロア開始位置へ配置（HP/MP は維持）
     void PlaceAt(const Vec2& position);
     // HP/MP を全快
@@ -75,6 +77,8 @@ public:
     WeaponType Weapon() const { return weapon_; }
 
 private:
+    // 装備由来の値を反映する（Setup / RefreshEquipment の共通処理）
+    void ApplyEquipment(const PlayerData& data);
     void UpdateNormal(float dt, CombatSystem& combat, const Input& input, bool controlEnabled,
                       const Stage& stage);
     void UpdateAttack(float dt, CombatSystem& combat, const Input& input);

@@ -61,6 +61,9 @@ public:
     void SetRect(const Rect& rect) { rect_ = rect; }
     void SetValue(int value);
     int  Value() const { return value_; }
+    void SetFontSize(FontSize size) { fontSize_ = size; }
+    // ラベル欄の幅（つまみの開始位置）
+    void SetLabelWidth(float width) { labelWidth_ = width; }
 
     // 値が変化したフレームで true
     bool Update(const Input& input);
@@ -69,6 +72,8 @@ public:
 private:
     Rect        rect_;
     std::string label_;
+    FontSize    fontSize_ = FontSize::Normal;
+    float       labelWidth_ = 220.0f;
     int         value_ = 50;
     bool        dragging_ = false;
 };
@@ -85,6 +90,7 @@ public:
     void SetRect(const Rect& rect) { rect_ = rect; }
     void SetValue(bool value) { value_ = value; }
     bool Value() const { return value_; }
+    void SetFontSize(FontSize size) { fontSize_ = size; }
 
     bool Update(const Input& input);
     void Draw() const;
@@ -92,6 +98,7 @@ public:
 private:
     Rect        rect_;
     std::string label_;
+    FontSize    fontSize_ = FontSize::Normal;
     bool        value_ = false;
     bool        hovered_ = false;
 };
