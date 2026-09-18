@@ -108,7 +108,8 @@ void SkillPanel::Open(const GameContext& context)
     open_ = true;
     closeRequested_ = false;
     viewWeapon_ = context.player.CurrentWeaponType();
-    uniqueTab_ = false;
+    // 今使える系統のタブを開いておく（二刀流中はユニークのタブ）
+    uniqueTab_ = context.player.UsesUniqueSkillSet();
     selectedSkillId_ = 0;
     targetSlot_ = 0;
     message_.clear();
@@ -140,20 +141,21 @@ bool SkillPanel::CanEquipSelected(const GameContext& context, std::string& outRe
         outReason = "まだ解放していません";
         return false;
     }
-    if (skill->weapon != player.CurrentWeaponType()) {
-        outReason = str::Format("%s を装備すると使えます", WeaponTypeName(skill->weapon));
+    if (!player.MatchesCurrentSkillSet(*skill)) {
+        if (skill->IsUnique()) {
+            // ユニークスキルは独立した系統。発動条件を満たす装備が要る
+            outReason = (skill->requiredUnique != player.UniqueSkill())
+                            ? "ユニークスキルの習得が必要です"
+                            : "両手に片手剣を装備すると使えます";
+        } else if (player.UsesUniqueSkillSet()) {
+            outReason = str::Format("「%s」の系統を使用中です（片手持ちに戻すと使えます）",
+                                    UniqueSkillName(player.UniqueSkill()));
+        } else {
+            outReason = str::Format("%s を装備すると使えます", WeaponTypeName(skill->weapon));
+        }
         return false;
     }
-    if (skill->IsUnique() && skill->requiredUnique != player.UniqueSkill()) {
-        outReason = "ユニークスキルの習得が必要です";
-        return false;
-    }
-    // 通常スキルと専用スキルは混在できない
-    if (!player.CanEquipSkill(skill->id)) {
-        outReason = skill->IsUnique() ? "通常のソードスキルを外してください"
-                                      : "ユニークスキルのスキルを外してください";
-        return false;
-    }
+    if (!player.CanEquipSkill(skill->id)) return false;
     return true;
 }
 
@@ -336,18 +338,18 @@ void SkillPanel::DrawWeaponTabs(const GameContext& context) const
             draw::StrokeRect(rect.Expanded(3.0f), palette::kExp, 2.0f,
                              static_cast<int>(200.0f * pulse));
             DrawTabBadge(rect, "解放可能", palette::kExp);
-        } else if (uniqueType == UniqueSkillType::DualWield
-                   && player.GetInventory().IsDualWielding()) {
+        } else if (player.UsesUniqueSkillSet() && uniqueType == player.UniqueSkill()) {
             // 両手に片手剣を持っている＝二刀流が働いている状態
             DrawTabBadge(rect, "装備中", palette::kAccent);
         }
     }
 
+    // ユニークスキルの系統を使っている間は、武器種のスキルは使えないので印を出さない
+    const bool uniqueSet = player.UsesUniqueSkillSet();
     for (int i = 0; i < static_cast<int>(weaponButtons_.size()); ++i) {
         weaponButtons_[static_cast<size_t>(i)].Draw();
 
-        // 現在装備中の武器種に印を付ける
-        if (static_cast<WeaponType>(i) == player.CurrentWeaponType()) {
+        if (!uniqueSet && static_cast<WeaponType>(i) == player.CurrentWeaponType()) {
             DrawTabBadge(weaponButtons_[static_cast<size_t>(i)].GetRect(), "装備中",
                          palette::kAccent);
         }
@@ -615,10 +617,12 @@ void SkillPanel::DrawSlots(const GameContext& context) const
     const int limit = player.SkillSlotLimit();
     draw::Text(FontSize::Small, slotRects_[0].left, slotRects_[0].top - 32.0f, palette::kAccent,
                str::Format("装備スキル（最大 %d つ / クリックで装備先を選択）", limit));
-    if (player.HasUniqueSkillEquipped()) {
+    if (player.UsesUniqueSkillSet()) {
         draw::Text(FontSize::Tiny, slotRects_[kSkillSlotCount - 1].right,
                    slotRects_[0].top - 28.0f, palette::kExp,
-                   "ユニークスキルのスキル装備中のため 1 枠減少", draw::TextAlign::Right);
+                   str::Format("「%s」の系統を使用中のため 1 枠減少",
+                               UniqueSkillName(player.UniqueSkill())),
+                   draw::TextAlign::Right);
     }
 
     for (int i = 0; i < kSkillSlotCount; ++i) {

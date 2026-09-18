@@ -83,53 +83,37 @@ Stats PlayerData::TotalStats() const
 void PlayerData::RefreshSkillLoadout()
 {
     const SkillDatabase& database = SkillDatabase::Instance();
-    const WeaponType weapon = CurrentWeaponType();
+    const bool uniqueSet = UsesUniqueSkillSet();
+    const int  limit = SkillSlotLimit();
 
-    // --- 1. 使えなくなったスキルを外す ------------------------------------------
+    // --- 1. 今の系統で使えないスキルを外す --------------------------------------
     for (int i = 0; i < kSkillSlotCount; ++i) {
-        const SwordSkill* skill = database.Find(skillLoadout_[i]);
-        if (!skill || !IsSkillUnlocked(skill->id) || skill->weapon != weapon) {
-            skillLoadout_[i] = 0;
-            continue;
-        }
-        // 専用スキルは対応するユニークスキルを習得している場合のみ
-        if (skill->IsUnique() && skill->requiredUnique != uniqueSkill_) {
-            skillLoadout_[i] = 0;
-        }
+        if (!CanEquipSkill(skillLoadout_[i])) skillLoadout_[i] = 0;
     }
 
-    // --- 2. 通常スキルと専用スキルを混在させない --------------------------------
-    //   先に入っている方の種類に合わせ、違う種類のスキルは外す。
-    bool uniqueLoadout = false;
-    bool decided = false;
-    for (int i = 0; i < kSkillSlotCount; ++i) {
-        const SwordSkill* skill = database.Find(skillLoadout_[i]);
-        if (!skill) continue;
-        if (!decided) {
-            uniqueLoadout = skill->IsUnique();
-            decided = true;
-            continue;
-        }
-        if (skill->IsUnique() != uniqueLoadout) skillLoadout_[i] = 0;
-    }
-
-    // --- 3. 専用スキル構成なら 3 枠に収める ------------------------------------
-    if (uniqueLoadout) {
+    // --- 2. 枠数に収める（余った分は前へ詰める）----------------------------------
+    {
         int packed[kSkillSlotCount] = { 0, 0, 0, 0 };
         int write = 0;
         for (int i = 0; i < kSkillSlotCount; ++i) {
-            if (skillLoadout_[i] != 0 && write < kUniqueSkillSlotCount) {
-                packed[write++] = skillLoadout_[i];
-            }
+            if (skillLoadout_[i] != 0 && write < limit) packed[write++] = skillLoadout_[i];
         }
-        for (int i = 0; i < kSkillSlotCount; ++i) skillLoadout_[i] = packed[i];
-        return;
+        bool changed = false;
+        for (int i = 0; i < kSkillSlotCount; ++i) {
+            if (packed[i] != skillLoadout_[i]) changed = true;
+        }
+        // 並び替えが要る時だけ書き戻す（プレイヤーが空けた枠を勝手に詰めない）
+        if (changed) {
+            for (int i = 0; i < kSkillSlotCount; ++i) skillLoadout_[i] = packed[i];
+        }
     }
 
-    // --- 4. 空きスロットを解放済みの通常スキルで埋める ----------------------------
-    for (int i = 0; i < kSkillSlotCount; ++i) {
+    // --- 3. 空きスロットを解放済みスキルで埋める ---------------------------------
+    const std::vector<const SwordSkill*> pool =
+        uniqueSet ? database.ForUnique(uniqueSkill_) : database.ForWeapon(CurrentWeaponType());
+    for (int i = 0; i < limit; ++i) {
         if (skillLoadout_[i] != 0) continue;
-        for (const SwordSkill* candidate : database.ForWeapon(weapon)) {
+        for (const SwordSkill* candidate : pool) {
             if (!IsSkillUnlocked(candidate->id)) continue;
             if (IsSkillEquipped(candidate->id)) continue;
             skillLoadout_[i] = candidate->id;
@@ -186,9 +170,8 @@ bool PlayerData::UnlockSkill(int skillId)
     skillPoints_ -= skill->unlockCost;
     unlockedSkills_.push_back(skillId);
 
-    // 同じ武器種で空きスロットがあれば自動で装備する
-    // （専用スキルは通常スキルと混在できないため自動装備しない）
-    if (!skill->IsUnique() && skill->weapon == CurrentWeaponType()) {
+    // 今の系統のスキルなら、空きスロットへ自動で装備する
+    if (MatchesCurrentSkillSet(*skill)) {
         for (int i = 0; i < SkillSlotLimit(); ++i) {
             if (skillLoadout_[i] == 0) {
                 skillLoadout_[i] = skillId;
@@ -204,18 +187,34 @@ bool PlayerData::UnlockSkill(int skillId)
 //------------------------------------------------------------------------------
 int PlayerData::SkillSlotLimit() const
 {
-    // ユニークスキル専用のスキルを装備している間だけ枠が 1 つ減る。
-    // 通常スキルだけの構成に戻せば 4 枠に復活する。
-    return HasUniqueSkillEquipped() ? kUniqueSkillSlotCount : kSkillSlotCount;
+    // ユニークスキルの系統を使っている間だけ枠が 1 つ減る。
+    // 通常スキルの系統に戻せば 4 枠に復活する。
+    return UsesUniqueSkillSet() ? kUniqueSkillSlotCount : kSkillSlotCount;
 }
 
-bool PlayerData::HasUniqueSkillEquipped() const
+//------------------------------------------------------------------------------
+// 今どの系統のスキルを使うか
+//   ユニークスキルは武器種（片手剣・片手棍…）と並ぶ独立した系統として扱う。
+//   ユニークスキルを追加したら、その発動条件をここに足す。
+//------------------------------------------------------------------------------
+bool PlayerData::UsesUniqueSkillSet() const
 {
-    for (int i = 0; i < kSkillSlotCount; ++i) {
-        const SwordSkill* skill = SkillDatabase::Instance().Find(skillLoadout_[i]);
-        if (skill && skill->IsUnique()) return true;
+    switch (uniqueSkill_) {
+    // 二刀流 : 両手に片手剣を装備している間だけ。
+    //          片手持ちに戻すと通常の片手剣スキルへ戻る。
+    case UniqueSkillType::DualWield: return inventory_.IsDualWielding();
+    default: return false;
     }
-    return false;
+}
+
+bool PlayerData::MatchesCurrentSkillSet(const SwordSkill& skill) const
+{
+    if (UsesUniqueSkillSet()) {
+        // ユニークスキルの系統中は専用スキルしか使えない
+        return skill.IsUnique() && skill.requiredUnique == uniqueSkill_;
+    }
+    // 通常の系統中はユニークスキル専用のスキルを使えない
+    return !skill.IsUnique() && skill.weapon == CurrentWeaponType();
 }
 
 bool PlayerData::CanEquipSkill(int skillId) const
@@ -223,16 +222,7 @@ bool PlayerData::CanEquipSkill(int skillId) const
     const SwordSkill* skill = SkillDatabase::Instance().Find(skillId);
     if (!skill) return false;
     if (!IsSkillUnlocked(skillId)) return false;
-    if (skill->weapon != CurrentWeaponType()) return false;
-    if (skill->IsUnique() && skill->requiredUnique != uniqueSkill_) return false;
-
-    // 通常スキルとユニークスキル専用のスキルは同時に装備できない
-    for (int i = 0; i < kSkillSlotCount; ++i) {
-        const SwordSkill* other = SkillDatabase::Instance().Find(skillLoadout_[i]);
-        if (!other || other->id == skillId) continue;
-        if (other->IsUnique() != skill->IsUnique()) return false;
-    }
-    return true;
+    return MatchesCurrentSkillSet(*skill);
 }
 
 bool PlayerData::IsUniqueSkillAvailable(UniqueSkillType type) const
@@ -312,14 +302,10 @@ bool PlayerData::SetSkillAt(int slotIndex, int skillId)
         return true;
     }
 
-    const SwordSkill* skill = SkillDatabase::Instance().Find(skillId);
-    if (!skill) return false;
-    // 未解放・武器種違い・専用スキルの混在はここで弾く
+    // 未解放・系統違い（武器種／ユニーク）はここで弾く
     if (!CanEquipSkill(skillId)) return false;
-
-    // 専用スキルを入れると枠が 3 つに減るため、4 番目の枠には入れられない
-    const int limit = skill->IsUnique() ? kUniqueSkillSlotCount : kSkillSlotCount;
-    if (slotIndex >= limit) return false;
+    // ユニークスキルの系統中は 3 枠までなので、4 番目の枠には入れられない
+    if (slotIndex >= SkillSlotLimit()) return false;
 
     // 既に他スロットにある場合は入れ替える
     const int existing = SkillSlotOf(skillId);
@@ -369,6 +355,12 @@ void PlayerData::RestoreProgress(int level, int exp, int skillPoints,
     for (int id : SkillDatabase::Instance().StarterSkillIds()) {
         if (!IsSkillUnlocked(id)) unlockedSkills_.push_back(id);
     }
+    RefreshSkillLoadout();
+}
+
+void PlayerData::RestoreSkillLoadout(const int skillLoadout[4])
+{
+    for (int i = 0; i < kSkillSlotCount; ++i) skillLoadout_[i] = skillLoadout[i];
     RefreshSkillLoadout();
 }
 

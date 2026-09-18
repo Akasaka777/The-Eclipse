@@ -7,6 +7,7 @@
 #include "Core/Input.h"
 #include "Core/SceneManager.h"
 #include "Game/GameContext.h"
+#include "Game/ItemDatabase.h"
 #include "Game/QuestDatabase.h"
 #include "Game/SaveData.h"
 #include "Game/UniqueSkill.h"
@@ -47,6 +48,8 @@ enum class DebugAction
 {
     AddCol,       // col を増やす
     AddMaterial,  // 強化素材を増やす
+    AddSkillPoint,// スキルポイントを増やす
+    AllWeapons,   // 全武器種の武器を入手する
     UnlockSkills, // スキルを全解放
     UnlockUnique, // ユニークスキルを解放
 };
@@ -58,10 +61,12 @@ struct DebugButtonDef
 };
 
 const DebugButtonDef kDebugButtons[] = {
-    { DebugAction::AddCol,       "col +10,000" },
-    { DebugAction::AddMaterial,  "素材 +50" },
-    { DebugAction::UnlockSkills, "スキル全習得" },
-    { DebugAction::UnlockUnique, "ユニーク解放" },
+    { DebugAction::AddCol,        "col +10,000" },
+    { DebugAction::AddMaterial,   "素材 +50" },
+    { DebugAction::AddSkillPoint, "SP +10" },
+    { DebugAction::AllWeapons,    "全武器取得" },
+    { DebugAction::UnlockSkills,  "スキル全習得" },
+    { DebugAction::UnlockUnique,  "ユニーク解放" },
 };
 
 constexpr int   kDebugButtonCount = static_cast<int>(sizeof(kDebugButtons) / sizeof(kDebugButtons[0]));
@@ -70,6 +75,24 @@ constexpr float kDebugButtonHeight = 44.0f;
 constexpr float kDebugButtonGap = 8.0f;
 constexpr int   kDebugColAmount = 10000;
 constexpr int   kDebugMaterialAmount = 50;
+constexpr int   kDebugSkillPointAmount = 10;
+// 全武器取得で配るレアリティ
+constexpr Rarity kDebugWeaponRarity = Rarity::SR;
+
+// 全武器種の武器を所持品に追加する（片手剣は二刀流を試せるよう 2 本ずつ）
+int GrantAllWeapons(Inventory& inventory)
+{
+    int added = 0;
+    for (const ItemTemplate& tmpl : ItemDatabase::Instance().Templates()) {
+        if (!IsWeaponSlot(tmpl.slot)) continue;
+        const int copies = (tmpl.weaponType == WeaponType::OneHandSword) ? 2 : 1;
+        for (int i = 0; i < copies; ++i) {
+            inventory.AddItem(ItemDatabase::Instance().Create(tmpl.id, kDebugWeaponRarity));
+            ++added;
+        }
+    }
+    return added;
+}
 
 } // namespace
 
@@ -130,6 +153,16 @@ void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& co
             inventory.AddMaterial(kDebugMaterialAmount);
             debugMessage_ = str::Format("強化素材を %d 追加しました", kDebugMaterialAmount);
             break;
+        case DebugAction::AddSkillPoint:
+            context.player.AddSkillPoints(kDebugSkillPointAmount);
+            debugMessage_ = str::Format("スキルポイントを %d 追加しました",
+                                        kDebugSkillPointAmount);
+            break;
+        case DebugAction::AllWeapons: {
+            const int added = GrantAllWeapons(inventory);
+            debugMessage_ = str::Format("全武器種の武器を %d 個入手しました", added);
+            break;
+        }
         case DebugAction::UnlockSkills:
             context.player.DebugUnlockAllSkills();
             debugMessage_ = "スキルツリーを全て解放しました";

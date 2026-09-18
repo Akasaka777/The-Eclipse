@@ -49,10 +49,14 @@ public:
     bool IsSkillEquipped(int skillId) const;
     // 装備中のスロット番号（未装備なら -1）
     int  SkillSlotOf(int skillId) const;
-    // ユニークスキル専用のスキルを装備しているか
-    bool HasUniqueSkillEquipped() const;
-    // そのスキルを装備できるか（通常スキルと専用スキルは混在できない）
+    // 今の装備でユニークスキル専用のスキルを使う状態か
+    //   二刀流なら「両手に片手剣を持っている間」だけ true になり、
+    //   その間は通常の片手剣スキルは使えない（独立した系統として扱う）。
+    bool UsesUniqueSkillSet() const;
+    // そのスキルを装備できるか（今の系統に合うスキルだけ装備できる）
     bool CanEquipSkill(int skillId) const;
+    // そのスキルが今の系統のものか（未解放でも判定する）
+    bool MatchesCurrentSkillSet(const SwordSkill& skill) const;
     const int* SkillLoadout() const { return skillLoadout_; }
 
     // --- スキルツリー ---------------------------------------------------------
@@ -80,8 +84,8 @@ public:
     void DebugUnlockAllSkills();
 
     // 装備できるスキル数
-    //   ユニークスキル専用のスキルを「装備している間だけ」3 つに減る。
-    //   通常スキルだけの構成に戻せば 4 つに復活する。
+    //   ユニークスキルの系統を使っている間だけ 3 つに減る。
+    //   通常スキルの系統に戻せば 4 つに復活する。
     int SkillSlotLimit() const;
 
     // --- クエスト進行 --------------------------------------------------------
@@ -96,6 +100,8 @@ public:
                          UniqueSkillType uniqueSkill,
                          const std::vector<int>& availableUniqueSkills);
     const std::vector<int>& AvailableUniqueSkills() const { return availableUniqueSkills_; }
+    // 装備を戻した後にスキル構成だけを復元し直す（系統は装備で決まるため）
+    void RestoreSkillLoadout(const int skillLoadout[4]);
 
 private:
     std::string name_ = "プレイヤー";

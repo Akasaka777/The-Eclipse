@@ -309,6 +309,10 @@ bool SaveSystem::Load(GameContext& context)
         if (equippedUid[i] == 0) continue;
         inventory.EquipTo(equippedUid[i], static_cast<EquipSlot>(i));
     }
+    // 装備を戻してからスキル構成を整える
+    //   （使えるスキルの系統は装備で決まるため、装備より先に整えると外れてしまう）
+    loaded.RestoreSkillLoadout(skillSlots);
+
     // 同じ uid が再発行されないようにする
     int maxUid = 0;
     for (const EquipmentItem& item : inventory.Items()) {

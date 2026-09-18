@@ -219,7 +219,7 @@ void SettingsPanel::Draw() const
         draw::Text(FontSize::Tiny, columnLeft_ + 12.0f, window_.top + 644.0f, palette::kAccentWarm,
                    "戦闘中 : F1 無敵 / F2 殲滅 / F3 全回復 / F4 判定表示");
         draw::Text(FontSize::Tiny, columnLeft_ + 12.0f, window_.top + 666.0f, palette::kAccentWarm,
-                   "ホーム : 画面左下のボタンで col 追加・スキル全習得");
+                   "ホーム : 画面左下のボタンで col・素材・SP・武器・スキルを追加");
     }
     deleteSaveButton_.Draw();
     logoutButton_.Draw();
