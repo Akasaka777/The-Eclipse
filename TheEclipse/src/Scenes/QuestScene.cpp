@@ -8,6 +8,7 @@
 #include "Core/SceneManager.h"
 #include "Game/EnemyDatabase.h"
 #include "Game/GameContext.h"
+#include "Game/UniqueSkill.h"
 #include "Graphics/DrawUtil.h"
 #include "UI/UIWidgets.h"
 
@@ -342,6 +343,13 @@ void QuestScene::UpdateDebug(const Input& input, GameContext& context)
         debugShowHitBoxes_ = !debugShowHitBoxes_;
         notify(debugShowHitBoxes_ ? "判定表示 ON" : "判定表示 OFF");
     }
+    // F6 : ユニークスキルを全て解放可能にして習得する
+    if (input.KeyPressed(KEY_INPUT_F6)) {
+        context.player.DebugUnlockAllUniqueSkills();
+        player_.RefreshEquipment(context.player);
+        notify(str::Format("ユニークスキルを解放（%s）",
+                           UniqueSkillName(context.player.UniqueSkill())));
+    }
     // F5 : col と素材、スキルポイントを追加
     if (input.KeyPressed(KEY_INPUT_F5)) {
         context.player.GetInventory().AddCol(10000);
@@ -399,7 +407,7 @@ void QuestScene::DrawDebugOverlay(const GameContext& context) const
                "F1 無敵 / F2 殲滅 / F3 全回復");
     y += 20.0f;
     draw::Text(FontSize::Tiny, panel.left + 12.0f, y, palette::kTextDim,
-               "F4 判定表示 / F5 col・SP 追加");
+               "F4 判定表示 / F5 col・SP / F6 ユニーク解放");
 
     if (debugMessageTimer_ > 0.0f) {
         draw::Text(FontSize::Small, panel.left + 12.0f, panel.bottom + 8.0f, palette::kAccentWarm,
@@ -470,7 +478,7 @@ void QuestScene::ResolveHitBoxes(GameContext& context)
                 ++combo_;
                 comboTimer_ = kComboHold;
                 maxCombo_ = math::MaxI(maxCombo_, combo_);
-                WearEquipment(context, EquipSlot::Weapon, kWeaponWearPerHit);
+                WearEquipment(context, EquipSlot::WeaponRight, kWeaponWearPerHit);
 
                 hitStop_ = math::MaxF(hitStop_, hitBox.hitStop);
                 camera_.Shake(hitBox.hitStop * 90.0f, 0.18f);
@@ -746,6 +754,16 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
     result.skillPointsGained = context.player.SkillPoints() - spBefore;
 
     if (cleared && quest_) context.player.MarkQuestCleared(quest_->id);
+
+    // --- ユニークスキルの解放条件判定 -----------------------------------------
+    //   条件の値は UniqueSkill.h にまとめてあります。
+    if (cleared && quest_ && quest_->id == kDualWieldQuestId
+        && questTime_ <= kDualWieldClearTimeLimit
+        && !context.player.IsUniqueSkillAvailable(UniqueSkillType::DualWield)) {
+        context.player.MakeUniqueSkillAvailable(UniqueSkillType::DualWield);
+        result.unlockedUniqueSkill = true;
+        result.unlockedUniqueSkillName = UniqueSkillName(UniqueSkillType::DualWield);
+    }
 }
 
 //==============================================================================

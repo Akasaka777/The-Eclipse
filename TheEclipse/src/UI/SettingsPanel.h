@@ -47,9 +47,11 @@ private:
     Toggle debugToggle_;
     Toggle softwareCursorToggle_;
     Button deleteSaveButton_;
+    Button logoutButton_;
 
     // セーブ削除の確認中か
     bool   confirmingDelete_ = false;
+    bool   confirmingLogout_ = false;
     std::string message_;
     float  messageTimer_ = 0.0f;
 

@@ -40,13 +40,27 @@ public:
     std::vector<const EquipmentItem*> ItemsForSlot(EquipSlot slot) const;
 
     // --- 装備 ---------------------------------------------------------------
+    // アイテム本来のスロットへ装備する（武器は右手）
     bool Equip(int uid);
+    // スロットを指定して装備する（武器を左手に持たせる場合など）
+    bool EquipTo(int uid, EquipSlot slot);
     void Unequip(EquipSlot slot);
+
+    // --- 二刀流 -------------------------------------------------------------
+    // ユニークスキル「二刀流」を習得しているか（PlayerData から設定する）
+    void SetDualWieldEnabled(bool enabled);
+    bool DualWieldEnabled() const { return dualWieldEnabled_; }
+    // 実際に両手へ武器を持っているか
+    bool IsDualWielding() const;
+    // 指定スロットにこのアイテムを装備できるか
+    bool CanEquipTo(int uid, EquipSlot slot) const;
     int  EquippedUid(EquipSlot slot) const;
     const EquipmentItem* Equipped(EquipSlot slot) const;
     bool IsEquipped(int uid) const;
-    // 装備中の合計ステータス
+    // 装備中の合計ステータス（左手の武器は控えめに加算する）
     Stats EquippedStats() const;
+    // 指定アイテムを指定スロットに装備した場合のステータス（比較表示用）
+    Stats PreviewStats(int uid, EquipSlot slot) const;
     WeaponType CurrentWeaponType() const;
     // 装備中のスキンからキャラクターの見た目を組み立てる
     ActorArt BuildAppearance() const;
@@ -88,6 +102,10 @@ private:
     int equippedUid_[static_cast<int>(EquipSlot::Count)] = {};
     int col_ = 3000;
     int material_ = 20;
+    bool dualWieldEnabled_ = false;
+
+    // 装備 uid の配列からステータスを合計する内部処理
+    Stats StatsFromSlots(const int equipped[static_cast<int>(EquipSlot::Count)]) const;
 };
 
 } // namespace ecl

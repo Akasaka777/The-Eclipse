@@ -30,6 +30,7 @@
     <ClCompile Include="src\Game\Stage.cpp" />
     <ClCompile Include="src\Game\Stats.cpp" />
     <ClCompile Include="src\Game\SwordSkill.cpp" />
+    <ClCompile Include="src\Game\UniqueSkill.cpp" />
     <ClCompile Include="src\Graphics\Animation.cpp" />
     <ClCompile Include="src\Graphics\CharacterArt.cpp" />
     <ClCompile Include="src\Graphics\DrawUtil.cpp" />
@@ -77,6 +78,7 @@
     <ClInclude Include="src\Game\Stage.h" />
     <ClInclude Include="src\Game\Stats.h" />
     <ClInclude Include="src\Game\SwordSkill.h" />
+    <ClInclude Include="src\Game\UniqueSkill.h" />
     <ClInclude Include="src\Game\WeaponType.h" />
     <ClInclude Include="src\Graphics\Animation.h" />
     <ClInclude Include="src\Graphics\CharacterArt.h" />

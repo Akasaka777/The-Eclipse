@@ -49,7 +49,9 @@ std::vector<const EquipmentItem*> Inventory::ItemsForSlot(EquipSlot slot) const
 {
     std::vector<const EquipmentItem*> result;
     for (const EquipmentItem& item : items_) {
-        if (item.slot == slot) result.push_back(&item);
+        // 武器は左右どちらのスロットにも候補として出す
+        const bool match = IsWeaponSlot(slot) ? item.IsWeapon() : (item.slot == slot);
+        if (match) result.push_back(&item);
     }
 
     std::sort(result.begin(), result.end(), [](const EquipmentItem* a, const EquipmentItem* b) {
@@ -64,8 +66,75 @@ bool Inventory::Equip(int uid)
 {
     const EquipmentItem* item = FindByUid(uid);
     if (!item) return false;
-    equippedUid_[static_cast<int>(item->slot)] = uid;
+    return EquipTo(uid, item->slot);
+}
+
+bool Inventory::CanEquipTo(int uid, EquipSlot slot) const
+{
+    const EquipmentItem* item = FindByUid(uid);
+    if (!item) return false;
+
+    if (IsWeaponSlot(slot)) {
+        if (!item->IsWeapon()) return false;
+        // 左手は二刀流を習得していないと使えない
+        if (slot == EquipSlot::WeaponLeft && !dualWieldEnabled_) return false;
+        return true;
+    }
+
+    if (item->IsWeapon()) return false;
+
+    // 両手に武器を持っている間は盾を装備できない
+    if (slot == EquipSlot::Shield && IsDualWielding()) return false;
+
+    return item->slot == slot;
+}
+
+bool Inventory::EquipTo(int uid, EquipSlot slot)
+{
+    if (!CanEquipTo(uid, slot)) return false;
+
+    const EquipmentItem* item = FindByUid(uid);
+    const int slotIndex = static_cast<int>(slot);
+
+    if (IsWeaponSlot(slot)) {
+        const EquipSlot other = OppositeWeaponSlot(slot);
+        const EquipmentItem* otherItem = Equipped(other);
+
+        // 同じ装備を両手に持つことはできない
+        if (otherItem && otherItem->uid == uid) {
+            equippedUid_[static_cast<int>(other)] = 0;
+        }
+
+        // 二刀流でない、または片手剣以外なら片手持ちにする
+        const bool canPairUp = dualWieldEnabled_
+                            && item->weaponType == WeaponType::OneHandSword
+                            && (!otherItem || otherItem->weaponType == WeaponType::OneHandSword);
+        if (!canPairUp) {
+            equippedUid_[static_cast<int>(other)] = 0;
+        }
+    }
+
+    equippedUid_[slotIndex] = uid;
+
+    // 両手に武器を持ったら盾は外す
+    if (IsDualWielding()) {
+        equippedUid_[static_cast<int>(EquipSlot::Shield)] = 0;
+    }
     return true;
+}
+
+void Inventory::SetDualWieldEnabled(bool enabled)
+{
+    dualWieldEnabled_ = enabled;
+    // 解除されたら左手の武器を外す
+    if (!dualWieldEnabled_) {
+        equippedUid_[static_cast<int>(EquipSlot::WeaponLeft)] = 0;
+    }
+}
+
+bool Inventory::IsDualWielding() const
+{
+    return EquippedUid(EquipSlot::WeaponRight) != 0 && EquippedUid(EquipSlot::WeaponLeft) != 0;
 }
 
 void Inventory::Unequip(EquipSlot slot)
@@ -96,19 +165,61 @@ bool Inventory::IsEquipped(int uid) const
     return false;
 }
 
-Stats Inventory::EquippedStats() const
+// 二刀流の左手武器が能力値に寄与する割合
+//   1.0 にすると単純に 2 本分の火力になるため、控えめにしている
+constexpr float kOffHandStatRate = 0.60f;
+
+Stats Inventory::StatsFromSlots(const int equipped[static_cast<int>(EquipSlot::Count)]) const
 {
     Stats total;
     for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {
-        const EquipmentItem* item = Equipped(static_cast<EquipSlot>(i));
-        if (item) total += item->TotalStats();
+        if (equipped[i] == 0) continue;
+        const EquipmentItem* item = FindByUid(equipped[i]);
+        if (!item) continue;
+
+        const bool offHand = (static_cast<EquipSlot>(i) == EquipSlot::WeaponLeft);
+        total += offHand ? item->TotalStats().Scaled(kOffHandStatRate) : item->TotalStats();
     }
     return total;
 }
 
+Stats Inventory::EquippedStats() const
+{
+    return StatsFromSlots(equippedUid_);
+}
+
+Stats Inventory::PreviewStats(int uid, EquipSlot slot) const
+{
+    int preview[static_cast<int>(EquipSlot::Count)];
+    for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) preview[i] = equippedUid_[i];
+
+    const EquipmentItem* item = FindByUid(uid);
+    if (!item || !CanEquipTo(uid, slot)) return StatsFromSlots(preview);
+
+    if (IsWeaponSlot(slot)) {
+        const EquipSlot other = OppositeWeaponSlot(slot);
+        const EquipmentItem* otherItem = Equipped(other);
+        const bool canPairUp = dualWieldEnabled_
+                            && item->weaponType == WeaponType::OneHandSword
+                            && (!otherItem || otherItem->weaponType == WeaponType::OneHandSword);
+        if (!canPairUp || (otherItem && otherItem->uid == uid)) {
+            preview[static_cast<int>(other)] = 0;
+        }
+    }
+    preview[static_cast<int>(slot)] = uid;
+
+    // 両手持ちになるなら盾は外れる
+    if (preview[static_cast<int>(EquipSlot::WeaponRight)] != 0
+        && preview[static_cast<int>(EquipSlot::WeaponLeft)] != 0) {
+        preview[static_cast<int>(EquipSlot::Shield)] = 0;
+    }
+    return StatsFromSlots(preview);
+}
+
 WeaponType Inventory::CurrentWeaponType() const
 {
-    const EquipmentItem* weapon = Equipped(EquipSlot::Weapon);
+    const EquipmentItem* weapon = Equipped(EquipSlot::WeaponRight);
+    if (!weapon) weapon = Equipped(EquipSlot::WeaponLeft);
     if (!weapon) return WeaponType::OneHandSword;
     return weapon->weaponType;
 }
@@ -118,49 +229,22 @@ ActorArt Inventory::BuildAppearance() const
     ActorArt art;
     art.style = ArtStyle::Humanoid;
     art.weapon = CurrentWeaponType();
-
-    // 既定（素の状態）
-    art.main = ColorRGB(48, 58, 84);
     art.accent = ColorRGB(226, 234, 248);
     art.trim = ColorRGB(64, 206, 255);
-    art.helmetColor = ColorRGB(226, 234, 248);
-    art.shieldColor = ColorRGB(120, 130, 150);
-    art.weaponColor = ColorRGB(226, 234, 248);
 
-    const EquipmentItem* weapon = Equipped(EquipSlot::Weapon);
-    const EquipmentItem* head = Equipped(EquipSlot::Head);
-    const EquipmentItem* body = Equipped(EquipSlot::Body);
-    const EquipmentItem* shield = Equipped(EquipSlot::Shield);
+    // 武器種で体の色みを少し変える
+    switch (art.weapon) {
+    case WeaponType::Dagger:      art.main = ColorRGB(58, 46, 76); break;
+    case WeaponType::Rapier:      art.main = ColorRGB(44, 62, 88); break;
+    case WeaponType::Spear:       art.main = ColorRGB(52, 66, 62); break;
+    case WeaponType::OneHandMace: art.main = ColorRGB(70, 58, 48); break;
+    default:                      art.main = ColorRGB(48, 58, 84); break;
+    }
 
-    art.hasWeapon = (weapon != nullptr);
-    art.hasShield = (shield != nullptr);
-
-    // 体装備が全体の色を決める
-    if (body && body->skin.shape != SkinShape::None) {
-        art.main = body->skin.primary;
-        art.accent = body->skin.secondary;
-        art.trim = body->skin.glow;
-        art.hasCape = body->skin.hasCape;
-        if (body->skin.shape == SkinShape::Eclipse) art.glowing = true;
-    }
-    // 頭装備
-    if (head && head->skin.shape != SkinShape::None) {
-        art.helmetColor = head->skin.primary;
-        art.hasHelmet = head->skin.hasHelmet;
-        if (!body) art.trim = head->skin.glow;
-    }
-    // 盾
-    if (shield && shield->skin.shape != SkinShape::None) {
-        art.shieldColor = shield->skin.primary;
-    }
-    // 武器（刀身の色と発光）
-    if (weapon && weapon->skin.shape != SkinShape::None) {
-        art.weaponColor = weapon->skin.secondary;
-        if (weapon->skin.shape == SkinShape::Eclipse) {
-            art.glowing = true;
-            art.trim = weapon->skin.glow;
-        }
-    }
+    art.hasWeapon = Equipped(EquipSlot::WeaponRight) != nullptr
+                 || Equipped(EquipSlot::WeaponLeft) != nullptr;
+    art.hasOffHandWeapon = IsDualWielding();
+    art.hasShield = Equipped(EquipSlot::Shield) != nullptr;
     return art;
 }
 
@@ -227,7 +311,7 @@ void Inventory::ApplyArmorWear(float amount)
 {
     for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {
         const EquipSlot slot = static_cast<EquipSlot>(i);
-        if (slot == EquipSlot::Weapon) continue;   // 武器は攻撃時に摩耗する
+        if (IsWeaponSlot(slot)) continue;   // 武器は攻撃時に摩耗する
         ApplyWear(slot, amount);
     }
 }

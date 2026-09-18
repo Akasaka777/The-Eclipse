@@ -6,6 +6,7 @@
 #include "Game/ItemDatabase.h"
 #include "Game/QuestDatabase.h"
 #include "Game/SwordSkill.h"
+#include "Game/UniqueSkill.h"
 
 #include <cstdio>
 #include <fstream>
@@ -24,7 +25,8 @@ namespace ecl {
 namespace {
 
 // セーブ形式のバージョン（構造を変えたら上げる）
-constexpr int kSaveVersion = 2;
+// v3: 武器スロットを左右に分割し、ユニークスキルを追加
+constexpr int kSaveVersion = 3;
 
 std::string g_lastError;
 
@@ -145,6 +147,12 @@ bool SaveSystem::Save(const GameContext& context)
         if (player.IsSkillUnlocked(skill.id)) file << "unlocked " << skill.id << "\n";
     }
 
+    // --- ユニークスキル -------------------------------------------------------
+    file << "uniqueskill " << static_cast<int>(player.UniqueSkill()) << "\n";
+    for (int value : player.AvailableUniqueSkills()) {
+        file << "uniqueavailable " << value << "\n";
+    }
+
     // --- 進行状況 -----------------------------------------------------------
     for (const QuestDef& quest : QuestDatabase::Instance().Quests()) {
         if (player.IsQuestCleared(quest.id)) file << "cleared " << quest.id << "\n";
@@ -181,6 +189,8 @@ bool SaveSystem::Load(GameContext& context)
     int skillSlots[kSkillSlotCount] = {};
     std::vector<int> unlocked;
     std::vector<int> cleared;
+    std::vector<int> uniqueAvailable;
+    UniqueSkillType uniqueSkill = UniqueSkillType::None;
     int version = 0;
     int level = 1;
     int exp = 0;
@@ -210,7 +220,9 @@ bool SaveSystem::Load(GameContext& context)
         else if (key == "material") material = ToInt(arg(1));
         else if (key == "selectedquest") selectedQuest = ToInt(arg(1), 1);
         else if (key == "equip") {
-            const int slot = ToInt(arg(1), -1);
+            int slot = ToInt(arg(1), -1);
+            // v2 以前は武器スロットが 1 つだったため、以降のスロットを 1 つずらす
+            if (version > 0 && version < 3 && slot > 0) slot += 1;
             if (slot >= 0 && slot < static_cast<int>(EquipSlot::Count)) {
                 equippedUid[slot] = ToInt(arg(2));
             }
@@ -219,6 +231,16 @@ bool SaveSystem::Load(GameContext& context)
             if (slot >= 0 && slot < kSkillSlotCount) skillSlots[slot] = ToInt(arg(2));
         } else if (key == "unlocked") {
             unlocked.push_back(ToInt(arg(1)));
+        } else if (key == "uniqueskill") {
+            const int value = ToInt(arg(1));
+            if (value > 0 && value < static_cast<int>(UniqueSkillType::Count)) {
+                uniqueSkill = static_cast<UniqueSkillType>(value);
+            }
+        } else if (key == "uniqueavailable") {
+            const int value = ToInt(arg(1));
+            if (value > 0 && value < static_cast<int>(UniqueSkillType::Count)) {
+                uniqueAvailable.push_back(value);
+            }
         } else if (key == "cleared") {
             cleared.push_back(ToInt(arg(1)));
         } else if (key == "item") {
@@ -234,7 +256,6 @@ bool SaveSystem::Load(GameContext& context)
             item.flavor = tmpl->flavor;
             item.slot = tmpl->slot;
             item.weaponType = tmpl->weaponType;
-            item.skin = tmpl->skin;
             item.rarity = static_cast<Rarity>(
                 math::ClampInt(ToInt(arg(3)), 0, static_cast<int>(Rarity::Count) - 1));
             item.upgradeLevel = ToInt(arg(4));
@@ -258,14 +279,6 @@ bool SaveSystem::Load(GameContext& context)
             // 壊れた状態では保存されない想定だが、念のため最低 1 は残す
             if (item.durability <= 0.0f) item.durability = 1.0f;
 
-            // 高レアリティのスキン補正を再適用
-            if (static_cast<int>(item.rarity) >= static_cast<int>(Rarity::SR)) {
-                const ColorRGB rarityColor = RarityColor(item.rarity);
-                const float blend = 0.25f + 0.18f * static_cast<float>(
-                    static_cast<int>(item.rarity) - static_cast<int>(Rarity::SR));
-                item.skin.glow = ColorRGB::Lerp(item.skin.glow, rarityColor, blend);
-                item.skin.secondary = ColorRGB::Lerp(item.skin.secondary, rarityColor, blend * 0.6f);
-            }
             inventory.AddItem(item);
         }
         else if (key == "bgm") settings.bgmVolume = ToInt(arg(1), settings.bgmVolume);
@@ -283,10 +296,12 @@ bool SaveSystem::Load(GameContext& context)
     }
 
     // --- 復元 ---------------------------------------------------------------
-    loaded.RestoreProgress(level, exp, skillPoints, unlocked, cleared, skillSlots);
+    loaded.RestoreProgress(level, exp, skillPoints, unlocked, cleared, skillSlots,
+                           uniqueSkill, uniqueAvailable);
     inventory.SetCurrency(col, material);
     for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {
-        if (equippedUid[i] != 0) inventory.Equip(equippedUid[i]);
+        if (equippedUid[i] == 0) continue;
+        inventory.EquipTo(equippedUid[i], static_cast<EquipSlot>(i));
     }
     // 同じ uid が再発行されないようにする
     int maxUid = 0;

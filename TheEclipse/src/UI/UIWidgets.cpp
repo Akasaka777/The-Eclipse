@@ -224,7 +224,8 @@ void DrawSlotIcon(const Rect& rect, EquipSlot slot, const ColorRGB& color)
     const float size = math::MinF(rect.Width(), rect.Height()) * 0.36f;
 
     switch (slot) {
-    case EquipSlot::Weapon:
+    case EquipSlot::WeaponRight:
+    case EquipSlot::WeaponLeft:
         DrawWeaponIcon(rect, WeaponType::OneHandSword, color);
         break;
     case EquipSlot::Head:

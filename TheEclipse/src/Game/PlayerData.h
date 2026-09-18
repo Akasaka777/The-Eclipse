@@ -5,6 +5,7 @@
 
 #include "Game/Inventory.h"
 #include "Game/SwordSkill.h"
+#include "Game/UniqueSkill.h"
 
 #include <string>
 #include <vector>
@@ -59,6 +60,22 @@ public:
     bool CanUnlockSkill(int skillId) const;
     bool UnlockSkill(int skillId);
 
+    // --- ユニークスキル -------------------------------------------------------
+    // 習得中のユニークスキル（未習得なら None）
+    UniqueSkillType UniqueSkill() const { return uniqueSkill_; }
+    bool HasUniqueSkill() const { return uniqueSkill_ != UniqueSkillType::None; }
+    bool HasDualWield() const { return uniqueSkill_ == UniqueSkillType::DualWield; }
+    // 解放条件を満たしたか（満たすとスキルメニューに現れる）
+    bool IsUniqueSkillAvailable(UniqueSkillType type) const;
+    void MakeUniqueSkillAvailable(UniqueSkillType type);
+    // 習得する。既に別のユニークスキルを習得済みなら失敗する（force で上書き）
+    bool AcquireUniqueSkill(UniqueSkillType type, bool force = false);
+    // デバッグ用: 全ユニークスキルを解放可能にする
+    void DebugUnlockAllUniqueSkills();
+
+    // 装備できるスキル数（ユニークスキル習得中は 3 つまで）
+    int SkillSlotLimit() const;
+
     // --- クエスト進行 --------------------------------------------------------
     bool IsQuestCleared(int questId) const;
     void MarkQuestCleared(int questId);
@@ -67,7 +84,10 @@ public:
     void RestoreProgress(int level, int exp, int skillPoints,
                          const std::vector<int>& unlockedSkills,
                          const std::vector<int>& clearedQuests,
-                         const int skillLoadout[4]);
+                         const int skillLoadout[4],
+                         UniqueSkillType uniqueSkill,
+                         const std::vector<int>& availableUniqueSkills);
+    const std::vector<int>& AvailableUniqueSkills() const { return availableUniqueSkills_; }
 
 private:
     std::string name_ = "プレイヤー";
@@ -76,6 +96,8 @@ private:
     Inventory inventory_;
     int skillLoadout_[4] = { 0, 0, 0, 0 };
     int skillPoints_ = 3;
+    UniqueSkillType uniqueSkill_ = UniqueSkillType::None;
+    std::vector<int> availableUniqueSkills_;
     std::vector<int> unlockedSkills_;
     std::vector<int> clearedQuests_;
 };

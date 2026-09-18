@@ -84,17 +84,28 @@ void PlayerData::RefreshSkillLoadout()
 {
     const SkillDatabase& database = SkillDatabase::Instance();
     const WeaponType weapon = CurrentWeaponType();
+    const int limit = SkillSlotLimit();
 
-    // 現在の武器種に合わない、または未解放のスキルは外す
+    // 使えなくなったスキルを外す
     for (int i = 0; i < kSkillSlotCount; ++i) {
+        if (i >= limit) {
+            // ユニークスキル習得で減った枠は空にする
+            skillLoadout_[i] = 0;
+            continue;
+        }
         const SwordSkill* skill = database.Find(skillLoadout_[i]);
-        if (!skill || skill->weapon != weapon || !IsSkillUnlocked(skill->id)) {
+        if (!skill || !IsSkillUnlocked(skill->id) || skill->weapon != weapon) {
+            skillLoadout_[i] = 0;
+            continue;
+        }
+        // 専用スキルは対応するユニークスキルを習得している場合のみ
+        if (skill->IsUnique() && skill->requiredUnique != uniqueSkill_) {
             skillLoadout_[i] = 0;
         }
     }
 
     // 空きスロットを解放済みスキルで埋める
-    for (int i = 0; i < kSkillSlotCount; ++i) {
+    for (int i = 0; i < limit; ++i) {
         if (skillLoadout_[i] != 0) continue;
         for (const SwordSkill* candidate : database.ForWeapon(weapon)) {
             if (!IsSkillUnlocked(candidate->id)) continue;
@@ -130,6 +141,8 @@ bool PlayerData::CanUnlockSkill(int skillId) const
     if (!skill) return false;
     if (IsSkillUnlocked(skillId)) return false;
     if (!IsSkillReachable(skillId)) return false;
+    // 専用スキルは対応するユニークスキルを習得している必要がある
+    if (skill->IsUnique() && skill->requiredUnique != uniqueSkill_) return false;
     return skillPoints_ >= skill->unlockCost;
 }
 
@@ -143,7 +156,7 @@ bool PlayerData::UnlockSkill(int skillId)
 
     // 同じ武器種で空きスロットがあれば自動で装備する
     if (skill->weapon == CurrentWeaponType()) {
-        for (int i = 0; i < kSkillSlotCount; ++i) {
+        for (int i = 0; i < SkillSlotLimit(); ++i) {
             if (skillLoadout_[i] == 0) {
                 skillLoadout_[i] = skillId;
                 break;
@@ -151,6 +164,53 @@ bool PlayerData::UnlockSkill(int skillId)
         }
     }
     return true;
+}
+
+//------------------------------------------------------------------------------
+// ユニークスキル
+//------------------------------------------------------------------------------
+int PlayerData::SkillSlotLimit() const
+{
+    // ユニークスキルを習得すると装備枠が 1 つ減る
+    return HasUniqueSkill() ? 3 : kSkillSlotCount;
+}
+
+bool PlayerData::IsUniqueSkillAvailable(UniqueSkillType type) const
+{
+    if (type == UniqueSkillType::None) return false;
+    const int value = static_cast<int>(type);
+    return std::find(availableUniqueSkills_.begin(), availableUniqueSkills_.end(), value)
+        != availableUniqueSkills_.end();
+}
+
+void PlayerData::MakeUniqueSkillAvailable(UniqueSkillType type)
+{
+    if (type == UniqueSkillType::None) return;
+    if (IsUniqueSkillAvailable(type)) return;
+    availableUniqueSkills_.push_back(static_cast<int>(type));
+}
+
+bool PlayerData::AcquireUniqueSkill(UniqueSkillType type, bool force)
+{
+    if (type == UniqueSkillType::None) return false;
+    if (!IsUniqueSkillAvailable(type)) return false;
+    // 習得できるユニークスキルは 1 つだけ
+    if (HasUniqueSkill() && !force) return false;
+
+    uniqueSkill_ = type;
+    inventory_.SetDualWieldEnabled(HasDualWield());
+    RefreshSkillLoadout();
+    return true;
+}
+
+void PlayerData::DebugUnlockAllUniqueSkills()
+{
+    for (const UniqueSkillDef& def : UniqueSkillDatabase::Instance().All()) {
+        MakeUniqueSkillAvailable(def.type);
+    }
+    if (!HasUniqueSkill() && !UniqueSkillDatabase::Instance().All().empty()) {
+        AcquireUniqueSkill(UniqueSkillDatabase::Instance().All().front().type, true);
+    }
 }
 
 bool PlayerData::IsSkillEquipped(int skillId) const
@@ -175,7 +235,7 @@ const SwordSkill* PlayerData::SkillAt(int slotIndex) const
 
 bool PlayerData::SetSkillAt(int slotIndex, int skillId)
 {
-    if (slotIndex < 0 || slotIndex >= kSkillSlotCount) return false;
+    if (slotIndex < 0 || slotIndex >= SkillSlotLimit()) return false;
     if (skillId == 0) {
         skillLoadout_[slotIndex] = 0;
         return true;
@@ -185,6 +245,8 @@ bool PlayerData::SetSkillAt(int slotIndex, int skillId)
     if (!skill) return false;
     if (!IsSkillUnlocked(skillId)) return false;
     if (skill->weapon != CurrentWeaponType()) return false;
+    // 専用スキルは対応するユニークスキルが必要
+    if (skill->IsUnique() && skill->requiredUnique != uniqueSkill_) return false;
 
     // 既に他スロットにある場合は入れ替える
     const int existing = SkillSlotOf(skillId);
@@ -214,8 +276,14 @@ void PlayerData::MarkQuestCleared(int questId)
 void PlayerData::RestoreProgress(int level, int exp, int skillPoints,
                                  const std::vector<int>& unlockedSkills,
                                  const std::vector<int>& clearedQuests,
-                                 const int skillLoadout[4])
+                                 const int skillLoadout[4],
+                                 UniqueSkillType uniqueSkill,
+                                 const std::vector<int>& availableUniqueSkills)
 {
+    uniqueSkill_ = uniqueSkill;
+    availableUniqueSkills_ = availableUniqueSkills;
+    inventory_.SetDualWieldEnabled(HasDualWield());
+
     level_ = math::ClampInt(level, 1, 99);
     exp_ = math::MaxI(0, exp);
     skillPoints_ = math::MaxI(0, skillPoints);

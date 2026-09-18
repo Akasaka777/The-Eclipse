@@ -35,42 +35,22 @@ int         RarityMaxUpgrade(Rarity rarity);
 //------------------------------------------------------------------------------
 enum class EquipSlot
 {
-    Weapon, // 武器
-    Head,   // 頭装備
-    Body,   // 体装備
-    Shield, // 盾
-    Arm,    // 腕
-    Hand,   // 手
-    Foot,   // 足
+    WeaponRight, // 武器（右手）＝ 武器カテゴリの代表でもある
+    WeaponLeft,  // 武器（左手）。二刀流の解放後のみ使用できる
+    Head,        // 頭装備
+    Body,        // 体装備
+    Shield,      // 盾
+    Arm,         // 腕
+    Hand,        // 手
+    Foot,        // 足
     Count
 };
 
 const char* EquipSlotName(EquipSlot slot);
-
-//------------------------------------------------------------------------------
-// 装備スキン（見た目）
-//   素材が用意されていれば assets/skins/<spriteFolder> を優先して使用し、
-//   無ければ色と形状の指定で代替描画に反映する。
-//------------------------------------------------------------------------------
-enum class SkinShape
-{
-    None,      // 見た目を変えない
-    Light,     // 軽装（布・革）
-    Heavy,     // 重装（金属）
-    Mystic,    // 魔導・ローブ
-    Eclipse    // 蝕（漆黒＋発光）
-};
-
-struct EquipSkin
-{
-    SkinShape   shape = SkinShape::None;
-    ColorRGB    primary = ColorRGB(70, 90, 130);   // 主色（体装備など）
-    ColorRGB    secondary = ColorRGB(220, 230, 245); // 差し色
-    ColorRGB    glow = ColorRGB(64, 206, 255);     // 発光色
-    const char* spriteFolder = "";                 // assets/skins/<folder>
-    bool        hasCape = false;                   // マント
-    bool        hasHelmet = false;                 // 兜（頭部形状の変化）
-};
+// 武器を装備するスロットか
+bool IsWeaponSlot(EquipSlot slot);
+// 反対の手のスロット（武器スロット以外を渡した場合はそのまま返す）
+EquipSlot OppositeWeaponSlot(EquipSlot slot);
 
 //------------------------------------------------------------------------------
 // 装備品
@@ -81,16 +61,16 @@ struct EquipmentItem
     int         templateId = 0;   // 元になった定義 ID
     std::string name;
     std::string flavor;
-    EquipSlot   slot = EquipSlot::Weapon;
+    EquipSlot   slot = EquipSlot::WeaponRight;
     WeaponType  weaponType = WeaponType::OneHandSword;
     Rarity      rarity = Rarity::N;
     int         upgradeLevel = 0;
     Stats       baseStats;        // +0 時点の能力値
-    EquipSkin   skin;             // 見た目
     float       durability = -1.0f; // 現在の耐久力（負値なら生成時に最大値で初期化）
 
     bool  IsValid() const { return uid != 0; }
-    bool  IsWeapon() const { return slot == EquipSlot::Weapon; }
+    // 武器カテゴリのアイテムは slot に WeaponRight を持つ（左右どちらにも装備できる）
+    bool  IsWeapon() const { return slot == EquipSlot::WeaponRight; }
     // 強化値を反映した最終ステータス
     Stats TotalStats() const;
     // "ロングソード +5"

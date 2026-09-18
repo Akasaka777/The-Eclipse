@@ -74,6 +74,10 @@ void SettingsPanel::Layout()
                                "セーブデータ削除", FontSize::Small);
     deleteSaveButton_.SetAccent(palette::kDanger);
 
+    logoutButton_ = Button(Rect::FromXYWH(left + 276.0f, window_.top + 690.0f, 260.0f, 52.0f),
+                           "ログアウト", FontSize::Small);
+    logoutButton_.SetAccent(palette::kAccentWarm);
+
     closeButton_ = Button(Rect::FromXYWH(window_.CenterX() - 110.0f, window_.bottom - 80.0f,
                                          220.0f, 56.0f), "閉じる");
 
@@ -111,6 +115,9 @@ void SettingsPanel::Open(const GameSettings& settings)
     softwareCursorToggle_.SetValue(settings.softwareCursor);
     debugToggle_.SetValue(settings.debugMode);
     confirmingDelete_ = false;
+    confirmingLogout_ = false;
+    deleteSaveButton_.SetLabel("セーブデータ削除");
+    logoutButton_.SetLabel("ログアウト");
     message_.clear();
     messageTimer_ = 0.0f;
 }
@@ -153,11 +160,26 @@ void SettingsPanel::Update(float dt, const Input& input, GameContext& context)
         }
     }
 
+    // --- ログアウト（2 段階で確認する） ------------------------------------------
+    if (logoutButton_.Update(input, dt)) {
+        if (!confirmingLogout_) {
+            confirmingLogout_ = true;
+            logoutButton_.SetLabel("本当に終了しますか？");
+            message_ = "セーブしてからゲームを終了します";
+            messageTimer_ = 4.0f;
+        } else {
+            // 終了要求。保存は Application 側で行う
+            context.quitRequested = true;
+        }
+    }
+
     if (closeButton_.Update(input, dt) || input.Pressed(GameAction::Cancel)) {
         closeRequested_ = true;
         open_ = false;
         confirmingDelete_ = false;
+        confirmingLogout_ = false;
         deleteSaveButton_.SetLabel("セーブデータ削除");
+        logoutButton_.SetLabel("ログアウト");
     }
 }
 
@@ -194,6 +216,7 @@ void SettingsPanel::Draw() const
                    "         F4 判定表示 / F5 col・SP 追加");
     }
     deleteSaveButton_.Draw();
+    logoutButton_.Draw();
 
     // --- 操作一覧（右カラム） --------------------------------------------------
     DrawKeyGuide();

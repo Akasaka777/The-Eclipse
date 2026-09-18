@@ -400,6 +400,63 @@ SkillDatabase::SkillDatabase()
         skills_.push_back(s);
     }
 
+    //==========================================================================
+    // ユニークスキル「二刀流」専用スキル
+    //   requiredUnique を設定したスキルは、そのユニークスキルを習得している間だけ
+    //   ツリーに現れ、装備できる。
+    //==========================================================================
+    {
+        SwordSkill s;
+        s.id = 9000; s.name = "ダブル・サーキュラー"; s.weapon = WeaponType::OneHandSword;
+        s.requiredUnique = UniqueSkillType::DualWield;
+        s.description = "二本の刃で円を描くように薙ぎ払う三連撃。";
+        s.mpCost = 18.0f; s.cooldown = 7.0f; s.duration = 0.78f; s.effectStyle = 4; s.effectColor = cyan;
+        s.invincibleUntil = 0.34f;
+        s.strikes = {
+            MakeStrike(0.16f, 1.8f, 2.0f, 1.1f, 90.0f, 200.0f, 0.05f),
+            MakeStrike(0.34f, 1.8f, 2.0f, 1.1f, 90.0f, 200.0f, 0.05f),
+            MakeStrike(0.56f, 3.0f, 2.2f, 1.2f, 340.0f, 240.0f, 0.12f),
+        };
+        skills_.push_back(s);
+    }
+    {
+        SwordSkill s;
+        s.id = 9001; s.name = "スターバースト・ストリーム"; s.weapon = WeaponType::OneHandSword;
+        s.requiredUnique = UniqueSkillType::DualWield;
+        s.description = "十六連撃の後に渾身の一撃を叩き込む、二刀流の到達点。";
+        s.mpCost = 38.0f; s.cooldown = 16.0f; s.duration = 1.45f; s.effectStyle = 3; s.effectColor = violet;
+        s.invincibleUntil = 0.60f;
+        s.strikes = {
+            MakeStrike(0.10f, 1.0f, 1.8f, 1.0f, 20.0f, 220.0f, 0.02f),
+            MakeStrike(0.20f, 1.0f, 1.8f, 1.0f, 20.0f, 220.0f, 0.02f),
+            MakeStrike(0.30f, 1.0f, 1.8f, 1.0f, 20.0f, 220.0f, 0.02f),
+            MakeStrike(0.40f, 1.0f, 1.8f, 1.0f, 20.0f, 220.0f, 0.02f),
+            MakeStrike(0.50f, 1.1f, 1.9f, 1.0f, 20.0f, 220.0f, 0.02f),
+            MakeStrike(0.60f, 1.1f, 1.9f, 1.0f, 20.0f, 220.0f, 0.02f),
+            MakeStrike(0.70f, 1.2f, 1.9f, 1.1f, 20.0f, 220.0f, 0.03f),
+            MakeStrike(0.80f, 1.2f, 1.9f, 1.1f, 20.0f, 220.0f, 0.03f),
+            MakeStrike(0.90f, 1.3f, 2.0f, 1.1f, 30.0f, 220.0f, 0.03f),
+            MakeStrike(1.00f, 1.3f, 2.0f, 1.1f, 30.0f, 220.0f, 0.03f),
+            MakeStrike(1.12f, 2.0f, 2.1f, 1.2f, 60.0f, 260.0f, 0.05f),
+            MakeStrike(1.26f, 4.2f, 2.4f, 1.3f, 420.0f, 300.0f, 0.16f, true),
+        };
+        skills_.push_back(s);
+    }
+    {
+        SwordSkill s;
+        s.id = 9002; s.name = "ジ・イクリプス"; s.weapon = WeaponType::OneHandSword;
+        s.requiredUnique = UniqueSkillType::DualWield;
+        s.description = "月を裂く二条の光。溜めは長いが一撃の威力は絶大。";
+        s.mpCost = 46.0f; s.cooldown = 22.0f; s.duration = 1.30f; s.effectStyle = 0; s.effectColor = gold;
+        s.invincibleUntil = 0.72f;
+        s.strikes = {
+            MakeStrike(0.40f, 2.4f, 2.6f, 1.4f, 120.0f, 320.0f, 0.08f),
+            MakeStrike(0.62f, 2.4f, 2.6f, 1.4f, 120.0f, 300.0f, 0.08f),
+            MakeStrike(0.88f, 7.0f, 3.0f, 1.8f, 520.0f, 360.0f, 0.22f, true),
+        };
+        skills_.push_back(s);
+    }
+
     //--- スキルツリーの構成 ------------------------------------------------------
     //   column 0 : 火力特化系統 / column 1 : 範囲・機動系統
     //   tier 1 の左側は初期解放（コスト 0）
@@ -427,6 +484,8 @@ SkillDatabase::SkillDatabase()
         // 槍
         { 1400, 0, 1, 0, 0    }, { 1404, 0, 2, 1, 1400 }, { 1403, 0, 3, 3, 1404 },
         { 1402, 1, 1, 1, 0    }, { 1401, 1, 2, 2, 1402 }, { 1405, 1, 3, 3, 1401 },
+        // ユニークスキル「二刀流」専用（1 列 3 段）
+        { 9000, 0, 1, 1, 0    }, { 9001, 0, 2, 2, 9000 }, { 9002, 0, 3, 3, 9001 },
     };
 
     for (const TreeEntry& entry : kTree) {
@@ -459,7 +518,21 @@ std::vector<const SwordSkill*> SkillDatabase::ForWeapon(WeaponType weapon) const
 {
     std::vector<const SwordSkill*> result;
     for (const SwordSkill& skill : skills_) {
+        if (skill.IsUnique()) continue;
         if (skill.weapon == weapon) result.push_back(&skill);
+    }
+    return result;
+}
+
+std::vector<const SwordSkill*> SkillDatabase::ForUnique(UniqueSkillType type) const
+{
+    std::vector<const SwordSkill*> result;
+    if (type == UniqueSkillType::None) return result;
+
+    for (int tier = 1; tier <= kSkillTreeTiers; ++tier) {
+        for (const SwordSkill& skill : skills_) {
+            if (skill.requiredUnique == type && skill.tier == tier) result.push_back(&skill);
+        }
     }
     return result;
 }
@@ -478,6 +551,7 @@ std::vector<const SwordSkill*> SkillDatabase::TreeForWeapon(WeaponType weapon) c
 const SwordSkill* SkillDatabase::NodeAt(WeaponType weapon, int column, int tier) const
 {
     for (const SwordSkill& skill : skills_) {
+        if (skill.IsUnique()) continue;
         if (skill.weapon == weapon && skill.column == column && skill.tier == tier) return &skill;
     }
     return nullptr;

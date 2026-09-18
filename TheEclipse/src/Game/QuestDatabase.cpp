@@ -43,11 +43,6 @@ QuestDatabase::QuestDatabase()
 
         {
             FloorDef floor = MakeFloor("FLOOR 1 - 森の入口", 3800.0f, StageTheme::Forest);
-            floor.platforms = {
-                Platform(900.0f, 700.0f, 280.0f, 28.0f),
-                Platform(1700.0f, 620.0f, 300.0f, 28.0f),
-                Platform(2600.0f, 700.0f, 260.0f, 28.0f),
-            };
             floor.spawns = {
                 EnemySpawn(1100.0f, 1),
                 EnemySpawn(1750.0f, 1),
@@ -58,12 +53,6 @@ QuestDatabase::QuestDatabase()
         }
         {
             FloorDef floor = MakeFloor("FLOOR 2 - 深緑の道", 4200.0f, StageTheme::Forest);
-            floor.platforms = {
-                Platform(700.0f, 660.0f, 320.0f, 28.0f),
-                Platform(1500.0f, 560.0f, 260.0f, 28.0f),
-                Platform(2300.0f, 680.0f, 320.0f, 28.0f),
-                Platform(3100.0f, 600.0f, 280.0f, 28.0f),
-            };
             floor.spawns = {
                 EnemySpawn(1000.0f, 2),
                 EnemySpawn(1600.0f, 1),
@@ -75,10 +64,6 @@ QuestDatabase::QuestDatabase()
         }
         {
             FloorDef floor = MakeFloor("FINAL FLOOR - 狼王の縄張り", 3000.0f, StageTheme::Forest);
-            floor.platforms = {
-                Platform(600.0f, 640.0f, 240.0f, 28.0f),
-                Platform(2200.0f, 640.0f, 240.0f, 28.0f),
-            };
             floor.bossId = 1;
             quest.floors.push_back(floor);
         }
@@ -121,12 +106,6 @@ QuestDatabase::QuestDatabase()
 
         {
             FloorDef floor = MakeFloor("FLOOR 1 - 崩れた前室", 4000.0f, StageTheme::Ruins);
-            floor.platforms = {
-                Platform(800.0f, 680.0f, 300.0f, 28.0f),
-                Platform(1600.0f, 580.0f, 260.0f, 28.0f),
-                Platform(2400.0f, 680.0f, 300.0f, 28.0f),
-                Platform(3200.0f, 600.0f, 260.0f, 28.0f),
-            };
             floor.spawns = {
                 EnemySpawn(1000.0f, 2),
                 EnemySpawn(1700.0f, 5),
@@ -138,13 +117,6 @@ QuestDatabase::QuestDatabase()
         }
         {
             FloorDef floor = MakeFloor("FLOOR 2 - 監視の回廊", 4400.0f, StageTheme::Ruins);
-            floor.platforms = {
-                Platform(600.0f, 640.0f, 280.0f, 28.0f),
-                Platform(1400.0f, 540.0f, 300.0f, 28.0f),
-                Platform(2300.0f, 640.0f, 280.0f, 28.0f),
-                Platform(3100.0f, 560.0f, 300.0f, 28.0f),
-                Platform(3900.0f, 660.0f, 260.0f, 28.0f),
-            };
             floor.spawns = {
                 EnemySpawn(900.0f, 4),
                 EnemySpawn(1500.0f, 3, 680.0f),
@@ -157,10 +129,6 @@ QuestDatabase::QuestDatabase()
         }
         {
             FloorDef floor = MakeFloor("FLOOR 3 - 番兵の間", 3600.0f, StageTheme::Ruins);
-            floor.platforms = {
-                Platform(1000.0f, 620.0f, 320.0f, 28.0f),
-                Platform(2200.0f, 620.0f, 320.0f, 28.0f),
-            };
             floor.spawns = {
                 EnemySpawn(1200.0f, 4),
                 EnemySpawn(1900.0f, 6),
@@ -171,10 +139,6 @@ QuestDatabase::QuestDatabase()
         }
         {
             FloorDef floor = MakeFloor("FINAL FLOOR - 守護者の広間", 3200.0f, StageTheme::Ruins);
-            floor.platforms = {
-                Platform(500.0f, 620.0f, 260.0f, 28.0f),
-                Platform(2440.0f, 620.0f, 260.0f, 28.0f),
-            };
             floor.bossId = 2;
             quest.floors.push_back(floor);
         }
@@ -218,12 +182,6 @@ QuestDatabase::QuestDatabase()
 
         {
             FloorDef floor = MakeFloor("FLOOR 1 - 蝕の参道", 4200.0f, StageTheme::Altar);
-            floor.platforms = {
-                Platform(800.0f, 660.0f, 300.0f, 28.0f),
-                Platform(1700.0f, 560.0f, 280.0f, 28.0f),
-                Platform(2600.0f, 660.0f, 300.0f, 28.0f),
-                Platform(3400.0f, 580.0f, 280.0f, 28.0f),
-            };
             floor.spawns = {
                 EnemySpawn(1000.0f, 6),
                 EnemySpawn(1600.0f, 3, 680.0f),
@@ -235,13 +193,6 @@ QuestDatabase::QuestDatabase()
         }
         {
             FloorDef floor = MakeFloor("FLOOR 2 - 流星の回廊", 4600.0f, StageTheme::Altar);
-            floor.platforms = {
-                Platform(700.0f, 620.0f, 260.0f, 28.0f),
-                Platform(1500.0f, 520.0f, 280.0f, 28.0f),
-                Platform(2300.0f, 620.0f, 260.0f, 28.0f),
-                Platform(3100.0f, 520.0f, 280.0f, 28.0f),
-                Platform(3900.0f, 620.0f, 260.0f, 28.0f),
-            };
             floor.spawns = {
                 EnemySpawn(900.0f, 3, 660.0f),
                 EnemySpawn(1400.0f, 6),
@@ -254,10 +205,6 @@ QuestDatabase::QuestDatabase()
         }
         {
             FloorDef floor = MakeFloor("FLOOR 3 - 祭壇前", 3800.0f, StageTheme::Altar);
-            floor.platforms = {
-                Platform(1100.0f, 600.0f, 320.0f, 28.0f),
-                Platform(2400.0f, 600.0f, 320.0f, 28.0f),
-            };
             floor.spawns = {
                 EnemySpawn(1200.0f, 6),
                 EnemySpawn(1800.0f, 4),
@@ -269,10 +216,6 @@ QuestDatabase::QuestDatabase()
         }
         {
             FloorDef floor = MakeFloor("FINAL FLOOR - 蝕の祭壇", 3400.0f, StageTheme::Altar);
-            floor.platforms = {
-                Platform(560.0f, 600.0f, 240.0f, 28.0f),
-                Platform(2600.0f, 600.0f, 240.0f, 28.0f),
-            };
             floor.bossId = 3;
             quest.floors.push_back(floor);
         }

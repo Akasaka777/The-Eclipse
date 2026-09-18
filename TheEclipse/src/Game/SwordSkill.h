@@ -5,6 +5,7 @@
 #pragma once
 
 #include "Common/Types.h"
+#include "Game/UniqueSkill.h"
 #include "Game/WeaponType.h"
 
 #include <string>
@@ -51,9 +52,12 @@ struct SwordSkill
     int  tier = 1;            // 1〜3（上から下へ）
     int  unlockCost = 1;      // 解放に必要なスキルポイント（0 は初期解放）
     int  requiredSkillId = 0; // 前提スキル（0 なら無し）
+    // 専用スキルの場合、必要なユニークスキル（None なら通常スキル）
+    UniqueSkillType requiredUnique = UniqueSkillType::None;
 
     float TotalMultiplier() const;
     bool  IsStarter() const { return unlockCost <= 0; }
+    bool  IsUnique() const { return requiredUnique != UniqueSkillType::None; }
 };
 
 // ツリーの段数と系統数
@@ -71,8 +75,10 @@ public:
     static const SkillDatabase& Instance();
 
     const SwordSkill* Find(int id) const;
-    // 武器種に対応するスキル一覧
+    // 武器種に対応するスキル一覧（通常スキルのみ）
     std::vector<const SwordSkill*> ForWeapon(WeaponType weapon) const;
+    // ユニークスキル専用のツリー（上から順）
+    std::vector<const SwordSkill*> ForUnique(UniqueSkillType type) const;
     // 武器種の既定ロードアウト（4つ）
     std::vector<int> DefaultLoadout(WeaponType weapon) const;
 

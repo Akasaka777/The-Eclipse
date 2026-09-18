@@ -47,7 +47,7 @@ public:
 private:
     void DrawPlayerStatus(const Player& player, const PlayerData& data) const;
     void DrawBossStatus(const Boss& boss) const;
-    void DrawSkillBar(const Player& player) const;
+    void DrawSkillBar(const Player& player, const PlayerData& data) const;
     void DrawFloorInfo(const HudInfo& info) const;
     void DrawCombo(const HudInfo& info) const;
 

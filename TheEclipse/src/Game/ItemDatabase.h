@@ -17,11 +17,10 @@ struct ItemTemplate
     int         id = 0;
     const char* name = "";
     const char* flavor = "";
-    EquipSlot   slot = EquipSlot::Weapon;
+    EquipSlot   slot = EquipSlot::WeaponRight;
     WeaponType  weaponType = WeaponType::OneHandSword;
     int         tier = 1; // 1〜3（出現フロアの目安）
     Stats       base;
-    EquipSkin   skin;
 };
 
 class ItemDatabase

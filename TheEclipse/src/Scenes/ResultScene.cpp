@@ -156,6 +156,22 @@ void ResultScene::DrawStats(const GameContext& context) const
         ++index;
     }
 
+    // ユニークスキルの解放通知
+    if (result.unlockedUniqueSkill) {
+        const float pulse = 0.6f + 0.4f * std::sin(time_ * 6.0f);
+        const Rect notice(panel.left + 20.0f, panel.bottom - 132.0f, panel.right - 20.0f,
+                          panel.bottom - 76.0f);
+        draw::FillRect(notice, palette::kExp.Scaled(0.35f), 220);
+        draw::StrokeRect(notice, palette::kExp, 2.0f, static_cast<int>(230.0f * pulse));
+        draw::Text(FontSize::Small, notice.CenterX(), notice.top + 6.0f, palette::kExp,
+                   str::Format("ユニークスキル「%s」が解放可能に！",
+                               result.unlockedUniqueSkillName.c_str()),
+                   draw::TextAlign::Center);
+        draw::Text(FontSize::Tiny, notice.CenterX(), notice.top + 32.0f, palette::kText,
+                   "ホームの「スキル」タブ → ユニーク から習得できます",
+                   draw::TextAlign::Center);
+    }
+
     // レベルアップ表示
     if (result.levelsGained > 0) {
         const float pulse = 0.7f + 0.3f * std::sin(time_ * 6.0f);

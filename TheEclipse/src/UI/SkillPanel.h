@@ -7,6 +7,7 @@
 #include "Core/Input.h"
 #include "Game/GameContext.h"
 #include "Game/SwordSkill.h"
+#include "Game/UniqueSkill.h"
 #include "UI/UIWidgets.h"
 
 #include <string>
@@ -34,6 +35,12 @@ private:
     Rect NodeRect(int column, int tier) const;
     void DrawWeaponTabs(const GameContext& context) const;
     void DrawTree(const GameContext& context) const;
+    void DrawUniqueTree(const GameContext& context) const;
+    // ユニークスキルのタブを表示中か
+    bool UniqueMode() const { return uniqueTab_; }
+    // 表示できるユニークスキル（解放条件を満たしたもの）があるか
+    bool HasVisibleUnique(const GameContext& context) const;
+    UniqueSkillType VisibleUniqueType(const GameContext& context) const;
     void DrawDetail(const GameContext& context) const;
     void DrawSlots(const GameContext& context) const;
 
@@ -47,11 +54,14 @@ private:
 
     std::vector<Button> weaponButtons_;
     Button unlockButton_;
+    Button uniqueTabButton_;
+    Button acquireButton_;
     Button equipButton_;
     Button unequipButton_;
     Button closeButton_;
 
     WeaponType viewWeapon_ = WeaponType::OneHandSword;
+    bool  uniqueTab_ = false;
     int   selectedSkillId_ = 0;
     int   targetSlot_ = 0;
     bool  open_ = false;

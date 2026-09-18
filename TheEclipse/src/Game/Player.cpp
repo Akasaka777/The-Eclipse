@@ -166,6 +166,7 @@ float Player::SkillCooldownRatio(int index) const
 
 bool Player::CanUseSkill(int index) const
 {
+    // 装備されていないスロット（ユニークスキルで減った枠を含む）は使用できない
     const SwordSkill* skill = Skill(index);
     if (!skill || !alive) return false;
     if (cooldowns_[index] > 0.0f) return false;

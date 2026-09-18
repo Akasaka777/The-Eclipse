@@ -38,6 +38,9 @@ struct QuestResult
     std::vector<EquipmentItem> drops;
     // 耐久力が尽きて消滅した装備
     std::vector<std::string> brokenItems;
+    // このクエストでユニークスキルの解放条件を満たしたか
+    bool unlockedUniqueSkill = false;
+    std::string unlockedUniqueSkillName;
 
     void Reset();
     // S / A / B / C 評価

@@ -61,7 +61,8 @@ int RarityMaxUpgrade(Rarity rarity)
 const char* EquipSlotName(EquipSlot slot)
 {
     switch (slot) {
-    case EquipSlot::Weapon: return "武器";
+    case EquipSlot::WeaponRight: return "武器（右手）";
+    case EquipSlot::WeaponLeft:  return "武器（左手）";
     case EquipSlot::Head:   return "頭装備";
     case EquipSlot::Body:   return "体装備";
     case EquipSlot::Shield: return "盾";
@@ -82,6 +83,18 @@ std::string EquipmentItem::DisplayName() const
 {
     if (upgradeLevel <= 0) return name;
     return str::Format("%s +%d", name.c_str(), upgradeLevel);
+}
+
+bool IsWeaponSlot(EquipSlot slot)
+{
+    return slot == EquipSlot::WeaponRight || slot == EquipSlot::WeaponLeft;
+}
+
+EquipSlot OppositeWeaponSlot(EquipSlot slot)
+{
+    if (slot == EquipSlot::WeaponRight) return EquipSlot::WeaponLeft;
+    if (slot == EquipSlot::WeaponLeft) return EquipSlot::WeaponRight;
+    return slot;
 }
 
 float EquipmentItem::MaxDurability() const

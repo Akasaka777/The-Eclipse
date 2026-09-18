@@ -44,7 +44,7 @@ private:
     Button sellButton_;
     std::vector<Button> slotButtons_;
 
-    EquipSlot selectedSlot_ = EquipSlot::Weapon;
+    EquipSlot selectedSlot_ = EquipSlot::WeaponRight;
     int  selectedUid_ = 0;
     int  scroll_ = 0;
     bool open_ = false;

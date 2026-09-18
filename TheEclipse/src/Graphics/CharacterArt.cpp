@@ -169,8 +169,8 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
     draw::Line(torso.left + 3.0f, torso.top + torso.Height() * 0.35f,
                torso.right - 3.0f, torso.top + torso.Height() * 0.45f, art.trim, 2.0f, alpha);
 
-    // --- マント（騎士 or マント付きスキン） ------------------------------------
-    if (art.style == ArtStyle::Knight || art.hasCape) {
+    // --- マント（騎士のみ） --------------------------------------------------
+    if (art.style == ArtStyle::Knight) {
         const float capeX = cx - dir * torsoW * 0.55f + lean * 0.3f;
         const Vec2 a(capeX, shoulderY - h * 0.02f);
         const Vec2 b(capeX - dir * w * 0.45f, hipY + h * 0.22f);
@@ -180,27 +180,11 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
 
     // --- 頭 -----------------------------------------------------------------
     const float headX = cx + lean * 0.9f + dir * w * 0.04f;
-    const ColorRGB headColor = art.helmetColor;
-
-    if (art.hasHelmet) {
-        // 兜：角張ったシルエット＋面覆い
-        const Rect helm = Rect::FromCenter(headX, headY, headR * 2.1f, headR * 2.2f);
-        draw::GradientRectV(helm, headColor.Scaled(1.2f), headColor.Scaled(0.75f), alpha, 8);
-        draw::StrokeRect(helm, main.Scaled(0.6f), 2.0f, alpha);
-        // 面のスリット
-        draw::Line(helm.left + 2.0f, headY + headR * 0.1f, helm.right - 2.0f, headY + headR * 0.1f,
-                   art.trim, 3.0f, alpha);
-        // 前立て
-        draw::Triangle(Vec2(headX - headR * 0.3f, helm.top), Vec2(headX + headR * 0.3f, helm.top),
-                       Vec2(headX + dir * headR * 0.2f, helm.top - headR * 0.9f),
-                       art.trim, true, alpha);
-    } else {
-        draw::Circle(headX, headY, headR, headColor, true, 1.0f, alpha);
-        draw::Circle(headX, headY, headR, main.Scaled(0.5f), false, 2.0f, alpha);
-        // 視線方向
-        draw::Circle(headX + dir * headR * 0.42f, headY - headR * 0.1f, headR * 0.17f,
-                     art.trim, true, 1.0f, alpha);
-    }
+    draw::Circle(headX, headY, headR, accent, true, 1.0f, alpha);
+    draw::Circle(headX, headY, headR, main.Scaled(0.5f), false, 2.0f, alpha);
+    // 視線方向
+    draw::Circle(headX + dir * headR * 0.42f, headY - headR * 0.1f, headR * 0.17f,
+                 art.trim, true, 1.0f, alpha);
 
     // --- 盾 -----------------------------------------------------------------
     if (art.hasShield) {
@@ -208,11 +192,8 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
                             + ((pose == PoseKind::Guard) ? dir * torsoW * 1.5f : 0.0f);
         const float shieldY = shoulderY + h * 0.10f;
         const Rect shield = Rect::FromCenter(shieldX, shieldY, w * 0.30f, h * 0.26f);
-        draw::GradientRectV(shield, art.shieldColor.Scaled(1.25f), art.shieldColor.Scaled(0.7f),
-                            alpha, 8);
+        draw::FillRect(shield, main.Scaled(1.35f), alpha);
         draw::StrokeRect(shield, art.trim, 2.0f, alpha);
-        draw::Line(shield.CenterX(), shield.top + 3.0f, shield.CenterX(), shield.bottom - 3.0f,
-                   art.trim, 2.0f, math::ClampInt(alpha - 60, 0, 255));
     }
 
     // --- 腕と武器 -----------------------------------------------------------
@@ -226,14 +207,29 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
 
     if (art.hasWeapon) {
         const float weaponLen = h * 0.46f * WeaponReachScale(art.weapon);
-        DrawWeapon(hand, angle, facing, weaponLen, art.weapon, art.weaponColor, art.trim, alpha);
+        DrawWeapon(hand, angle, facing, weaponLen, art.weapon, accent, art.trim, alpha);
 
-        // 発光する装備は常に軌跡が光る
-        if (pose == PoseKind::Skill || art.glowing) {
+        // スキル発動中は軌跡を光らせる
+        if (pose == PoseKind::Skill) {
             const Vec2 tip = Rotate(hand, weaponLen, angle);
-            const int glowAlpha = (pose == PoseKind::Skill) ? 150 : 70;
-            draw::Glow(tip.x, tip.y, h * (pose == PoseKind::Skill ? 0.16f : 0.10f),
-                       art.trim, glowAlpha, 4);
+            draw::Glow(tip.x, tip.y, h * 0.16f, art.trim, 150, 4);
+        }
+
+        // --- 二刀流：逆手にもう一振り --------------------------------------
+        if (art.hasOffHandWeapon) {
+            const Vec2 offShoulder(cx - dir * torsoW * 0.35f + lean * 0.5f, shoulderY + h * 0.06f);
+            // 主武器と逆位相で振る
+            const float offAngle = angle + math::DegToRad(dir > 0.0f ? 48.0f : -48.0f);
+            const Vec2 offHand = Rotate(offShoulder, armLen * 0.95f,
+                                        offAngle - math::DegToRad(dir > 0.0f ? 20.0f : -20.0f));
+            Limb(offShoulder, offHand, h * 0.042f, main, alpha);
+            DrawWeapon(offHand, offAngle, facing, weaponLen * 0.95f, art.weapon,
+                       accent.Scaled(0.9f), art.trim, alpha);
+
+            if (pose == PoseKind::Skill) {
+                const Vec2 tip = Rotate(offHand, weaponLen * 0.95f, offAngle);
+                draw::Glow(tip.x, tip.y, h * 0.14f, art.trim, 130, 4);
+            }
         }
     }
 }

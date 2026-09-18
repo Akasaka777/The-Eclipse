@@ -57,6 +57,7 @@ void BattleHud::Update(float dt, const Player& player, const Boss* boss, const I
     const float mouseY = static_cast<float>(input.MouseY());
     if (input.MouseClicked(MouseButton::Left)) {
         for (int i = 0; i < kSkillSlotCount; ++i) {
+            if (player.Skill(i) == nullptr) continue;
             if (skillRects_[i].Contains(mouseX, mouseY)) {
                 clickedSkill_ = i;
                 break;
@@ -70,7 +71,7 @@ void BattleHud::Draw(const Player& player, const PlayerData& data, const Boss* b
 {
     DrawPlayerStatus(player, data);
     if (boss && boss->Def()) DrawBossStatus(*boss);
-    DrawSkillBar(player);
+    DrawSkillBar(player, data);
     DrawFloorInfo(info);
     DrawCombo(info);
 
@@ -183,9 +184,10 @@ void BattleHud::DrawBossStatus(const Boss& boss) const
                draw::TextAlign::Right);
 }
 
-void BattleHud::DrawSkillBar(const Player& player) const
+void BattleHud::DrawSkillBar(const Player& player, const PlayerData& data) const
 {
-    for (int i = 0; i < kSkillSlotCount; ++i) {
+    const int limit = data.SkillSlotLimit();
+    for (int i = 0; i < limit; ++i) {
         const Rect rect = skillRects_[i];
         const SwordSkill* skill = player.Skill(i);
 
@@ -244,7 +246,7 @@ void BattleHud::DrawSkillBar(const Player& player) const
 
     // 操作ヒント
     draw::Text(FontSize::Tiny, skillRects_[0].left, skillRects_[0].top - 26.0f, palette::kTextDim,
-               "1〜4 / クリックでソードスキル     ESC : メニュー");
+               str::Format("1〜%d / クリックでソードスキル     ESC : メニュー", limit));
 }
 
 void BattleHud::DrawFloorInfo(const HudInfo& info) const

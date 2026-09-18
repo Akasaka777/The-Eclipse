@@ -3,6 +3,7 @@
 #include "Common/MathUtil.h"
 #include "Common/StringUtil.h"
 #include "Core/GameConfig.h"
+#include "Game/UniqueSkill.h"
 #include "Graphics/DrawUtil.h"
 
 #include <cmath>
@@ -35,8 +36,8 @@ void SkillPanel::Layout()
 
     // 武器種の切り替えタブ
     weaponButtons_.clear();
-    const float tabWidth = 270.0f;
-    const float tabGap = 18.0f;
+    const float tabWidth = 220.0f;
+    const float tabGap = 14.0f;
     for (int i = 0; i < static_cast<int>(WeaponType::Count); ++i) {
         const float x = window_.left + 40.0f + (tabWidth + tabGap) * static_cast<float>(i);
         weaponButtons_.push_back(Button(Rect::FromXYWH(x, window_.top + 70.0f, tabWidth, 46.0f),
@@ -57,6 +58,15 @@ void SkillPanel::Layout()
         slotRects_[i] = Rect::FromXYWH(slotStart + (slotWidth + slotGap) * static_cast<float>(i),
                                        window_.top + 620.0f, slotWidth, 116.0f);
     }
+
+    // ユニークスキルのタブ（武器タブの右端に置く）
+    uniqueTabButton_ = Button(Rect::FromXYWH(window_.right - 250.0f, window_.top + 70.0f,
+                                             210.0f, 46.0f), "ユニーク", FontSize::Small);
+    uniqueTabButton_.SetAccent(palette::kExp);
+    acquireButton_ = Button(Rect::FromXYWH(detailArea_.left + 20.0f, detailArea_.bottom - 146.0f,
+                                           460.0f, 56.0f), "このユニークスキルを習得する",
+                            FontSize::Small);
+    acquireButton_.SetAccent(palette::kExp);
 
     unlockButton_ = Button(Rect::FromXYWH(detailArea_.left + 20.0f, detailArea_.bottom - 76.0f,
                                           220.0f, 56.0f), "解放する");
@@ -81,10 +91,26 @@ void SkillPanel::Open(const GameContext& context)
     open_ = true;
     closeRequested_ = false;
     viewWeapon_ = context.player.CurrentWeaponType();
+    uniqueTab_ = false;
     selectedSkillId_ = 0;
     targetSlot_ = 0;
     message_.clear();
     messageTimer_ = 0.0f;
+}
+
+UniqueSkillType SkillPanel::VisibleUniqueType(const GameContext& context) const
+{
+    // 習得済みがあればそれを、無ければ解放条件を満たしたものを表示する
+    if (context.player.HasUniqueSkill()) return context.player.UniqueSkill();
+    for (const UniqueSkillDef& def : UniqueSkillDatabase::Instance().All()) {
+        if (context.player.IsUniqueSkillAvailable(def.type)) return def.type;
+    }
+    return UniqueSkillType::None;
+}
+
+bool SkillPanel::HasVisibleUnique(const GameContext& context) const
+{
+    return VisibleUniqueType(context) != UniqueSkillType::None;
 }
 
 bool SkillPanel::IsCurrentWeapon(const GameContext& context) const
@@ -104,12 +130,25 @@ void SkillPanel::Update(float dt, const Input& input, GameContext& context)
 
     // --- 武器種タブ ----------------------------------------------------------
     for (int i = 0; i < static_cast<int>(weaponButtons_.size()); ++i) {
-        const bool selected = (static_cast<WeaponType>(i) == viewWeapon_);
+        const bool selected = (!uniqueTab_ && static_cast<WeaponType>(i) == viewWeapon_);
         weaponButtons_[static_cast<size_t>(i)].SetSelected(selected);
         if (weaponButtons_[static_cast<size_t>(i)].Update(input, dt)) {
             viewWeapon_ = static_cast<WeaponType>(i);
+            uniqueTab_ = false;
             selectedSkillId_ = 0;
         }
+    }
+
+    // --- ユニークスキルのタブ（解放条件を満たすまで表示しない） ------------------
+    const bool uniqueVisible = HasVisibleUnique(context);
+    if (uniqueVisible) {
+        uniqueTabButton_.SetSelected(uniqueTab_);
+        if (uniqueTabButton_.Update(input, dt)) {
+            uniqueTab_ = true;
+            selectedSkillId_ = 0;
+        }
+    } else {
+        uniqueTab_ = false;
     }
 
     const float mouseX = static_cast<float>(input.MouseX());
@@ -117,6 +156,15 @@ void SkillPanel::Update(float dt, const Input& input, GameContext& context)
 
     // --- ノード選択 ----------------------------------------------------------
     if (input.MouseClicked(MouseButton::Left)) {
+        if (uniqueTab_) {
+            const std::vector<const SwordSkill*> nodes =
+                SkillDatabase::Instance().ForUnique(VisibleUniqueType(context));
+            for (size_t i = 0; i < nodes.size(); ++i) {
+                if (NodeRect(0, static_cast<int>(i) + 1).Contains(mouseX, mouseY)) {
+                    selectedSkillId_ = nodes[i]->id;
+                }
+            }
+        } else {
         for (int column = 0; column < kSkillTreeColumns; ++column) {
             for (int tier = 1; tier <= kSkillTreeTiers; ++tier) {
                 const SwordSkill* node = SkillDatabase::Instance().NodeAt(viewWeapon_, column, tier);
@@ -126,8 +174,9 @@ void SkillPanel::Update(float dt, const Input& input, GameContext& context)
                 }
             }
         }
+        }
         // --- スロット選択 ----------------------------------------------------
-        for (int i = 0; i < kSkillSlotCount; ++i) {
+        for (int i = 0; i < player.SkillSlotLimit(); ++i) {
             if (slotRects_[i].Contains(mouseX, mouseY)) targetSlot_ = i;
         }
     }
@@ -139,7 +188,22 @@ void SkillPanel::Update(float dt, const Input& input, GameContext& context)
 
     unlockButton_.SetEnabled(canUnlock);
     equipButton_.SetEnabled(equippable);
+    if (targetSlot_ >= player.SkillSlotLimit()) targetSlot_ = 0;
     unequipButton_.SetEnabled(player.SkillAt(targetSlot_) != nullptr);
+
+    // --- ユニークスキルの習得 --------------------------------------------------
+    const UniqueSkillType uniqueType = VisibleUniqueType(context);
+    const bool canAcquire = uniqueTab_ && uniqueType != UniqueSkillType::None
+                         && (!player.HasUniqueSkill() || context.settings.debugMode);
+    acquireButton_.SetEnabled(canAcquire);
+    if (uniqueTab_ && acquireButton_.Update(input, dt) && canAcquire) {
+        // デバッグモードでは習得済みでも切り替えられる
+        if (player.AcquireUniqueSkill(uniqueType, context.settings.debugMode)) {
+            message_ = str::Format("ユニークスキル「%s」を習得しました",
+                                   UniqueSkillName(uniqueType));
+            messageTimer_ = 3.0f;
+        }
+    }
 
     if (unlockButton_.Update(input, dt) && canUnlock) {
         if (player.UnlockSkill(selected->id)) {
@@ -153,8 +217,9 @@ void SkillPanel::Update(float dt, const Input& input, GameContext& context)
                                    targetSlot_ + 1, selected->name.c_str());
             messageTimer_ = 2.4f;
             // 次の空きスロットへ自動で移動する
-            for (int i = 1; i <= kSkillSlotCount; ++i) {
-                const int next = (targetSlot_ + i) % kSkillSlotCount;
+            const int limit = player.SkillSlotLimit();
+            for (int i = 1; i <= limit; ++i) {
+                const int next = (targetSlot_ + i) % limit;
                 if (player.SkillAt(next) == nullptr) {
                     targetSlot_ = next;
                     break;
@@ -188,7 +253,8 @@ void SkillPanel::Draw(const GameContext& context) const
                str::Format("SP  %d", context.player.SkillPoints()), draw::TextAlign::Center);
 
     DrawWeaponTabs(context);
-    DrawTree(context);
+    if (uniqueTab_) DrawUniqueTree(context);
+    else DrawTree(context);
     DrawDetail(context);
     DrawSlots(context);
 
@@ -201,6 +267,19 @@ void SkillPanel::Draw(const GameContext& context) const
 
 void SkillPanel::DrawWeaponTabs(const GameContext& context) const
 {
+    // ユニークスキルは解放条件を満たすまで表示しない
+    if (HasVisibleUnique(context)) {
+        uniqueTabButton_.Draw();
+        if (!context.player.HasUniqueSkill()) {
+            const Rect rect = uniqueTabButton_.GetRect();
+            const float pulse = 0.7f + 0.3f * std::sin(time_ * 4.0f);
+            draw::StrokeRect(rect.Expanded(3.0f), palette::kExp, 2.0f,
+                             static_cast<int>(200.0f * pulse));
+            draw::Text(FontSize::Tiny, rect.CenterX(), rect.top - 20.0f, palette::kExp,
+                       "習得可能！", draw::TextAlign::Center);
+        }
+    }
+
     for (int i = 0; i < static_cast<int>(weaponButtons_.size()); ++i) {
         weaponButtons_[static_cast<size_t>(i)].Draw();
 
@@ -297,6 +376,86 @@ void SkillPanel::DrawTree(const GameContext& context) const
     }
 }
 
+void SkillPanel::DrawUniqueTree(const GameContext& context) const
+{
+    const PlayerData& player = context.player;
+    const UniqueSkillType type = VisibleUniqueType(context);
+    const UniqueSkillDef* def = UniqueSkillDatabase::Instance().Find(type);
+
+    draw::FillRect(treeArea_.Expanded(8.0f), palette::kPanelDark, 190);
+    draw::StrokeRect(treeArea_.Expanded(8.0f), palette::kExp.Scaled(0.7f), 1.0f, 180);
+
+    if (!def) return;
+
+    draw::Text(FontSize::Small, treeArea_.left + 12.0f, treeArea_.top + 2.0f, palette::kExp,
+               str::Format("ユニークスキル : %s", def->name.c_str()));
+
+    const bool acquired = (player.UniqueSkill() == type);
+    const std::vector<const SwordSkill*> nodes = SkillDatabase::Instance().ForUnique(type);
+
+    for (size_t i = 0; i < nodes.size(); ++i) {
+        const SwordSkill* node = nodes[i];
+        const Rect rect = NodeRect(0, static_cast<int>(i) + 1);
+
+        const bool unlocked = player.IsSkillUnlocked(node->id);
+        const bool reachable = acquired && player.IsSkillReachable(node->id);
+        const bool canUnlock = player.CanUnlockSkill(node->id);
+        const bool selected = (node->id == selectedSkillId_);
+        const int equippedSlot = player.SkillSlotOf(node->id);
+
+        if (i > 0) {
+            const Rect parent = NodeRect(0, static_cast<int>(i));
+            draw::Line(parent.CenterX(), parent.bottom, rect.CenterX(), rect.top,
+                       unlocked ? node->effectColor : palette::kTextDisabled,
+                       unlocked ? 4.0f : 2.0f, 220);
+        }
+
+        ColorRGB fill = palette::kPanelDark;
+        if (unlocked) fill = ColorRGB::Lerp(palette::kPanelLight, node->effectColor.Scaled(0.5f), 0.55f);
+        else if (canUnlock) fill = palette::kPanelLight;
+        draw::GradientRectV(rect, fill.Scaled(1.15f), fill.Scaled(0.75f), 235, 10);
+
+        ColorRGB border = palette::kTextDisabled;
+        if (equippedSlot >= 0) border = palette::kAccent;
+        else if (unlocked) border = node->effectColor;
+        else if (canUnlock) border = palette::kExp;
+        draw::StrokeRect(rect, border, selected ? 4.0f : 2.0f, 255);
+
+        DrawWeaponIcon(Rect(rect.left + 8.0f, rect.top + 8.0f, rect.left + 68.0f, rect.bottom - 8.0f),
+                       node->weapon, unlocked ? node->effectColor : palette::kTextDisabled);
+
+        const ColorRGB textColor = unlocked ? palette::kText
+                                 : (reachable ? palette::kTextDim : palette::kTextDisabled);
+        draw::Text(FontSize::Small, rect.left + 76.0f, rect.top + 10.0f, textColor, node->name);
+        draw::Text(FontSize::Tiny, rect.left + 76.0f, rect.top + 38.0f, palette::kTextDim,
+                   str::Format("MP %d  CD %.1fs", static_cast<int>(node->mpCost), node->cooldown));
+
+        if (!acquired) {
+            draw::Text(FontSize::Tiny, rect.left + 76.0f, rect.bottom - 26.0f, palette::kTextDisabled,
+                       "ユニークスキルの習得が必要");
+        } else if (equippedSlot >= 0) {
+            draw::Text(FontSize::Tiny, rect.left + 76.0f, rect.bottom - 26.0f, palette::kAccent,
+                       str::Format("装備中  スロット %d", equippedSlot + 1));
+        } else if (unlocked) {
+            draw::Text(FontSize::Tiny, rect.left + 76.0f, rect.bottom - 26.0f, palette::kHp, "解放済み");
+        } else if (!reachable) {
+            draw::Text(FontSize::Tiny, rect.left + 76.0f, rect.bottom - 26.0f, palette::kTextDisabled,
+                       "前提スキルが必要");
+        } else {
+            draw::Text(FontSize::Tiny, rect.left + 76.0f, rect.bottom - 26.0f,
+                       canUnlock ? palette::kExp : palette::kDanger,
+                       str::Format("解放に SP %d", node->unlockCost));
+        }
+    }
+
+    // 効果と解放条件の説明
+    const float infoY = treeArea_.top + 470.0f;
+    draw::Text(FontSize::Tiny, treeArea_.left + 12.0f, infoY, palette::kTextDim, def->description);
+    draw::Text(FontSize::Tiny, treeArea_.left + 12.0f, infoY + 26.0f,
+               acquired ? palette::kHp : palette::kExp,
+               acquired ? "習得済み" : str::Format("解放条件 : %s", def->unlockCondition.c_str()));
+}
+
 void SkillPanel::DrawDetail(const GameContext& context) const
 {
     const PlayerData& player = context.player;
@@ -365,6 +524,7 @@ void SkillPanel::DrawDetail(const GameContext& context) const
                    palette::kTextDim, "※ 装備するには対応する武器を装備してください");
     }
 
+    if (uniqueTab_) acquireButton_.Draw();
     unlockButton_.Draw();
     equipButton_.Draw();
     unequipButton_.Draw();
@@ -374,11 +534,27 @@ void SkillPanel::DrawSlots(const GameContext& context) const
 {
     const PlayerData& player = context.player;
 
+    const int limit = player.SkillSlotLimit();
     draw::Text(FontSize::Small, slotRects_[0].left, slotRects_[0].top - 30.0f, palette::kAccent,
-               str::Format("装備スキル（最大 %d つ / クリックで装備先を選択）", kSkillSlotCount));
+               str::Format("装備スキル（最大 %d つ / クリックで装備先を選択）", limit));
+    if (player.HasUniqueSkill()) {
+        draw::Text(FontSize::Tiny, slotRects_[kSkillSlotCount - 1].right, slotRects_[0].top - 28.0f,
+                   palette::kExp,
+                   str::Format("ユニークスキル「%s」習得中のため 1 枠減少",
+                               UniqueSkillName(player.UniqueSkill())),
+                   draw::TextAlign::Right);
+    }
 
     for (int i = 0; i < kSkillSlotCount; ++i) {
         const Rect rect = slotRects_[i];
+        if (i >= limit) {
+            // 使えない枠は封鎖表示
+            draw::FillRect(rect, palette::kPanelDark, 200);
+            draw::StrokeRect(rect, palette::kTextDisabled, 1.0f, 180);
+            draw::Text(FontSize::Small, rect.CenterX(), rect.CenterY() - 12.0f,
+                       palette::kTextDisabled, "使用不可", draw::TextAlign::Center);
+            continue;
+        }
         const SwordSkill* skill = player.SkillAt(i);
         const bool target = (i == targetSlot_);
 

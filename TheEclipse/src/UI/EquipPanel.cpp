@@ -24,10 +24,10 @@ void EquipPanel::Layout()
     window_ = Rect::FromXYWH(120.0f, 100.0f, 1680.0f, 880.0f);
 
     slotButtons_.clear();
-    float y = window_.top + 90.0f;
+    float y = window_.top + 88.0f;
     for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {
-        slotButtons_.push_back(Button(Rect::FromXYWH(window_.left + 36.0f, y, 300.0f, 74.0f), ""));
-        y += 84.0f;
+        slotButtons_.push_back(Button(Rect::FromXYWH(window_.left + 36.0f, y, 300.0f, 66.0f), ""));
+        y += 74.0f;
     }
 
     const float listLeft = window_.left + 372.0f;
@@ -96,13 +96,15 @@ void EquipPanel::Update(float dt, const Input& input, GameContext& context)
 
     // --- ボタン -------------------------------------------------------------
     const EquipmentItem* selected = inventory.FindByUid(selectedUid_);
-    equipButton_.SetEnabled(selected != nullptr && !inventory.IsEquipped(selectedUid_));
+    const bool canEquipHere = selected != nullptr && inventory.CanEquipTo(selectedUid_, selectedSlot_)
+                           && inventory.EquippedUid(selectedSlot_) != selectedUid_;
+    equipButton_.SetEnabled(canEquipHere);
     unequipButton_.SetEnabled(inventory.EquippedUid(selectedSlot_) != 0);
     sellButton_.SetEnabled(sellEnabled_ && selected != nullptr
                            && !inventory.IsEquipped(selectedUid_));
 
     if (equipButton_.Update(input, dt) && equipButton_.Enabled()) {
-        if (inventory.Equip(selectedUid_)) {
+        if (inventory.EquipTo(selectedUid_, selectedSlot_)) {
             context.player.RefreshSkillLoadout();
             equipmentChanged_ = true;
             message_ = "装備を変更しました";
@@ -167,17 +169,24 @@ void EquipPanel::DrawSlotColumn(const GameContext& context) const
                          selected ? 3.0f : 1.0f, 255);
 
         const ColorRGB iconColor = equipped ? RarityColor(equipped->rarity) : palette::kTextDisabled;
-        DrawSlotIcon(Rect(rect.left + 8.0f, rect.top + 8.0f, rect.left + 66.0f, rect.bottom - 8.0f),
+        DrawSlotIcon(Rect(rect.left + 6.0f, rect.top + 6.0f, rect.left + 56.0f, rect.bottom - 6.0f),
                      slot, iconColor);
 
-        draw::Text(FontSize::Tiny, rect.left + 76.0f, rect.top + 10.0f, palette::kTextDim,
+        draw::Text(FontSize::Tiny, rect.left + 64.0f, rect.top + 6.0f, palette::kTextDim,
                    EquipSlotName(slot));
         if (equipped) {
-            draw::Text(FontSize::Small, rect.left + 76.0f, rect.top + 32.0f, palette::kText,
+            draw::Text(FontSize::Small, rect.left + 64.0f, rect.top + 28.0f, palette::kText,
                        equipped->DisplayName());
         } else {
-            draw::Text(FontSize::Small, rect.left + 76.0f, rect.top + 32.0f, palette::kTextDisabled,
-                       "未装備");
+            // 使えないスロットは理由を表示する
+            const char* reason = "未装備";
+            if (slot == EquipSlot::WeaponLeft && !inventory.DualWieldEnabled()) {
+                reason = "二刀流の習得が必要";
+            } else if (slot == EquipSlot::Shield && inventory.IsDualWielding()) {
+                reason = "二刀流中は装備不可";
+            }
+            draw::Text(FontSize::Small, rect.left + 64.0f, rect.top + 28.0f, palette::kTextDisabled,
+                       reason);
         }
     }
 
@@ -257,13 +266,11 @@ void EquipPanel::DrawComparison(const GameContext& context) const
 
     const Stats current = context.player.TotalStats();
 
-    // 選択中のアイテムを装備した場合のステータス
+    // 選択中のアイテムを今のスロットへ装備した場合のステータス
     Stats next = current;
     const EquipmentItem* selected = inventory.FindByUid(selectedUid_);
-    if (selected && !inventory.IsEquipped(selectedUid_)) {
-        const EquipmentItem* equipped = inventory.Equipped(selected->slot);
-        if (equipped) next += selected->TotalStats().Scaled(1.0f) + equipped->TotalStats().Scaled(-1.0f);
-        else next += selected->TotalStats();
+    if (selected && inventory.CanEquipTo(selectedUid_, selectedSlot_)) {
+        next = context.player.BaseStats() + inventory.PreviewStats(selectedUid_, selectedSlot_);
     }
 
     float y = preview.bottom + 22.0f;
