@@ -1,6 +1,7 @@
 #include "Game/PlayerData.h"
 
 #include "Common/MathUtil.h"
+#include "Common/StringUtil.h"
 #include "Game/ItemDatabase.h"
 
 #include <algorithm>
@@ -80,11 +81,54 @@ Stats PlayerData::TotalStats() const
     return BaseStats() + inventory_.EquippedStats();
 }
 
+//------------------------------------------------------------------------------
+// プレイヤー名
+//------------------------------------------------------------------------------
+namespace {
+constexpr int kMaxNameLength = 12; // 表示できる文字数（UTF-8 の文字単位）
+} // namespace
+
+int PlayerData::MaxNameLength()
+{
+    return kMaxNameLength;
+}
+
+void PlayerData::SetName(const std::string& name)
+{
+    // 前後の空白を落とす
+    size_t begin = 0;
+    size_t end = name.size();
+    while (begin < end && (name[begin] == ' ' || name[begin] == '\t')) ++begin;
+    while (end > begin && (name[end - 1] == ' ' || name[end - 1] == '\t')) --end;
+    const std::string trimmed = name.substr(begin, end - begin);
+
+    if (trimmed.empty()) {
+        name_ = "プレイヤー";
+        return;
+    }
+
+    // 最大文字数で切り詰める（UTF-8 の途中で切らない）
+    name_ = str::Truncate(trimmed, kMaxNameLength);
+}
+
+void PlayerData::RefreshSkillLoadoutForEquipment()
+{
+    // 系統が変わったらスロットを作り直す（前の武器のスキルを残さない）
+    if (UsesUniqueSkillSet() != lastLoadoutUnique_ || CurrentWeaponType() != lastLoadoutWeapon_) {
+        for (int i = 0; i < kSkillSlotCount; ++i) skillLoadout_[i] = 0;
+    }
+    RefreshSkillLoadout();
+}
+
 void PlayerData::RefreshSkillLoadout()
 {
     const SkillDatabase& database = SkillDatabase::Instance();
     const bool uniqueSet = UsesUniqueSkillSet();
     const int  limit = SkillSlotLimit();
+
+    // 次回の装備変更で系統の変化を検知できるように控えておく
+    lastLoadoutUnique_ = uniqueSet;
+    lastLoadoutWeapon_ = CurrentWeaponType();
 
     // --- 1. 今の系統で使えないスキルを外す --------------------------------------
     for (int i = 0; i < kSkillSlotCount; ++i) {

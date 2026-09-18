@@ -8,13 +8,15 @@ namespace ui {
 
 BattleMenu::BattleMenu()
 {
-    window_ = Rect::FromXYWH(660.0f, 260.0f, 600.0f, 560.0f);
+    // ボタンが 5 つ入るよう、縦に少し広げている
+    window_ = Rect::FromXYWH(660.0f, 220.0f, 600.0f, 640.0f);
 
     const float x = window_.left + 100.0f;
     resumeButton_ = Button(Rect::FromXYWH(x, window_.top + 100.0f, 400.0f, 72.0f), "ゲームに戻る");
     equipButton_ = Button(Rect::FromXYWH(x, window_.top + 190.0f, 400.0f, 72.0f), "装備");
-    settingsButton_ = Button(Rect::FromXYWH(x, window_.top + 280.0f, 400.0f, 72.0f), "設定");
-    retireButton_ = Button(Rect::FromXYWH(x, window_.top + 370.0f, 400.0f, 72.0f), "クエストリタイア");
+    skillButton_ = Button(Rect::FromXYWH(x, window_.top + 280.0f, 400.0f, 72.0f), "スキル");
+    settingsButton_ = Button(Rect::FromXYWH(x, window_.top + 370.0f, 400.0f, 72.0f), "設定");
+    retireButton_ = Button(Rect::FromXYWH(x, window_.top + 460.0f, 400.0f, 72.0f), "クエストリタイア");
     retireButton_.SetAccent(palette::kDanger);
 
     retireYesButton_ = Button(Rect::FromXYWH(window_.CenterX() - 210.0f, window_.bottom - 150.0f,
@@ -38,6 +40,7 @@ void BattleMenu::Close()
     confirmingRetire_ = false;
     settings_.Close();
     equipment_.Close();
+    skills_.Close();
 }
 
 void BattleMenu::Update(float dt, const Input& input, GameContext& context)
@@ -50,6 +53,14 @@ void BattleMenu::Update(float dt, const Input& input, GameContext& context)
     if (equipment_.IsOpen()) {
         equipment_.Update(dt, input, context);
         equipmentChanged_ = equipment_.EquipmentChanged();
+        return;
+    }
+
+    // スキルパネルが開いている間はそちらを優先
+    if (skills_.IsOpen()) {
+        skills_.Update(dt, input, context);
+        // スキル構成が変わったらプレイヤーへ反映させる
+        equipmentChanged_ = skills_.LoadoutChanged();
         return;
     }
 
@@ -79,6 +90,9 @@ void BattleMenu::Update(float dt, const Input& input, GameContext& context)
         // 戦闘中は売却させない（誤操作防止）
         equipment_.SetSellEnabled(false);
     }
+    if (skillButton_.Update(input, dt)) {
+        skills_.Open(context);
+    }
     if (settingsButton_.Update(input, dt)) {
         settings_.Open(context.settings);
     }
@@ -95,6 +109,10 @@ void BattleMenu::Draw(const GameContext& context) const
 
     if (equipment_.IsOpen()) {
         equipment_.Draw(context);
+        return;
+    }
+    if (skills_.IsOpen()) {
+        skills_.Draw(context);
         return;
     }
     if (settings_.IsOpen()) {
@@ -116,6 +134,7 @@ void BattleMenu::Draw(const GameContext& context) const
 
     resumeButton_.Draw();
     equipButton_.Draw();
+    skillButton_.Draw();
     settingsButton_.Draw();
     retireButton_.Draw();
 

@@ -21,6 +21,10 @@ public:
     void SetupNewGame();
 
     const std::string& Name() const { return name_; }
+    // プレイヤー名を設定する（空文字や長すぎる名前は調整される）
+    void SetName(const std::string& name);
+    // 名前の最大文字数
+    static int MaxNameLength();
     int Level() const { return level_; }
     int Exp() const { return exp_; }
     int ExpToNext() const;
@@ -42,6 +46,9 @@ public:
     // --- スキル構成 ----------------------------------------------------------
     // 武器種に合わせてロードアウトを組み直す（未解放スキルは外れる）
     void RefreshSkillLoadout();
+    // 装備変更後に呼ぶ。使えるスキルの系統（武器種／ユニーク）が変わった場合は
+    // スロットを一度空にしてから、新しい武器用のスキルを入れ直す。
+    void RefreshSkillLoadoutForEquipment();
     const SwordSkill* SkillAt(int slotIndex) const;
     // スロットへ装備（未解放・武器種違いは失敗）
     bool SetSkillAt(int slotIndex, int skillId);
@@ -109,6 +116,9 @@ private:
     int exp_ = 0;
     Inventory inventory_;
     int skillLoadout_[4] = { 0, 0, 0, 0 };
+    // 直近にロードアウトを組んだ時の系統（装備変更の検知用。セーブしない）
+    WeaponType lastLoadoutWeapon_ = WeaponType::OneHandSword;
+    bool       lastLoadoutUnique_ = false;
     int skillPoints_ = 3;
     UniqueSkillType uniqueSkill_ = UniqueSkillType::None;
     std::vector<int> availableUniqueSkills_;

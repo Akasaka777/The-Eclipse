@@ -29,6 +29,9 @@ public:
     void Update(float dt, GameContext& context, SceneManager& manager) override;
     void Draw(GameContext& context) override;
 
+    // 戦闘中のプレイヤー（HUD やテストからの参照用）
+    const Player& GetPlayer() const { return player_; }
+
 private:
     enum class Phase
     {

@@ -105,7 +105,8 @@ void EquipPanel::Update(float dt, const Input& input, GameContext& context)
 
     if (equipButton_.Update(input, dt) && equipButton_.Enabled()) {
         if (inventory.EquipTo(selectedUid_, selectedSlot_)) {
-            context.player.RefreshSkillLoadout();
+            // 武器が変わったらスキルスロットを組み直す
+            context.player.RefreshSkillLoadoutForEquipment();
             equipmentChanged_ = true;
             message_ = "装備を変更しました";
             messageTimer_ = 2.0f;
@@ -113,7 +114,7 @@ void EquipPanel::Update(float dt, const Input& input, GameContext& context)
     }
     if (unequipButton_.Update(input, dt) && unequipButton_.Enabled()) {
         inventory.Unequip(selectedSlot_);
-        context.player.RefreshSkillLoadout();
+        context.player.RefreshSkillLoadoutForEquipment();
         equipmentChanged_ = true;
         message_ = "装備を外しました";
         messageTimer_ = 2.0f;

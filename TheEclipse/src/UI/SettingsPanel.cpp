@@ -39,7 +39,8 @@ SettingsPanel::SettingsPanel()
 
 void SettingsPanel::Layout()
 {
-    window_ = Rect::FromXYWH(360.0f, 110.0f, 1200.0f, 880.0f);
+    // 開発者向けの項目が増えたので、縦に少し広げている
+    window_ = Rect::FromXYWH(360.0f, 80.0f, 1200.0f, 940.0f);
 
     // 左カラム: 設定項目 / 右カラム: 操作一覧
     columnLeft_ = window_.left + 36.0f;
@@ -70,11 +71,16 @@ void SettingsPanel::Layout()
     y = window_.top + 592.0f;
     debugToggle_ = Toggle(Rect(left, y, right, y + 40.0f), "デバッグモード", false);
 
-    deleteSaveButton_ = Button(Rect::FromXYWH(left, window_.top + 690.0f, 260.0f, 52.0f),
+    // プレイヤー名の変更はデバッグモード中だけ押せる
+    nameButton_ = Button(Rect::FromXYWH(left, window_.top + 640.0f, 260.0f, 48.0f),
+                         "プレイヤー名を変更", FontSize::Small);
+    nameButton_.SetAccent(palette::kExp);
+
+    deleteSaveButton_ = Button(Rect::FromXYWH(left, window_.top + 750.0f, 260.0f, 52.0f),
                                "セーブデータ削除", FontSize::Small);
     deleteSaveButton_.SetAccent(palette::kDanger);
 
-    logoutButton_ = Button(Rect::FromXYWH(left + 276.0f, window_.top + 690.0f, 260.0f, 52.0f),
+    logoutButton_ = Button(Rect::FromXYWH(left + 276.0f, window_.top + 750.0f, 260.0f, 52.0f),
                            "ログアウト", FontSize::Small);
     logoutButton_.SetAccent(palette::kAccentWarm);
 
@@ -127,6 +133,18 @@ void SettingsPanel::Update(float dt, const Input& input, GameContext& context)
     if (!open_) return;
     closeRequested_ = false;
 
+    // --- プレイヤー名の入力中はそちらを優先 --------------------------------------
+    if (namePanel_.IsOpen()) {
+        namePanel_.Update(dt, input);
+        if (namePanel_.Confirmed()) {
+            context.player.SetName(namePanel_.Result());
+            message_ = str::Format("プレイヤー名を「%s」に変更しました",
+                                   context.player.Name().c_str());
+            messageTimer_ = 3.0f;
+        }
+        return;
+    }
+
     bgmSlider_.Update(input);
     seSlider_.Update(input);
     damageToggle_.Update(input);
@@ -145,6 +163,15 @@ void SettingsPanel::Update(float dt, const Input& input, GameContext& context)
     context.settings.fullScreen = fullScreenToggle_.Value();
     context.settings.softwareCursor = softwareCursorToggle_.Value();
     context.settings.debugMode = debugToggle_.Value();
+
+    // --- プレイヤー名の変更（デバッグモード中のみ） --------------------------------
+    nameButton_.SetEnabled(context.settings.debugMode);
+    if (context.settings.debugMode && nameButton_.Update(input, dt)) {
+        namePanel_.SetTitle("プレイヤー名の変更");
+        namePanel_.SetCancelEnabled(true);
+        namePanel_.Open(context.player.Name());
+        return;
+    }
 
     // --- セーブデータ削除（2 段階で確認する） ------------------------------------
     if (deleteSaveButton_.Update(input, dt)) {
@@ -186,6 +213,7 @@ void SettingsPanel::Update(float dt, const Input& input, GameContext& context)
         confirmingLogout_ = false;
         deleteSaveButton_.SetLabel("セーブデータ削除");
         logoutButton_.SetLabel("ログアウト");
+        namePanel_.Close();
     }
 }
 
@@ -215,11 +243,15 @@ void SettingsPanel::Draw() const
     // --- 開発者向け ---------------------------------------------------------
     DrawSectionHeader(columnLeft_, window_.top + 556.0f, columnWidth, "開発者向け");
     debugToggle_.Draw();
+    nameButton_.Draw();
     if (debugToggle_.Value()) {
-        draw::Text(FontSize::Tiny, columnLeft_ + 12.0f, window_.top + 644.0f, palette::kAccentWarm,
+        draw::Text(FontSize::Tiny, columnLeft_ + 12.0f, window_.top + 700.0f, palette::kAccentWarm,
                    "戦闘中 : F1 無敵 / F2 殲滅 / F3 全回復 / F4 判定表示");
-        draw::Text(FontSize::Tiny, columnLeft_ + 12.0f, window_.top + 666.0f, palette::kAccentWarm,
+        draw::Text(FontSize::Tiny, columnLeft_ + 12.0f, window_.top + 722.0f, palette::kAccentWarm,
                    "ホーム : 画面左下のボタンで col・素材・SP・武器・スキルを追加");
+    } else {
+        draw::Text(FontSize::Tiny, columnLeft_ + 288.0f, window_.top + 654.0f,
+                   palette::kTextDisabled, "※ デバッグモード中のみ変更できます");
     }
     deleteSaveButton_.Draw();
     logoutButton_.Draw();
@@ -230,8 +262,11 @@ void SettingsPanel::Draw() const
     closeButton_.Draw();
 
     if (messageTimer_ > 0.0f) {
-        draw::Text(FontSize::Tiny, columnLeft_, window_.top + 752.0f, palette::kAccent, message_);
+        draw::Text(FontSize::Tiny, columnLeft_, window_.top + 812.0f, palette::kAccent, message_);
     }
+
+    // 名前入力は最前面に重ねる
+    namePanel_.Draw();
 }
 
 void SettingsPanel::DrawKeyGuide() const

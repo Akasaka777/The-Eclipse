@@ -40,6 +40,14 @@ void TitleScene::OnEnter(GameContext& context)
         } else if (context.player.GetInventory().Items().empty()) {
             context.player.SetupNewGame();
         }
+
+        // セーブデータが無い初回だけ、プレイヤー名を訊く
+        if (!hasSaveData_) {
+            nameAsked_ = true;
+            namePanel_.SetTitle("プレイヤー名を入力");
+            namePanel_.SetCancelEnabled(false);   // 初回は必ず決めてもらう
+            namePanel_.Open("");                  // 初回は空から入力してもらう
+        }
     }
 }
 
@@ -47,6 +55,13 @@ void TitleScene::Update(float dt, GameContext& context, SceneManager& manager)
 {
     time_ += dt;
     const Input& input = Input::Instance();
+
+    // --- 初回の名前入力 --------------------------------------------------------
+    if (namePanel_.IsOpen()) {
+        namePanel_.Update(dt, input);
+        if (namePanel_.Confirmed()) context.player.SetName(namePanel_.Result());
+        return;
+    }
 
     if (manager.IsTransitioning()) return;
 
@@ -96,7 +111,12 @@ void TitleScene::Draw(GameContext& context)
 
     if (hasSaveData_) {
         draw::Text(FontSize::Small, kScreenW * 0.5f, 660.0f, palette::kHp,
-                   str::Format("セーブデータを読み込みました（Lv %d）", context.player.Level()),
+                   str::Format("セーブデータを読み込みました（%s / Lv %d）",
+                               context.player.Name().c_str(), context.player.Level()),
+                   draw::TextAlign::Center);
+    } else if (nameAsked_ && !namePanel_.IsOpen()) {
+        draw::Text(FontSize::Small, kScreenW * 0.5f, 660.0f, palette::kAccent,
+                   str::Format("ようこそ、%s さん", context.player.Name().c_str()),
                    draw::TextAlign::Center);
     }
     draw::Text(FontSize::Tiny, kScreenW * 0.5f, kScreenH - 60.0f, palette::kTextDim,
@@ -104,6 +124,9 @@ void TitleScene::Draw(GameContext& context)
                draw::TextAlign::Center);
     draw::Text(FontSize::Tiny, kScreenW - 24.0f, kScreenH - 32.0f, palette::kTextDisabled,
                "DxLib / C++17", draw::TextAlign::Right);
+
+    // 名前入力は最前面に重ねる
+    namePanel_.Draw();
 }
 
 } // namespace ecl

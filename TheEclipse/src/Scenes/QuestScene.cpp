@@ -632,7 +632,7 @@ void QuestScene::HandleBrokenEquipment(GameContext& context)
     breakNoticeTimer_ = 3.0f;
 
     // 装備が外れた状態をプレイヤーへ即座に反映する
-    context.player.RefreshSkillLoadout();
+    context.player.RefreshSkillLoadoutForEquipment();
     player_.RefreshEquipment(context.player);
 
     camera_.Shake(20.0f, 0.4f);

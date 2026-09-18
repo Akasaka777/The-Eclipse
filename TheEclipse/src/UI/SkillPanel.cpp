@@ -107,6 +107,7 @@ void SkillPanel::Open(const GameContext& context)
 {
     open_ = true;
     closeRequested_ = false;
+    loadoutChanged_ = false;
     viewWeapon_ = context.player.CurrentWeaponType();
     // 今使える系統のタブを開いておく（二刀流中はユニークのタブ）
     uniqueTab_ = context.player.UsesUniqueSkillSet();
@@ -164,6 +165,7 @@ void SkillPanel::Update(float dt, const Input& input, GameContext& context)
     if (!open_) return;
 
     closeRequested_ = false;
+    loadoutChanged_ = false;
     time_ += dt;
     messageTimer_ = math::MaxF(0.0f, messageTimer_ - dt);
 
@@ -246,6 +248,7 @@ void SkillPanel::Update(float dt, const Input& input, GameContext& context)
                                  && selected->requiredUnique != player.UniqueSkill();
         const UniqueSkillType acquired = selected->requiredUnique;
         if (player.UnlockSkill(selected->id)) {
+            loadoutChanged_ = true;
             if (acquiresUnique) {
                 message_ = str::Format("ユニークスキル「%s」を習得しました",
                                        UniqueSkillName(acquired));
@@ -260,6 +263,7 @@ void SkillPanel::Update(float dt, const Input& input, GameContext& context)
     // --- 装備 / 解除 ---------------------------------------------------------
     if (equipButton_.Update(input, dt) && equippable) {
         if (player.SetSkillAt(targetSlot_, selected->id)) {
+            loadoutChanged_ = true;
             message_ = str::Format("スロット %d に「%s」を装備しました",
                                    targetSlot_ + 1, selected->name.c_str());
             messageTimer_ = 2.4f;
@@ -276,6 +280,7 @@ void SkillPanel::Update(float dt, const Input& input, GameContext& context)
     }
     if (unequipButton_.Update(input, dt) && unequipButton_.Enabled()) {
         player.ClearSkillSlot(targetSlot_);
+        loadoutChanged_ = true;
         message_ = str::Format("スロット %d を空にしました", targetSlot_ + 1);
         messageTimer_ = 2.4f;
     }

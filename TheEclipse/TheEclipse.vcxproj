@@ -231,6 +231,7 @@
     <ClCompile Include="src\UI\BattleHud.cpp" />
     <ClCompile Include="src\UI\BattleMenu.cpp" />
     <ClCompile Include="src\UI\EquipPanel.cpp" />
+    <ClCompile Include="src\UI\NamePanel.cpp" />
     <ClCompile Include="src\UI\QuestPanel.cpp" />
     <ClCompile Include="src\UI\SettingsPanel.cpp" />
     <ClCompile Include="src\UI\SkillPanel.cpp" />
@@ -280,6 +281,7 @@
     <ClInclude Include="src\UI\BattleHud.h" />
     <ClInclude Include="src\UI\BattleMenu.h" />
     <ClInclude Include="src\UI\EquipPanel.h" />
+    <ClInclude Include="src\UI\NamePanel.h" />
     <ClInclude Include="src\UI\QuestPanel.h" />
     <ClInclude Include="src\UI\SettingsPanel.h" />
     <ClInclude Include="src\UI\SkillPanel.h" />

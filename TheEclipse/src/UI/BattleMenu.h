@@ -1,5 +1,5 @@
 //==============================================================================
-// BattleMenu.h : 戦闘中の MENU（設定 / クエストリタイア）
+// BattleMenu.h : 戦闘中の MENU（装備 / スキル / 設定 / クエストリタイア）
 //==============================================================================
 #pragma once
 
@@ -7,6 +7,7 @@
 #include "Game/GameContext.h"
 #include "UI/EquipPanel.h"
 #include "UI/SettingsPanel.h"
+#include "UI/SkillPanel.h"
 #include "UI/UIWidgets.h"
 
 namespace ecl {
@@ -26,19 +27,21 @@ public:
 
     // リタイアが確定したら true
     bool RetireConfirmed() const { return retireConfirmed_; }
-    // 装備が変更されたら true（このフレームのみ）
+    // 装備またはスキル構成が変更されたら true（このフレームのみ）
     bool EquipmentChanged() const { return equipmentChanged_; }
 
 private:
     Rect   window_;
     Button resumeButton_;
     Button equipButton_;
+    Button skillButton_;
     Button settingsButton_;
     Button retireButton_;
     Button retireYesButton_;
     Button retireNoButton_;
     SettingsPanel settings_;
     EquipPanel    equipment_;
+    SkillPanel    skills_;
 
     bool open_ = false;
     bool equipmentChanged_ = false;

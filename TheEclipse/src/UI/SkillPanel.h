@@ -30,6 +30,8 @@ public:
     void Draw(const GameContext& context) const;
 
     bool CloseRequested() const { return closeRequested_; }
+    // このフレームでスキル構成が変わったか（戦闘中の反映に使う）
+    bool LoadoutChanged() const { return loadoutChanged_; }
 
 private:
     void Layout();
@@ -68,6 +70,7 @@ private:
     int   targetSlot_ = 0;
     bool  open_ = false;
     bool  closeRequested_ = false;
+    bool  loadoutChanged_ = false;
 
     std::string message_;
     float messageTimer_ = 0.0f;

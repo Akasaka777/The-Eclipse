@@ -26,7 +26,7 @@ namespace {
 
 // セーブ形式のバージョン（構造を変えたら上げる）
 // v3: 武器スロットを左右に分割し、ユニークスキルを追加
-constexpr int kSaveVersion = 3;
+constexpr int kSaveVersion = 4;
 
 std::string g_lastError;
 
@@ -122,6 +122,7 @@ bool SaveSystem::Save(const GameContext& context)
     file << "version " << kSaveVersion << "\n";
 
     // --- プレイヤー ---------------------------------------------------------
+    file << "name " << player.Name() << "\n";
     file << "level " << player.Level() << "\n";
     file << "exp " << player.Exp() << "\n";
     file << "skillpoints " << player.SkillPoints() << "\n";
@@ -204,6 +205,7 @@ bool SaveSystem::Load(GameContext& context)
     int col = 0;
     int material = 0;
     int selectedQuest = 1;
+    std::string playerName;
     GameSettings settings = context.settings;
 
     std::string line;
@@ -219,6 +221,11 @@ bool SaveSystem::Load(GameContext& context)
         };
 
         if (key == "version") version = ToInt(arg(1));
+        else if (key == "name") {
+            // 名前は空白を含み得るので、キーの後ろをそのまま取り出す
+            const size_t space = line.find(' ');
+            if (space != std::string::npos) playerName = line.substr(space + 1);
+        }
         else if (key == "level") level = ToInt(arg(1), 1);
         else if (key == "exp") exp = ToInt(arg(1));
         else if (key == "skillpoints") skillPoints = ToInt(arg(1));
@@ -302,6 +309,8 @@ bool SaveSystem::Load(GameContext& context)
     }
 
     // --- 復元 ---------------------------------------------------------------
+    // v3 以前には名前が無いので、その場合は既定値のままにする
+    if (!playerName.empty()) loaded.SetName(playerName);
     loaded.RestoreProgress(level, exp, skillPoints, unlocked, cleared, skillSlots,
                            uniqueSkill, uniqueAvailable);
     inventory.SetCurrency(col, material);

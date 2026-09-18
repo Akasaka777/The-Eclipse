@@ -1,99 +1,286 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\Common\MathUtil.cpp" />
-    <ClCompile Include="src\Common\StringUtil.cpp" />
-    <ClCompile Include="src\Common\Types.cpp" />
-    <ClCompile Include="src\Core\Application.cpp" />
-    <ClCompile Include="src\Core\Camera.cpp" />
-    <ClCompile Include="src\Core\FontManager.cpp" />
-    <ClCompile Include="src\Core\GameConfig.cpp" />
-    <ClCompile Include="src\Core\Input.cpp" />
-    <ClCompile Include="src\Core\ResourceManager.cpp" />
-    <ClCompile Include="src\Core\SceneManager.cpp" />
-    <ClCompile Include="src\Game\Actor.cpp" />
-    <ClCompile Include="src\Game\ActorAssets.cpp" />
-    <ClCompile Include="src\Game\Boss.cpp" />
-    <ClCompile Include="src\Game\Combat.cpp" />
-    <ClCompile Include="src\Game\Enemy.cpp" />
-    <ClCompile Include="src\Game\EnemyDatabase.cpp" />
-    <ClCompile Include="src\Game\Equipment.cpp" />
-    <ClCompile Include="src\Game\GameContext.cpp" />
-    <ClCompile Include="src\Game\Inventory.cpp" />
-    <ClCompile Include="src\Game\ItemDatabase.cpp" />
-    <ClCompile Include="src\Game\Player.cpp" />
-    <ClCompile Include="src\Game\PlayerData.cpp" />
-    <ClCompile Include="src\Game\QuestDatabase.cpp" />
-    <ClCompile Include="src\Game\SaveData.cpp" />
-    <ClCompile Include="src\Game\Stage.cpp" />
-    <ClCompile Include="src\Game\Stats.cpp" />
-    <ClCompile Include="src\Game\SwordSkill.cpp" />
-    <ClCompile Include="src\Game\UniqueSkill.cpp" />
-    <ClCompile Include="src\Graphics\Animation.cpp" />
-    <ClCompile Include="src\Graphics\CharacterArt.cpp" />
-    <ClCompile Include="src\Graphics\DrawUtil.cpp" />
-    <ClCompile Include="src\Scenes\HomeScene.cpp" />
-    <ClCompile Include="src\Scenes\QuestScene.cpp" />
-    <ClCompile Include="src\Scenes\ResultScene.cpp" />
-    <ClCompile Include="src\Scenes\TitleScene.cpp" />
-    <ClCompile Include="src\UI\BattleHud.cpp" />
-    <ClCompile Include="src\UI\BattleMenu.cpp" />
-    <ClCompile Include="src\UI\EquipPanel.cpp" />
-    <ClCompile Include="src\UI\QuestPanel.cpp" />
-    <ClCompile Include="src\UI\SettingsPanel.cpp" />
-    <ClCompile Include="src\UI\SkillPanel.cpp" />
-    <ClCompile Include="src\UI\SmithPanel.cpp" />
-    <ClCompile Include="src\UI\UIWidgets.cpp" />
-    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\Common\MathUtil.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Common\StringUtil.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Common\Types.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\Application.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\Camera.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\FontManager.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\GameConfig.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\Input.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\ResourceManager.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\SceneManager.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Actor.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\ActorAssets.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Boss.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Combat.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Enemy.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\EnemyDatabase.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Equipment.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\GameContext.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Inventory.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\ItemDatabase.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Player.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\PlayerData.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\QuestDatabase.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\SaveData.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Stage.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Stats.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\SwordSkill.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\UniqueSkill.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Graphics\Animation.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Graphics\CharacterArt.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Graphics\DrawUtil.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Scenes\HomeScene.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Scenes\QuestScene.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Scenes\ResultScene.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Scenes\TitleScene.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\BattleHud.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\BattleMenu.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\EquipPanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\NamePanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\QuestPanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\SettingsPanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\SkillPanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\SmithPanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\UIWidgets.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\main.cpp">
+      <Filter></Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\Common\MathUtil.h" />
-    <ClInclude Include="src\Common\StringUtil.h" />
-    <ClInclude Include="src\Common\Types.h" />
-    <ClInclude Include="src\Core\Application.h" />
-    <ClInclude Include="src\Core\Camera.h" />
-    <ClInclude Include="src\Core\DxInclude.h" />
-    <ClInclude Include="src\Core\FontManager.h" />
-    <ClInclude Include="src\Core\GameConfig.h" />
-    <ClInclude Include="src\Core\Input.h" />
-    <ClInclude Include="src\Core\ResourceManager.h" />
-    <ClInclude Include="src\Core\Scene.h" />
-    <ClInclude Include="src\Core\SceneManager.h" />
-    <ClInclude Include="src\Game\Actor.h" />
-    <ClInclude Include="src\Game\ActorAssets.h" />
-    <ClInclude Include="src\Game\Boss.h" />
-    <ClInclude Include="src\Game\Combat.h" />
-    <ClInclude Include="src\Game\Enemy.h" />
-    <ClInclude Include="src\Game\EnemyDatabase.h" />
-    <ClInclude Include="src\Game\Equipment.h" />
-    <ClInclude Include="src\Game\GameContext.h" />
-    <ClInclude Include="src\Game\Inventory.h" />
-    <ClInclude Include="src\Game\ItemDatabase.h" />
-    <ClInclude Include="src\Game\Player.h" />
-    <ClInclude Include="src\Game\PlayerData.h" />
-    <ClInclude Include="src\Game\QuestDatabase.h" />
-    <ClInclude Include="src\Game\SaveData.h" />
-    <ClInclude Include="src\Game\Stage.h" />
-    <ClInclude Include="src\Game\Stats.h" />
-    <ClInclude Include="src\Game\SwordSkill.h" />
-    <ClInclude Include="src\Game\UniqueSkill.h" />
-    <ClInclude Include="src\Game\WeaponType.h" />
-    <ClInclude Include="src\Graphics\Animation.h" />
-    <ClInclude Include="src\Graphics\CharacterArt.h" />
-    <ClInclude Include="src\Graphics\DrawUtil.h" />
-    <ClInclude Include="src\Scenes\HomeScene.h" />
-    <ClInclude Include="src\Scenes\QuestScene.h" />
-    <ClInclude Include="src\Scenes\ResultScene.h" />
-    <ClInclude Include="src\Scenes\TitleScene.h" />
-    <ClInclude Include="src\UI\BattleHud.h" />
-    <ClInclude Include="src\UI\BattleMenu.h" />
-    <ClInclude Include="src\UI\EquipPanel.h" />
-    <ClInclude Include="src\UI\QuestPanel.h" />
-    <ClInclude Include="src\UI\SettingsPanel.h" />
-    <ClInclude Include="src\UI\SkillPanel.h" />
-    <ClInclude Include="src\UI\SmithPanel.h" />
-    <ClInclude Include="src\UI\UIWidgets.h" />
+    <ClInclude Include="src\Common\MathUtil.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Common\StringUtil.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Common\Types.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\Application.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\Camera.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\DxInclude.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\FontManager.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\GameConfig.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\Input.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\ResourceManager.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\Scene.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\SceneManager.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Actor.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\ActorAssets.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Boss.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Combat.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Enemy.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\EnemyDatabase.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Equipment.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\GameContext.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Inventory.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\ItemDatabase.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Player.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\PlayerData.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\QuestDatabase.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\SaveData.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Stage.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Stats.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\SwordSkill.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\UniqueSkill.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\WeaponType.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Graphics\Animation.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Graphics\CharacterArt.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Graphics\DrawUtil.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Scenes\HomeScene.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Scenes\QuestScene.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Scenes\ResultScene.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Scenes\TitleScene.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\BattleHud.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\BattleMenu.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\EquipPanel.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\NamePanel.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\QuestPanel.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\SettingsPanel.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\SkillPanel.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\SmithPanel.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\UIWidgets.h">
+      <Filter></Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

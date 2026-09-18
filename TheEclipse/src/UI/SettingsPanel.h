@@ -5,6 +5,7 @@
 
 #include "Core/Input.h"
 #include "Game/GameContext.h"
+#include "UI/NamePanel.h"
 #include "UI/UIWidgets.h"
 
 #include <string>
@@ -48,6 +49,9 @@ private:
     Toggle softwareCursorToggle_;
     Button deleteSaveButton_;
     Button logoutButton_;
+    // プレイヤー名の変更（デバッグモード中のみ表示）
+    Button    nameButton_;
+    NamePanel namePanel_;
 
     // セーブ削除の確認中か
     bool   confirmingDelete_ = false;
