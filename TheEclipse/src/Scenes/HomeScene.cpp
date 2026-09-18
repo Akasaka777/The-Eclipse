@@ -9,6 +9,7 @@
 #include "Game/GameContext.h"
 #include "Game/QuestDatabase.h"
 #include "Game/SaveData.h"
+#include "Game/UniqueSkill.h"
 #include "Graphics/DrawUtil.h"
 
 #include <cmath>
@@ -39,6 +40,37 @@ const TabDef kTabs[] = {
 
 constexpr int kTabCount = static_cast<int>(sizeof(kTabs) / sizeof(kTabs[0]));
 
+//------------------------------------------------------------------------------
+// 開発者モードのボタン
+//------------------------------------------------------------------------------
+enum class DebugAction
+{
+    AddCol,       // col を増やす
+    AddMaterial,  // 強化素材を増やす
+    UnlockSkills, // スキルを全解放
+    UnlockUnique, // ユニークスキルを解放
+};
+
+struct DebugButtonDef
+{
+    DebugAction action;
+    const char* label;
+};
+
+const DebugButtonDef kDebugButtons[] = {
+    { DebugAction::AddCol,       "col +10,000" },
+    { DebugAction::AddMaterial,  "素材 +50" },
+    { DebugAction::UnlockSkills, "スキル全習得" },
+    { DebugAction::UnlockUnique, "ユニーク解放" },
+};
+
+constexpr int   kDebugButtonCount = static_cast<int>(sizeof(kDebugButtons) / sizeof(kDebugButtons[0]));
+constexpr float kDebugButtonWidth = 220.0f;
+constexpr float kDebugButtonHeight = 44.0f;
+constexpr float kDebugButtonGap = 8.0f;
+constexpr int   kDebugColAmount = 10000;
+constexpr int   kDebugMaterialAmount = 50;
+
 } // namespace
 
 HomeScene::HomeScene()
@@ -55,6 +87,82 @@ HomeScene::HomeScene()
         ui::Button button(rect, kTabs[i].label, FontSize::Medium);
         tabButtons_.push_back(button);
     }
+
+    BuildDebugButtons();
+}
+
+void HomeScene::BuildDebugButtons()
+{
+    // 画面左下（タブバーの上）に縦並びで置く
+    const float stackHeight = kDebugButtonHeight * static_cast<float>(kDebugButtonCount)
+                            + kDebugButtonGap * static_cast<float>(kDebugButtonCount - 1);
+    const float top = kScreenH - kTabBarHeight - 24.0f - stackHeight;
+
+    debugButtons_.clear();
+    for (int i = 0; i < kDebugButtonCount; ++i) {
+        const Rect rect = Rect::FromXYWH(28.0f,
+                                         top + (kDebugButtonHeight + kDebugButtonGap)
+                                                   * static_cast<float>(i),
+                                         kDebugButtonWidth, kDebugButtonHeight);
+        ui::Button button(rect, kDebugButtons[i].label, FontSize::Small);
+        button.SetAccent(palette::kAccentWarm);
+        debugButtons_.push_back(button);
+    }
+}
+
+void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& context)
+{
+    debugMessageTimer_ = math::MaxF(0.0f, debugMessageTimer_ - dt);
+    if (!context.settings.debugMode) return;
+
+    Inventory& inventory = context.player.GetInventory();
+
+    for (int i = 0; i < static_cast<int>(debugButtons_.size()); ++i) {
+        if (!debugButtons_[static_cast<size_t>(i)].Update(input, dt)) continue;
+
+        switch (kDebugButtons[i].action) {
+        case DebugAction::AddCol:
+            inventory.AddCol(kDebugColAmount);
+            debugMessage_ = str::Format("col を %s 追加しました",
+                                        str::Comma(kDebugColAmount).c_str());
+            break;
+        case DebugAction::AddMaterial:
+            inventory.AddMaterial(kDebugMaterialAmount);
+            debugMessage_ = str::Format("強化素材を %d 追加しました", kDebugMaterialAmount);
+            break;
+        case DebugAction::UnlockSkills:
+            context.player.DebugUnlockAllSkills();
+            debugMessage_ = "スキルツリーを全て解放しました";
+            break;
+        case DebugAction::UnlockUnique:
+            context.player.DebugUnlockAllUniqueSkills();
+            debugMessage_ = str::Format("ユニークスキル「%s」を習得しました",
+                                        UniqueSkillName(context.player.UniqueSkill()));
+            break;
+        }
+        debugMessageTimer_ = 2.8f;
+    }
+}
+
+void HomeScene::DrawDebugPanel(const GameContext& context) const
+{
+    if (!context.settings.debugMode || debugButtons_.empty()) return;
+
+    const Rect first = debugButtons_.front().GetRect();
+    const Rect last = debugButtons_.back().GetRect();
+    const Rect panel(first.left - 12.0f, first.top - 40.0f, first.right + 12.0f, last.bottom + 12.0f);
+
+    draw::ChamferRect(panel, 10.0f, palette::kPanelDark, 205);
+    draw::StrokeRect(panel, palette::kAccentWarm.Scaled(0.8f), 1.0f, 180);
+    draw::Text(FontSize::Tiny, panel.left + 12.0f, panel.top + 10.0f, palette::kAccentWarm,
+               "開発者モード");
+
+    for (const ui::Button& button : debugButtons_) button.Draw();
+
+    if (debugMessageTimer_ > 0.0f) {
+        draw::Text(FontSize::Tiny, panel.right + 14.0f, last.bottom - 20.0f, palette::kAccentWarm,
+                   debugMessage_);
+    }
 }
 
 void HomeScene::BuildField()
@@ -65,11 +173,8 @@ void HomeScene::BuildField()
     field.groundY = 880.0f;
     field.depth = config::kDefaultFieldDepth;
     field.theme = StageTheme::Home;
-    field.platforms = {
-        Platform(620.0f, 700.0f, 300.0f, 28.0f),
-        Platform(1180.0f, 620.0f, 280.0f, 28.0f),
-        Platform(1720.0f, 700.0f, 300.0f, 28.0f),
-    };
+    // 浮いている足場は置かず、地面だけのフィールドにする
+    field.platforms.clear();
     stage_.Load(field);
     stage_.SetGateOpen(true);
 }
@@ -187,9 +292,26 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
         if (input.Pressed(GameAction::Menu)) OpenTab(HomeTab::Settings, context);
     }
 
+    // --- 開発者モードのボタン --------------------------------------------------
+    if (!panelOpen) {
+        UpdateDebugButtons(dt, input, context);
+    } else {
+        debugMessageTimer_ = math::MaxF(0.0f, debugMessageTimer_ - dt);
+    }
+
+    // ボタンの上にカーソルがある間は、クリックで攻撃が出ないようにする
+    bool overDebugPanel = false;
+    if (context.settings.debugMode && !panelOpen) {
+        const float mouseX = static_cast<float>(input.MouseX());
+        const float mouseY = static_cast<float>(input.MouseY());
+        for (const ui::Button& button : debugButtons_) {
+            if (button.GetRect().Expanded(12.0f).Contains(mouseX, mouseY)) overDebugPanel = true;
+        }
+    }
+
     // --- フィールド ----------------------------------------------------------
     stage_.Update(dt);
-    player_.Update(dt, stage_, combat_, input, !panelOpen);
+    player_.Update(dt, stage_, combat_, input, !panelOpen && !overDebugPanel);
     combat_.Update(dt);
 
     // ゲートに触れたらクエスト選択を開く
@@ -222,6 +344,7 @@ void HomeScene::Draw(GameContext& context)
 
     DrawFieldGuide(context);
     DrawPlayerSummary(context);
+    DrawDebugPanel(context);
     DrawTabBar(context);
 
     // --- パネル -------------------------------------------------------------

@@ -57,6 +57,8 @@ public:
     float        globalTime = 0.0f;
     // タイトルの「終了」などから立てる終了要求
     bool         quitRequested = false;
+    // セーブデータを削除した後は、終了時などに書き戻さないよう自動セーブを止める
+    bool         autoSaveEnabled = true;
 };
 
 } // namespace ecl

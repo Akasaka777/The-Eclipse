@@ -38,6 +38,8 @@ struct UniqueSkillDef
     std::string      name;
     std::string      description;
     std::string      unlockCondition; // 解放条件の説明文
+    // 効果の詳細（スキルツリーで 1 行ずつ表示する）
+    std::vector<std::string> details;
     std::vector<int> skillIds;        // 専用スキル（ツリーの上から順）
 };
 

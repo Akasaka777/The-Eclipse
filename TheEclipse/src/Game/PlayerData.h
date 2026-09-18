@@ -49,6 +49,10 @@ public:
     bool IsSkillEquipped(int skillId) const;
     // 装備中のスロット番号（未装備なら -1）
     int  SkillSlotOf(int skillId) const;
+    // ユニークスキル専用のスキルを装備しているか
+    bool HasUniqueSkillEquipped() const;
+    // そのスキルを装備できるか（通常スキルと専用スキルは混在できない）
+    bool CanEquipSkill(int skillId) const;
     const int* SkillLoadout() const { return skillLoadout_; }
 
     // --- スキルツリー ---------------------------------------------------------
@@ -72,8 +76,12 @@ public:
     bool AcquireUniqueSkill(UniqueSkillType type, bool force = false);
     // デバッグ用: 全ユニークスキルを解放可能にする
     void DebugUnlockAllUniqueSkills();
+    // デバッグ用: 全武器のスキルツリーを解放する
+    void DebugUnlockAllSkills();
 
-    // 装備できるスキル数（ユニークスキル習得中は 3 つまで）
+    // 装備できるスキル数
+    //   ユニークスキル専用のスキルを「装備している間だけ」3 つに減る。
+    //   通常スキルだけの構成に戻せば 4 つに復活する。
     int SkillSlotLimit() const;
 
     // --- クエスト進行 --------------------------------------------------------

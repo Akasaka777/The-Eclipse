@@ -1,6 +1,7 @@
 //==============================================================================
 // SkillPanel.h : スキルツリータブ
-//   スキルポイントでスキルを解放し、4 つのスロットへ装備する。
+//   スキルポイントでスキルを解放し、スロットへ装備する。
+//   ユニークスキルを習得すると、そのユニークスキル名のタブが増える。
 //==============================================================================
 #pragma once
 
@@ -36,26 +37,27 @@ private:
     void DrawWeaponTabs(const GameContext& context) const;
     void DrawTree(const GameContext& context) const;
     void DrawUniqueTree(const GameContext& context) const;
-    // ユニークスキルのタブを表示中か
-    bool UniqueMode() const { return uniqueTab_; }
-    // 表示できるユニークスキル（解放条件を満たしたもの）があるか
-    bool HasVisibleUnique(const GameContext& context) const;
+    void DrawNode(const Rect& rect, const SwordSkill& skill, const PlayerData& player,
+                  const std::string& status, const ColorRGB& statusColor) const;
+    // 表示できるユニークスキル（習得済み、または解放条件を満たしたもの）
     UniqueSkillType VisibleUniqueType(const GameContext& context) const;
     void DrawDetail(const GameContext& context) const;
     void DrawSlots(const GameContext& context) const;
+    // タブの右上に付ける小さなバッジ
+    void DrawTabBadge(const Rect& tabRect, const char* label, const ColorRGB& color) const;
 
-    // 表示中の武器種がプレイヤーの装備武器と一致しているか
-    bool IsCurrentWeapon(const GameContext& context) const;
+    // 選択中のスキルを今すぐ装備できるか（できない場合は理由を返す）
+    bool CanEquipSelected(const GameContext& context, std::string& outReason) const;
 
     Rect window_;
     Rect treeArea_;
     Rect detailArea_;
     Rect slotRects_[kSkillSlotCount];
+    Rect spTag_;
 
     std::vector<Button> weaponButtons_;
     Button unlockButton_;
     Button uniqueTabButton_;
-    Button acquireButton_;
     Button equipButton_;
     Button unequipButton_;
     Button closeButton_;

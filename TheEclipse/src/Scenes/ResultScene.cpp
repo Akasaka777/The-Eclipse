@@ -168,7 +168,8 @@ void ResultScene::DrawStats(const GameContext& context) const
                                result.unlockedUniqueSkillName.c_str()),
                    draw::TextAlign::Center);
         draw::Text(FontSize::Tiny, notice.CenterX(), notice.top + 32.0f, palette::kText,
-                   "ホームの「スキル」タブ → ユニーク から習得できます",
+                   str::Format("「スキル」タブ →「%s」の先頭スキルを解放すると習得",
+                               result.unlockedUniqueSkillName.c_str()),
                    draw::TextAlign::Center);
     }
 

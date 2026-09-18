@@ -65,6 +65,8 @@ constexpr int kSkillTreeColumns = 2;
 constexpr int kSkillTreeTiers = 3;
 // 装備できるスキル数
 constexpr int kSkillSlotCount = 4;
+// ユニークスキル専用のスキルを装備している間の枠数（1 枠減る）
+constexpr int kUniqueSkillSlotCount = 3;
 
 //------------------------------------------------------------------------------
 // スキルのマスターデータ

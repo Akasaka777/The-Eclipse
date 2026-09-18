@@ -101,6 +101,12 @@ bool SaveSystem::Remove()
 
 bool SaveSystem::Save(const GameContext& context)
 {
+    // セーブデータを削除した後は書き戻さない（削除が次回起動まで残るようにする）
+    if (!context.autoSaveEnabled) {
+        g_lastError = "セーブデータを削除したため保存しません";
+        return false;
+    }
+
     EnsureDirectory();
 
     std::ofstream file(FilePath());

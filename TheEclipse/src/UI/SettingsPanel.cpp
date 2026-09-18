@@ -154,9 +154,14 @@ void SettingsPanel::Update(float dt, const Input& input, GameContext& context)
         } else {
             confirmingDelete_ = false;
             deleteSaveButton_.SetLabel("セーブデータ削除");
-            message_ = SaveSystem::Remove() ? "セーブデータを削除しました（次回起動時に反映）"
-                                            : SaveSystem::LastError();
-            messageTimer_ = 3.0f;
+            if (SaveSystem::Remove()) {
+                // 削除後に自動セーブで書き戻されると消えないため、保存を止める
+                context.autoSaveEnabled = false;
+                message_ = "セーブデータを削除しました（以降は自動セーブしません）";
+            } else {
+                message_ = SaveSystem::LastError();
+            }
+            messageTimer_ = 4.0f;
         }
     }
 
@@ -165,7 +170,8 @@ void SettingsPanel::Update(float dt, const Input& input, GameContext& context)
         if (!confirmingLogout_) {
             confirmingLogout_ = true;
             logoutButton_.SetLabel("本当に終了しますか？");
-            message_ = "セーブしてからゲームを終了します";
+            message_ = context.autoSaveEnabled ? "セーブしてからゲームを終了します"
+                                               : "セーブせずにゲームを終了します";
             messageTimer_ = 4.0f;
         } else {
             // 終了要求。保存は Application 側で行う
@@ -211,9 +217,9 @@ void SettingsPanel::Draw() const
     debugToggle_.Draw();
     if (debugToggle_.Value()) {
         draw::Text(FontSize::Tiny, columnLeft_ + 12.0f, window_.top + 644.0f, palette::kAccentWarm,
-                   "戦闘中 : F1 無敵 / F2 殲滅 / F3 全回復");
+                   "戦闘中 : F1 無敵 / F2 殲滅 / F3 全回復 / F4 判定表示");
         draw::Text(FontSize::Tiny, columnLeft_ + 12.0f, window_.top + 666.0f, palette::kAccentWarm,
-                   "         F4 判定表示 / F5 col・SP 追加");
+                   "ホーム : 画面左下のボタンで col 追加・スキル全習得");
     }
     deleteSaveButton_.Draw();
     logoutButton_.Draw();

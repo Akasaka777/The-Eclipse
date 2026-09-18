@@ -75,10 +75,9 @@ bool Inventory::CanEquipTo(int uid, EquipSlot slot) const
     if (!item) return false;
 
     if (IsWeaponSlot(slot)) {
-        if (!item->IsWeapon()) return false;
-        // 左手は二刀流を習得していないと使えない
-        if (slot == EquipSlot::WeaponLeft && !dualWieldEnabled_) return false;
-        return true;
+        // 武器は左右どちらのスロットにも装備できる。
+        // 二刀流を習得していない場合は、装備した時点で反対の手が空く（EquipTo 参照）。
+        return item->IsWeapon();
     }
 
     if (item->IsWeapon()) return false;
@@ -126,8 +125,8 @@ bool Inventory::EquipTo(int uid, EquipSlot slot)
 void Inventory::SetDualWieldEnabled(bool enabled)
 {
     dualWieldEnabled_ = enabled;
-    // 解除されたら左手の武器を外す
-    if (!dualWieldEnabled_) {
+    // 解除された時に両手持ちだった場合のみ、左手の武器を外して片手持ちに戻す
+    if (!dualWieldEnabled_ && IsDualWielding()) {
         equippedUid_[static_cast<int>(EquipSlot::WeaponLeft)] = 0;
     }
 }
@@ -177,7 +176,9 @@ Stats Inventory::StatsFromSlots(const int equipped[static_cast<int>(EquipSlot::C
         const EquipmentItem* item = FindByUid(equipped[i]);
         if (!item) continue;
 
-        const bool offHand = (static_cast<EquipSlot>(i) == EquipSlot::WeaponLeft);
+        // 左手の武器は「両手に持っている時だけ」控えめに加算する
+        const bool offHand = (static_cast<EquipSlot>(i) == EquipSlot::WeaponLeft)
+                          && equipped[static_cast<int>(EquipSlot::WeaponRight)] != 0;
         total += offHand ? item->TotalStats().Scaled(kOffHandStatRate) : item->TotalStats();
     }
     return total;

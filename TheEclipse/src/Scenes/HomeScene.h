@@ -16,6 +16,7 @@
 #include "UI/UIWidgets.h"
 #include "UI/SmithPanel.h"
 
+#include <string>
 #include <vector>
 
 namespace ecl {
@@ -52,6 +53,10 @@ private:
     void DrawPlayerSummary(const GameContext& context) const;
     void DrawTabBar(const GameContext& context) const;
     void DrawFieldGuide(const GameContext& context) const;
+    // 開発者モード用のボタン群（デバッグモードが ON の時だけ表示）
+    void BuildDebugButtons();
+    void UpdateDebugButtons(float dt, const Input& input, GameContext& context);
+    void DrawDebugPanel(const GameContext& context) const;
 
     Stage        stage_;
     Player       player_;
@@ -59,6 +64,7 @@ private:
     CombatSystem combat_;
 
     std::vector<ui::Button> tabButtons_;
+    std::vector<ui::Button> debugButtons_;
     HomeTab activeTab_ = HomeTab::None;
 
     ui::EquipPanel    equipPanel_;
@@ -70,6 +76,9 @@ private:
     float time_ = 0.0f;
     float saveNoticeTimer_ = 0.0f;
     bool  startQuest_ = false;
+
+    std::string debugMessage_;
+    float debugMessageTimer_ = 0.0f;
 };
 
 } // namespace ecl

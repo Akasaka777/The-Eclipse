@@ -178,15 +178,20 @@ void EquipPanel::DrawSlotColumn(const GameContext& context) const
             draw::Text(FontSize::Small, rect.left + 64.0f, rect.top + 28.0f, palette::kText,
                        equipped->DisplayName());
         } else {
-            // 使えないスロットは理由を表示する
-            const char* reason = "未装備";
-            if (slot == EquipSlot::WeaponLeft && !inventory.DualWieldEnabled()) {
-                reason = "二刀流の習得が必要";
+            // 空きスロットは理由や、反対の手に装備中であることを表示する
+            std::string reason = "未装備";
+            ColorRGB reasonColor = palette::kTextDisabled;
+            if (IsWeaponSlot(slot)) {
+                const EquipSlot other = OppositeWeaponSlot(slot);
+                if (inventory.Equipped(other) != nullptr) {
+                    // 二刀流が無い間は片手にしか持てないので、どちらに持っているかを示す
+                    reason = str::Format("%s に装備中", EquipSlotName(other));
+                    reasonColor = palette::kTextDim;
+                }
             } else if (slot == EquipSlot::Shield && inventory.IsDualWielding()) {
                 reason = "二刀流中は装備不可";
             }
-            draw::Text(FontSize::Small, rect.left + 64.0f, rect.top + 28.0f, palette::kTextDisabled,
-                       reason);
+            draw::Text(FontSize::Small, rect.left + 64.0f, rect.top + 28.0f, reasonColor, reason);
         }
     }
 

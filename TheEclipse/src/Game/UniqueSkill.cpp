@@ -10,10 +10,17 @@ UniqueSkillDatabase::UniqueSkillDatabase()
         UniqueSkillDef def;
         def.type = UniqueSkillType::DualWield;
         def.name = "二刀流";
-        def.description = "片手剣を両手に装備できるようになる。"
-                          "その代わり盾は持てず、装備できるソードスキルは 3 つまでになる。";
+        def.description = "片手剣を両手に装備できる。";
         def.unlockCondition = str::Format("「蝕の祭壇」を %d 秒以内でクリア",
                                           static_cast<int>(kDualWieldClearTimeLimit));
+        // 1 行が長すぎるとツリー欄からはみ出すため、短く区切っている
+        def.details = {
+            "・右手と左手の両方に片手剣",
+            "・左手の武器は能力値が控えめ",
+            "・両手持ちの間は盾を装備不可",
+            "・専用スキル装備中は枠が 3 つ",
+            "・通常スキルとは同時装備不可",
+        };
         // 専用スキル（ツリーの上から順）
         def.skillIds = { 9000, 9001, 9002 };
         entries_.push_back(def);
