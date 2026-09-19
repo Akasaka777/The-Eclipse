@@ -26,7 +26,7 @@ namespace {
 
 // セーブ形式のバージョン（構造を変えたら上げる）
 // v3: 武器スロットを左右に分割し、ユニークスキルを追加
-constexpr int kSaveVersion = 4;
+constexpr int kSaveVersion = 5;
 
 std::string g_lastError;
 
@@ -130,12 +130,12 @@ bool SaveSystem::Save(const GameContext& context)
     file << "material " << inventory.Material() << "\n";
 
     // --- 所持品 -------------------------------------------------------------
-    //   item <uid> <templateId> <rarity> <upgradeLevel> <攻撃> <防御> <HP> <MP>
+    //   item <uid> <templateId> <個体値> <upgradeLevel> <攻撃> <防御> <HP> <MP>
     //        <クリ率> <クリ倍率> <MP回復> <移動> <攻撃速度> <耐久力>
     for (const EquipmentItem& item : inventory.Items()) {
         const Stats& base = item.baseStats;
         file << "item " << item.uid << ' ' << item.templateId << ' '
-             << static_cast<int>(item.rarity) << ' ' << item.upgradeLevel << ' '
+             << item.iv << ' ' << item.upgradeLevel << ' '
              << base.attack << ' ' << base.defense << ' ' << base.maxHp << ' ' << base.maxMp << ' '
              << base.critRate << ' ' << base.critDamage << ' ' << base.mpRegen << ' '
              << base.moveSpeed << ' ' << base.attackSpeed << ' ' << item.durability << "\n";
@@ -269,8 +269,10 @@ bool SaveSystem::Load(GameContext& context)
             item.flavor = tmpl->flavor;
             item.slot = tmpl->slot;
             item.weaponType = tmpl->weaponType;
-            item.rarity = static_cast<Rarity>(
-                math::ClampInt(ToInt(arg(3)), 0, static_cast<int>(Rarity::Count) - 1));
+            // v4 以前はここがレアリティ（0〜4）だったので、個体値へ読み替える
+            const int ivField = ToInt(arg(3));
+            item.iv = (version > 0 && version < 5) ? ClampIv(ivField * 20 + 10)
+                                                   : ClampIv(ivField);
             item.upgradeLevel = ToInt(arg(4));
 
             item.baseStats.attack = ToFloat(arg(5));

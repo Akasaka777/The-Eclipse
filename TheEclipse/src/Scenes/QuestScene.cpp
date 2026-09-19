@@ -757,10 +757,11 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
 
     // --- ユニークスキルの解放条件判定 -----------------------------------------
     //   条件の値は UniqueSkill.h にまとめてあります。
+    //   既に別のユニークスキルの条件を満たしている場合は解放されない。
+    //   その時はリザルトにも何も出さない（解放できたものだけを知らせる）。
     if (cleared && quest_ && quest_->id == kDualWieldQuestId
         && questTime_ <= kDualWieldClearTimeLimit
-        && !context.player.IsUniqueSkillAvailable(UniqueSkillType::DualWield)) {
-        context.player.MakeUniqueSkillAvailable(UniqueSkillType::DualWield);
+        && context.player.MakeUniqueSkillAvailable(UniqueSkillType::DualWield)) {
         result.unlockedUniqueSkill = true;
         result.unlockedUniqueSkillName = UniqueSkillName(UniqueSkillType::DualWield);
     }

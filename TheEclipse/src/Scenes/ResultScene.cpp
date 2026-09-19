@@ -262,10 +262,10 @@ void ResultScene::DrawRewards(const GameContext& context) const
 
         ui::DrawItemRow(rect, item, false, false, false);
 
-        // 高レアリティは光らせる
-        if (static_cast<int>(item.rarity) >= static_cast<int>(Rarity::SSR)) {
+        // 個体値が高い装備は光らせる
+        if (item.iv >= 70) {
             const float pulse = 0.6f + 0.4f * std::sin(time_ * 5.0f + static_cast<float>(row));
-            draw::StrokeRect(rect.Expanded(3.0f), RarityColor(item.rarity), 2.0f,
+            draw::StrokeRect(rect.Expanded(3.0f), item.IvDisplayColor(), 2.0f,
                              static_cast<int>(180.0f * pulse));
         }
     }

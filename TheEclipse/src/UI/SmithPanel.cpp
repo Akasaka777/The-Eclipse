@@ -64,7 +64,7 @@ std::vector<const EquipmentItem*> SmithPanel::SortedItems(const GameContext& con
         const bool ea = inventory.IsEquipped(a->uid);
         const bool eb = inventory.IsEquipped(b->uid);
         if (ea != eb) return ea;
-        if (a->rarity != b->rarity) return static_cast<int>(a->rarity) > static_cast<int>(b->rarity);
+        if (a->iv != b->iv) return a->iv > b->iv;
         return a->Power() > b->Power();
     });
     return items;
@@ -218,13 +218,17 @@ void SmithPanel::Draw(const GameContext& context) const
     }
 
     float y = detail.top + 24.0f;
-    draw::Text(FontSize::Large, detail.left + 24.0f, y, RarityColor(item->rarity), item->DisplayName());
+    draw::Text(FontSize::Large, detail.left + 24.0f, y, item->IvDisplayColor(), item->DisplayName());
     y += 58.0f;
     draw::Text(FontSize::Small, detail.left + 24.0f, y, palette::kTextDim,
-               str::Format("%s ／ %s ／ 強化 %d / %d", RarityName(item->rarity),
+               str::Format("%s ／ 強化 %d / %d",
                            item->IsWeapon() ? WeaponTypeName(item->weaponType) : EquipSlotName(item->slot),
                            item->upgradeLevel, item->MaxUpgrade()));
-    y += 44.0f;
+    y += 30.0f;
+    // 個体値（強化上限と耐久力の最大値もここから決まる）
+    draw::Text(FontSize::Small, detail.left + 24.0f, y, item->IvDisplayColor(),
+               str::Format("個体値 %d / %d", item->iv, kMaxIv));
+    y += 36.0f;
 
     // --- 耐久力 ---------------------------------------------------------------
     {

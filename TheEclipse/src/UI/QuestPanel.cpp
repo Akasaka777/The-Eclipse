@@ -169,9 +169,11 @@ void QuestPanel::Draw(const GameContext& context) const
         if (!tmpl) continue;
 
         const Rect row(detail.left + 24.0f, y, detail.right - 24.0f, y + 34.0f);
-        DrawRarityBadge(Rect(row.left, row.top + 4.0f, row.left + 48.0f, row.bottom - 4.0f),
-                        entry.maxRarity);
+        DrawIvBadge(Rect(row.left, row.top + 4.0f, row.left + 48.0f, row.bottom - 4.0f),
+                    entry.maxIv);
         draw::Text(FontSize::Small, row.left + 62.0f, row.top + 5.0f, palette::kText, tmpl->name);
+        draw::Text(FontSize::Tiny, row.left + 62.0f + 320.0f, row.top + 8.0f, palette::kTextDim,
+                   str::Format("個体値 %d〜%d", entry.minIv, entry.maxIv));
         draw::Text(FontSize::Small, row.right, row.top + 5.0f, palette::kTextDim,
                    str::Format("%.0f%%", entry.chance * 100.0f), draw::TextAlign::Right);
         y += 38.0f;

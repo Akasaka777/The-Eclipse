@@ -1,5 +1,5 @@
 //==============================================================================
-// Equipment.h : 装備アイテム / レアリティ / 装備スロット
+// Equipment.h : 装備アイテム / 個体値 / 装備スロット
 //==============================================================================
 #pragma once
 
@@ -10,25 +10,26 @@
 
 namespace ecl {
 
+//==============================================================================
+// 個体値
+//   装備 1 つ 1 つが持つ 0〜100 の値。この値だけで、
+//   能力値・強化上限・耐久力のすべてをこの値から決める。
 //------------------------------------------------------------------------------
-// レアリティ
-//------------------------------------------------------------------------------
-enum class Rarity
-{
-    N,
-    R,
-    SR,
-    SSR,
-    UR,
-    Count
-};
+//   数値を変えたい場合はこのあたりを調整してください。
+//==============================================================================
+constexpr int kMinIv = 0;
+constexpr int kMaxIv = 100;
 
-const char* RarityName(Rarity rarity);
-ColorRGB    RarityColor(Rarity rarity);
-// 基礎ステータスに掛かる倍率
-float       RarityMultiplier(Rarity rarity);
-// 強化上限
-int         RarityMaxUpgrade(Rarity rarity);
+// 基礎ステータスに掛かる倍率（個体値 0 → 0.60 倍 / 100 → 1.80 倍）
+float IvStatScale(int iv);
+// 強化上限（個体値 0 → +4 / 100 → +14）
+int   IvMaxUpgrade(int iv);
+// 耐久力の最大値に加算される分（個体値 0 → +0 / 100 → +80）
+float IvDurabilityBonus(int iv);
+// 個体値の高さを表す色（低い＝灰、中間＝水色、高い＝金）
+ColorRGB IvColor(int iv);
+// 0〜100 に収める
+int  ClampIv(int iv);
 
 //------------------------------------------------------------------------------
 // 装備スロット
@@ -63,7 +64,7 @@ struct EquipmentItem
     std::string flavor;
     EquipSlot   slot = EquipSlot::WeaponRight;
     WeaponType  weaponType = WeaponType::OneHandSword;
-    Rarity      rarity = Rarity::N;
+    int         iv = 0;           // 個体値（0〜100）
     int         upgradeLevel = 0;
     Stats       baseStats;        // +0 時点の能力値
     float       durability = -1.0f; // 現在の耐久力（負値なら生成時に最大値で初期化）
@@ -76,10 +77,12 @@ struct EquipmentItem
     // "ロングソード +5"
     std::string DisplayName() const;
     int   Power() const { return TotalStats().Power(); }
-    int   MaxUpgrade() const { return RarityMaxUpgrade(rarity); }
+    int   MaxUpgrade() const { return IvMaxUpgrade(iv); }
+    // 個体値の表示色
+    ColorRGB IvDisplayColor() const { return IvColor(iv); }
 
     // --- 耐久力 ---------------------------------------------------------------
-    // レアリティが高く、強化するほど長持ちする
+    // 個体値が高く、強化するほど長持ちする
     float MaxDurability() const;
     float DurabilityRatio() const;
     // 表示用（切り上げ）

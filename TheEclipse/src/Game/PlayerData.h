@@ -82,7 +82,11 @@ public:
     bool HasDualWield() const { return uniqueSkill_ == UniqueSkillType::DualWield; }
     // 解放条件を満たしたか（満たすとスキルメニューに現れる）
     bool IsUniqueSkillAvailable(UniqueSkillType type) const;
-    void MakeUniqueSkillAvailable(UniqueSkillType type);
+    // どれか 1 つでも解放条件を満たしていると、他は二度と手に入らない
+    bool IsUniqueSkillLocked() const { return !availableUniqueSkills_.empty(); }
+    // 解放条件を満たした時に呼ぶ。既に他のユニークスキルが解放済みなら false。
+    // force（デバッグ用）を立てると締め切りを無視して解放できる。
+    bool MakeUniqueSkillAvailable(UniqueSkillType type, bool force = false);
     // 習得する。既に別のユニークスキルを習得済みなら失敗する（force で上書き）
     bool AcquireUniqueSkill(UniqueSkillType type, bool force = false);
     // デバッグ用: 全ユニークスキルを解放可能にする

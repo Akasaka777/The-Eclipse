@@ -18,8 +18,8 @@ struct DropEntry
 {
     int   templateId = 0;
     float chance = 0.5f;      // 抽選確率
-    Rarity minRarity = Rarity::N;
-    Rarity maxRarity = Rarity::SR;
+    int   minIv = 0;          // 落ちる装備の個体値の下限
+    int   maxIv = 60;         // 同・上限（難易度が高いほど上振れしやすい）
 };
 
 //------------------------------------------------------------------------------
@@ -60,8 +60,9 @@ public:
 private:
     QuestDatabase();
 
-    // 難易度に応じたレアリティ抽選
-    Rarity RollRarity(const DropEntry& entry, int difficulty) const;
+    // 難易度に応じた個体値抽選
+    // ドロップ 1 個分の個体値を抽選する
+    int RollIv(const DropEntry& entry, int difficulty) const;
 
     std::vector<QuestDef> quests_;
 };

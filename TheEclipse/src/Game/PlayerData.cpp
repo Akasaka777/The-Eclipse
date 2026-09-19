@@ -277,11 +277,15 @@ bool PlayerData::IsUniqueSkillAvailable(UniqueSkillType type) const
         != availableUniqueSkills_.end();
 }
 
-void PlayerData::MakeUniqueSkillAvailable(UniqueSkillType type)
+bool PlayerData::MakeUniqueSkillAvailable(UniqueSkillType type, bool force)
 {
-    if (type == UniqueSkillType::None) return;
-    if (IsUniqueSkillAvailable(type)) return;
+    if (type == UniqueSkillType::None) return false;
+    if (IsUniqueSkillAvailable(type)) return false;
+    // 先に別のユニークスキルの条件を満たしていたら、以降は手に入らない
+    if (IsUniqueSkillLocked() && !force) return false;
+
     availableUniqueSkills_.push_back(static_cast<int>(type));
+    return true;
 }
 
 bool PlayerData::AcquireUniqueSkill(UniqueSkillType type, bool force)
@@ -310,8 +314,9 @@ void PlayerData::DebugUnlockAllSkills()
 
 void PlayerData::DebugUnlockAllUniqueSkills()
 {
+    // デバッグモードでは締め切りを無視して全て解放できるようにする
     for (const UniqueSkillDef& def : UniqueSkillDatabase::Instance().All()) {
-        MakeUniqueSkillAvailable(def.type);
+        MakeUniqueSkillAvailable(def.type, true);
     }
     if (!HasUniqueSkill() && !UniqueSkillDatabase::Instance().All().empty()) {
         AcquireUniqueSkill(UniqueSkillDatabase::Instance().All().front().type, true);

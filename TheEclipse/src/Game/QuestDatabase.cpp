@@ -69,20 +69,20 @@ QuestDatabase::QuestDatabase()
         }
 
         quest.floorDrops = {
-            { 100, 0.10f, Rarity::N,  Rarity::R  },
-            { 200, 0.10f, Rarity::N,  Rarity::R  },
-            { 210, 0.10f, Rarity::N,  Rarity::R  },
-            { 250, 0.08f, Rarity::N,  Rarity::R  },
+            { 100, 0.10f,   0,  40  },
+            { 200, 0.10f,   0,  40  },
+            { 210, 0.10f,   0,  40  },
+            { 250, 0.08f,   0,  40  },
         };
         quest.bossDrops = {
-            { 101, 0.55f, Rarity::R,  Rarity::SR },
-            { 111, 0.30f, Rarity::R,  Rarity::SR },
-            { 121, 0.30f, Rarity::R,  Rarity::SR },
-            { 131, 0.30f, Rarity::R,  Rarity::SR },
-            { 141, 0.30f, Rarity::R,  Rarity::SR },
-            { 201, 0.45f, Rarity::R,  Rarity::SR },
-            { 211, 0.45f, Rarity::R,  Rarity::SR },
-            { 221, 0.35f, Rarity::R,  Rarity::SR },
+            { 101, 0.55f,  20,  60 },
+            { 111, 0.30f,  20,  60 },
+            { 121, 0.30f,  20,  60 },
+            { 131, 0.30f,  20,  60 },
+            { 141, 0.30f,  20,  60 },
+            { 201, 0.45f,  20,  60 },
+            { 211, 0.45f,  20,  60 },
+            { 221, 0.35f,  20,  60 },
         };
         quests_.push_back(quest);
     }
@@ -144,21 +144,21 @@ QuestDatabase::QuestDatabase()
         }
 
         quest.floorDrops = {
-            { 101, 0.10f, Rarity::N,  Rarity::SR },
-            { 201, 0.10f, Rarity::N,  Rarity::SR },
-            { 211, 0.10f, Rarity::N,  Rarity::SR },
-            { 231, 0.10f, Rarity::N,  Rarity::R  },
+            { 101, 0.10f,   0,  60 },
+            { 201, 0.10f,   0,  60 },
+            { 211, 0.10f,   0,  60 },
+            { 231, 0.10f,   0,  40  },
         };
         quest.bossDrops = {
-            { 102, 0.40f, Rarity::SR, Rarity::SSR },
-            { 112, 0.30f, Rarity::SR, Rarity::SSR },
-            { 122, 0.30f, Rarity::SR, Rarity::SSR },
-            { 132, 0.30f, Rarity::SR, Rarity::SSR },
-            { 142, 0.30f, Rarity::SR, Rarity::SSR },
-            { 212, 0.45f, Rarity::R,  Rarity::SSR },
-            { 221, 0.50f, Rarity::R,  Rarity::SR  },
-            { 241, 0.40f, Rarity::R,  Rarity::SR  },
-            { 251, 0.40f, Rarity::R,  Rarity::SR  },
+            { 102, 0.40f,  40,  80 },
+            { 112, 0.30f,  40,  80 },
+            { 122, 0.30f,  40,  80 },
+            { 132, 0.30f,  40,  80 },
+            { 142, 0.30f,  40,  80 },
+            { 212, 0.45f,  20,  80 },
+            { 221, 0.50f,  20,  60  },
+            { 241, 0.40f,  20,  60  },
+            { 251, 0.40f,  20,  60  },
         };
         quests_.push_back(quest);
     }
@@ -221,20 +221,20 @@ QuestDatabase::QuestDatabase()
         }
 
         quest.floorDrops = {
-            { 102, 0.10f, Rarity::R,  Rarity::SSR },
-            { 203, 0.10f, Rarity::R,  Rarity::SSR },
-            { 213, 0.10f, Rarity::R,  Rarity::SSR },
-            { 222, 0.10f, Rarity::R,  Rarity::SR  },
+            { 102, 0.10f,  20,  80 },
+            { 203, 0.10f,  20,  80 },
+            { 213, 0.10f,  20,  80 },
+            { 222, 0.10f,  20,  60  },
         };
         quest.bossDrops = {
-            { 102, 0.45f, Rarity::SSR, Rarity::UR },
-            { 112, 0.35f, Rarity::SSR, Rarity::UR },
-            { 122, 0.35f, Rarity::SSR, Rarity::UR },
-            { 132, 0.35f, Rarity::SSR, Rarity::UR },
-            { 142, 0.35f, Rarity::SSR, Rarity::UR },
-            { 203, 0.50f, Rarity::SR,  Rarity::UR },
-            { 213, 0.50f, Rarity::SR,  Rarity::UR },
-            { 222, 0.45f, Rarity::SR,  Rarity::SSR },
+            { 102, 0.45f,  60, 100 },
+            { 112, 0.35f,  60, 100 },
+            { 122, 0.35f,  60, 100 },
+            { 132, 0.35f,  60, 100 },
+            { 142, 0.35f,  60, 100 },
+            { 203, 0.50f,  40, 100 },
+            { 213, 0.50f,  40, 100 },
+            { 222, 0.45f,  40,  80 },
         };
         quests_.push_back(quest);
     }
@@ -254,19 +254,20 @@ const QuestDef* QuestDatabase::Find(int id) const
     return nullptr;
 }
 
-Rarity QuestDatabase::RollRarity(const DropEntry& entry, int difficulty) const
+int QuestDatabase::RollIv(const DropEntry& entry, int difficulty) const
 {
-    const int minRarity = static_cast<int>(entry.minRarity);
-    const int maxRarity = static_cast<int>(entry.maxRarity);
-    if (maxRarity <= minRarity) return entry.minRarity;
+    const int minIv = ClampIv(entry.minIv);
+    const int maxIv = ClampIv(entry.maxIv);
+    if (maxIv <= minIv) return minIv;
 
-    // 上位レアリティほど出にくい。難易度が高いほど上振れしやすい。
-    const float upChance = 0.16f + 0.05f * static_cast<float>(difficulty);
-    int rarity = minRarity;
-    while (rarity < maxRarity && math::RandChance(upChance)) {
-        ++rarity;
+    // 難易度が高いほど多めに引いて、その中の最大値を採用する（上振れしやすくなる）
+    const int samples = 1 + math::ClampInt(difficulty, 0, 4);
+    int best = minIv;
+    for (int i = 0; i < samples; ++i) {
+        const int roll = math::RandInt(minIv, maxIv);
+        if (roll > best) best = roll;
     }
-    return static_cast<Rarity>(math::ClampInt(rarity, 0, static_cast<int>(Rarity::Count) - 1));
+    return best;
 }
 
 std::vector<EquipmentItem> QuestDatabase::RollDrops(const QuestDef& quest, bool bossDefeated,
@@ -280,7 +281,7 @@ std::vector<EquipmentItem> QuestDatabase::RollDrops(const QuestDef& quest, bool 
     for (int i = 0; i < rolls; ++i) {
         for (const DropEntry& entry : quest.floorDrops) {
             if (!math::RandChance(entry.chance)) continue;
-            EquipmentItem item = items.Create(entry.templateId, RollRarity(entry, quest.difficulty));
+            EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
             if (item.IsValid()) drops.push_back(item);
             break; // 1 回の抽選につき最大 1 個
         }
@@ -291,7 +292,7 @@ std::vector<EquipmentItem> QuestDatabase::RollDrops(const QuestDef& quest, bool 
         bool gotAny = false;
         for (const DropEntry& entry : quest.bossDrops) {
             if (!math::RandChance(entry.chance)) continue;
-            EquipmentItem item = items.Create(entry.templateId, RollRarity(entry, quest.difficulty));
+            EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
             if (item.IsValid()) {
                 drops.push_back(item);
                 gotAny = true;
@@ -300,7 +301,7 @@ std::vector<EquipmentItem> QuestDatabase::RollDrops(const QuestDef& quest, bool 
         // 最低 1 個は必ず落とす
         if (!gotAny && !quest.bossDrops.empty()) {
             const DropEntry& entry = quest.bossDrops[0];
-            EquipmentItem item = items.Create(entry.templateId, entry.minRarity);
+            EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
             if (item.IsValid()) drops.push_back(item);
         }
     }

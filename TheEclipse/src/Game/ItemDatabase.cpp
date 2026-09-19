@@ -119,7 +119,7 @@ const ItemTemplate* ItemDatabase::Find(int templateId) const
     return nullptr;
 }
 
-EquipmentItem ItemDatabase::Create(int templateId, Rarity rarity) const
+EquipmentItem ItemDatabase::Create(int templateId, int iv) const
 {
     EquipmentItem item;
     const ItemTemplate* tmpl = Find(templateId);
@@ -131,22 +131,22 @@ EquipmentItem ItemDatabase::Create(int templateId, Rarity rarity) const
     item.flavor = tmpl->flavor;
     item.slot = tmpl->slot;
     item.weaponType = tmpl->weaponType;
-    item.rarity = rarity;
+    item.iv = ClampIv(iv);
     item.upgradeLevel = 0;
 
-    const float rarityMul = RarityMultiplier(rarity);
-    const float variance = math::RandFloat(0.94f, 1.06f);
-    item.baseStats = tmpl->base.Scaled(rarityMul * variance);
+    // 能力値は個体値だけで決まる（同じ個体値なら必ず同じ性能になる）
+    const float scale = IvStatScale(item.iv);
+    item.baseStats = tmpl->base.Scaled(scale);
 
-    // クリティカル率は倍率が効き過ぎないよう補正
-    item.baseStats.critRate = tmpl->base.critRate * (1.0f + (rarityMul - 1.0f) * 0.45f);
-    item.baseStats.attackSpeed = tmpl->base.attackSpeed * (1.0f + (rarityMul - 1.0f) * 0.30f);
+    // クリティカル率と攻撃速度は倍率が効き過ぎないよう補正
+    item.baseStats.critRate = tmpl->base.critRate * (1.0f + (scale - 1.0f) * 0.45f);
+    item.baseStats.attackSpeed = tmpl->base.attackSpeed * (1.0f + (scale - 1.0f) * 0.30f);
 
     item.RestoreDurability();
     return item;
 }
 
-EquipmentItem ItemDatabase::CreateRandom(EquipSlot slot, Rarity rarity, int maxTier) const
+EquipmentItem ItemDatabase::CreateRandom(EquipSlot slot, int iv, int maxTier) const
 {
     std::vector<int> candidates;
     for (const ItemTemplate& t : templates_) {
@@ -155,10 +155,10 @@ EquipmentItem ItemDatabase::CreateRandom(EquipSlot slot, Rarity rarity, int maxT
     if (candidates.empty()) return EquipmentItem();
 
     const int index = math::RandInt(0, static_cast<int>(candidates.size()) - 1);
-    return Create(candidates[static_cast<size_t>(index)], rarity);
+    return Create(candidates[static_cast<size_t>(index)], iv);
 }
 
-EquipmentItem ItemDatabase::CreateRandomAny(Rarity rarity, int maxTier) const
+EquipmentItem ItemDatabase::CreateRandomAny(int iv, int maxTier) const
 {
     std::vector<int> candidates;
     for (const ItemTemplate& t : templates_) {
@@ -167,21 +167,24 @@ EquipmentItem ItemDatabase::CreateRandomAny(Rarity rarity, int maxTier) const
     if (candidates.empty()) return EquipmentItem();
 
     const int index = math::RandInt(0, static_cast<int>(candidates.size()) - 1);
-    return Create(candidates[static_cast<size_t>(index)], rarity);
+    return Create(candidates[static_cast<size_t>(index)], iv);
 }
 
 std::vector<EquipmentItem> ItemDatabase::CreateStarterSet() const
 {
+    // 初期装備の個体値（低めに固定して、ドロップで更新していく想定）
+    constexpr int kStarterIv = 20;
+
     std::vector<EquipmentItem> items;
-    items.push_back(Create(100, Rarity::N)); // アイアンソード
-    items.push_back(Create(200, Rarity::N)); // レザーキャップ
-    items.push_back(Create(210, Rarity::N)); // レザーアーマー
-    items.push_back(Create(220, Rarity::N)); // ラウンドシールド
+    items.push_back(Create(100, kStarterIv)); // アイアンソード
+    items.push_back(Create(200, kStarterIv)); // レザーキャップ
+    items.push_back(Create(210, kStarterIv)); // レザーアーマー
+    items.push_back(Create(220, kStarterIv)); // ラウンドシールド
     // 他の武器種も試せるように 1 本ずつ配布
-    items.push_back(Create(110, Rarity::N));
-    items.push_back(Create(120, Rarity::N));
-    items.push_back(Create(130, Rarity::N));
-    items.push_back(Create(140, Rarity::N));
+    items.push_back(Create(110, kStarterIv));
+    items.push_back(Create(120, kStarterIv));
+    items.push_back(Create(130, kStarterIv));
+    items.push_back(Create(140, kStarterIv));
     return items;
 }
 

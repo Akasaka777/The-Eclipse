@@ -76,8 +76,8 @@ constexpr float kDebugButtonGap = 8.0f;
 constexpr int   kDebugColAmount = 10000;
 constexpr int   kDebugMaterialAmount = 50;
 constexpr int   kDebugSkillPointAmount = 10;
-// 全武器取得で配るレアリティ
-constexpr Rarity kDebugWeaponRarity = Rarity::SR;
+// 全武器取得で配る個体値
+constexpr int kDebugWeaponIv = 70;
 
 // 全武器種の武器を所持品に追加する（片手剣は二刀流を試せるよう 2 本ずつ）
 int GrantAllWeapons(Inventory& inventory)
@@ -87,7 +87,7 @@ int GrantAllWeapons(Inventory& inventory)
         if (!IsWeaponSlot(tmpl.slot)) continue;
         const int copies = (tmpl.weaponType == WeaponType::OneHandSword) ? 2 : 1;
         for (int i = 0; i < copies; ++i) {
-            inventory.AddItem(ItemDatabase::Instance().Create(tmpl.id, kDebugWeaponRarity));
+            inventory.AddItem(ItemDatabase::Instance().Create(tmpl.id, kDebugWeaponIv));
             ++added;
         }
     }

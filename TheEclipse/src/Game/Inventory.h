@@ -36,7 +36,7 @@ public:
     EquipmentItem*       FindByUid(int uid);
     const EquipmentItem* FindByUid(int uid) const;
 
-    // 指定スロットの所持品（レアリティ・強化値順にソート済み）
+    // 指定スロットの所持品（個体値・戦力順にソート済み）
     std::vector<const EquipmentItem*> ItemsForSlot(EquipSlot slot) const;
 
     // --- 装備 ---------------------------------------------------------------

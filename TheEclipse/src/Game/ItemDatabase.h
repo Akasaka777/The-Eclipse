@@ -10,7 +10,7 @@
 namespace ecl {
 
 //------------------------------------------------------------------------------
-// 装備の定義（レアリティ適用前の素の値）
+// 装備の定義（個体値を掛ける前の素の値）
 //------------------------------------------------------------------------------
 struct ItemTemplate
 {
@@ -31,12 +31,12 @@ public:
     const std::vector<ItemTemplate>& Templates() const { return templates_; }
     const ItemTemplate* Find(int templateId) const;
 
-    // 定義とレアリティから実アイテムを生成（±6% の個体差あり）
-    EquipmentItem Create(int templateId, Rarity rarity) const;
+    // 定義と個体値（0〜100）から実アイテムを生成する
+    EquipmentItem Create(int templateId, int iv) const;
     // スロット指定のランダム生成
-    EquipmentItem CreateRandom(EquipSlot slot, Rarity rarity, int maxTier = 3) const;
+    EquipmentItem CreateRandom(EquipSlot slot, int iv, int maxTier = 3) const;
     // 完全ランダム
-    EquipmentItem CreateRandomAny(Rarity rarity, int maxTier = 3) const;
+    EquipmentItem CreateRandomAny(int iv, int maxTier = 3) const;
 
     // 初期装備一式
     std::vector<EquipmentItem> CreateStarterSet() const;

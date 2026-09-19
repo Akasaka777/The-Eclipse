@@ -174,14 +174,14 @@ void DrawWindow(const Rect& rect, const std::string& title)
     draw::Text(FontSize::Medium, rect.left + 24.0f, rect.top + 10.0f, palette::kText, title);
 }
 
-void DrawRarityBadge(const Rect& rect, Rarity rarity)
+void DrawIvBadge(const Rect& rect, int iv)
 {
-    const ColorRGB color = RarityColor(rarity);
+    const ColorRGB color = IvColor(iv);
     draw::GradientRectV(rect, color.Scaled(0.9f), color.Scaled(0.45f), 255, 6);
     draw::StrokeRect(rect, color.Scaled(1.2f), 1.0f, 255);
     draw::Text(FontSize::Small, rect.CenterX(),
                rect.CenterY() - static_cast<float>(draw::TextHeight(FontSize::Small)) * 0.5f,
-               palette::kBlack, RarityName(rarity), draw::TextAlign::Center);
+               palette::kBlack, str::Format("%d", ClampIv(iv)), draw::TextAlign::Center);
 }
 
 void DrawWeaponIcon(const Rect& rect, WeaponType type, const ColorRGB& color)
@@ -260,20 +260,22 @@ void DrawSlotIcon(const Rect& rect, EquipSlot slot, const ColorRGB& color)
 
 void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, bool equipped, bool hovered)
 {
-    const ColorRGB rarity = RarityColor(item.rarity);
+    const ColorRGB ivColor = item.IvDisplayColor();
 
     ColorRGB fill = palette::kPanelDark;
-    if (selected) fill = ColorRGB::Lerp(palette::kPanelLight, rarity.Scaled(0.5f), 0.55f);
+    if (selected) fill = ColorRGB::Lerp(palette::kPanelLight, ivColor.Scaled(0.5f), 0.55f);
     else if (hovered) fill = palette::kPanelLight;
 
     draw::GradientRectH(rect, fill, fill.Scaled(0.75f), 235, 12);
-    draw::StrokeRect(rect, selected ? rarity : palette::kBorder.Scaled(0.7f), selected ? 2.0f : 1.0f, 255);
-    // 左端のレアリティ帯
-    draw::FillRect(Rect(rect.left, rect.top, rect.left + 6.0f, rect.bottom), rarity, 255);
+    draw::StrokeRect(rect, selected ? ivColor : palette::kBorder.Scaled(0.7f), selected ? 2.0f : 1.0f, 255);
+    // 左端の帯は個体値の高さを表す（高いほど長い）
+    const float bandHeight = rect.Height() * (0.25f + 0.75f * static_cast<float>(ClampIv(item.iv)) / 100.0f);
+    draw::FillRect(Rect(rect.left, rect.top, rect.left + 6.0f, rect.bottom), palette::kPanelDark, 255);
+    draw::FillRect(Rect(rect.left, rect.bottom - bandHeight, rect.left + 6.0f, rect.bottom), ivColor, 255);
 
     const Rect iconRect(rect.left + 12.0f, rect.top + 6.0f, rect.left + 62.0f, rect.bottom - 6.0f);
-    if (item.IsWeapon()) DrawWeaponIcon(iconRect, item.weaponType, rarity);
-    else DrawSlotIcon(iconRect, item.slot, rarity);
+    if (item.IsWeapon()) DrawWeaponIcon(iconRect, item.weaponType, ivColor);
+    else DrawSlotIcon(iconRect, item.slot, ivColor);
 
     draw::Text(FontSize::Normal, rect.left + 74.0f, rect.top + 8.0f, palette::kText, item.DisplayName());
 
@@ -285,8 +287,8 @@ void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, boo
                       static_cast<int>(item.TotalStats().maxHp));
     draw::Text(FontSize::Small, rect.left + 74.0f, rect.top + 36.0f, palette::kTextDim, sub);
 
-    DrawRarityBadge(Rect(rect.right - 62.0f, rect.top + 8.0f, rect.right - 12.0f, rect.top + 34.0f),
-                    item.rarity);
+    DrawIvBadge(Rect(rect.right - 62.0f, rect.top + 8.0f, rect.right - 12.0f, rect.top + 34.0f),
+                item.iv);
     draw::Text(FontSize::Tiny, rect.right - 12.0f, rect.top + 38.0f, palette::kTextDim,
                str::Format("戦力 %d", item.Power()), draw::TextAlign::Right);
 

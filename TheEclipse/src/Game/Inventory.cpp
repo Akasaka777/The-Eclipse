@@ -55,7 +55,7 @@ std::vector<const EquipmentItem*> Inventory::ItemsForSlot(EquipSlot slot) const
     }
 
     std::sort(result.begin(), result.end(), [](const EquipmentItem* a, const EquipmentItem* b) {
-        if (a->rarity != b->rarity) return static_cast<int>(a->rarity) > static_cast<int>(b->rarity);
+        if (a->iv != b->iv) return a->iv > b->iv;
         if (a->Power() != b->Power()) return a->Power() > b->Power();
         return a->uid < b->uid;
     });
@@ -257,10 +257,11 @@ UpgradeCost Inventory::CalcUpgradeCost(int uid) const
     if (item->upgradeLevel >= item->MaxUpgrade()) return cost;
 
     const int level = item->upgradeLevel;
-    const float rarityFactor = 1.0f + static_cast<float>(item->rarity) * 0.55f;
+    // 個体値が高い装備ほど強化費用も上がる（0 → 1.00 倍 / 100 → 3.20 倍）
+    const float ivFactor = 1.0f + 0.022f * static_cast<float>(item->iv);
 
-    cost.col = static_cast<int>((160.0f + 130.0f * static_cast<float>(level) * (1.0f + level * 0.25f)) * rarityFactor);
-    cost.material = 1 + level / 2 + static_cast<int>(item->rarity) / 2;
+    cost.col = static_cast<int>((160.0f + 130.0f * static_cast<float>(level) * (1.0f + level * 0.25f)) * ivFactor);
+    cost.material = 1 + level / 2 + item->iv / 50;
 
     // +3 までは確実に成功、以降は段階的に低下
     if (level < 3) {
@@ -355,8 +356,9 @@ int Inventory::RepairCost(int uid) const
     const float missing = item->MaxDurability() - item->durability;
     if (missing <= 0.0f) return 0;
 
-    // レアリティが高いほど修理費も高い
-    const float unit = 8.0f + 4.0f * static_cast<float>(static_cast<int>(item->rarity));
+    // 個体値が高いほど修理費も高い
+    // 修理費用は耐久力 1 点あたり（個体値 0 → 8 col / 100 → 24 col）
+    const float unit = 8.0f + 0.16f * static_cast<float>(item->iv);
     return math::MaxI(1, static_cast<int>(missing * unit));
 }
 
@@ -402,10 +404,10 @@ int Inventory::SellValue(int uid) const
 {
     const EquipmentItem* item = FindByUid(uid);
     if (!item) return 0;
-    const float rarityFactor = 1.0f + static_cast<float>(item->rarity) * 1.2f;
+    const float ivFactor = 1.0f + 0.048f * static_cast<float>(item->iv);
     // 傷んだ装備は買い叩かれる
     const float condition = 0.4f + 0.6f * item->DurabilityRatio();
-    return math::MaxI(1, static_cast<int>((60.0f + item->Power() * 0.9f) * rarityFactor * condition));
+    return math::MaxI(1, static_cast<int>((60.0f + item->Power() * 0.9f) * ivFactor * condition));
 }
 
 bool Inventory::Sell(int uid)
@@ -415,7 +417,7 @@ bool Inventory::Sell(int uid)
     for (size_t i = 0; i < items_.size(); ++i) {
         if (items_[i].uid != uid) continue;
         col_ += SellValue(uid);
-        material_ += 1 + static_cast<int>(items_[i].rarity);
+        material_ += 1 + items_[i].iv / 25;
         items_.erase(items_.begin() + static_cast<long>(i));
         return true;
     }

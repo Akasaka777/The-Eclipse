@@ -10,52 +10,39 @@ namespace {
 int g_nextUid = 1;
 } // namespace
 
-const char* RarityName(Rarity rarity)
+int ClampIv(int iv)
 {
-    switch (rarity) {
-    case Rarity::N:   return "N";
-    case Rarity::R:   return "R";
-    case Rarity::SR:  return "SR";
-    case Rarity::SSR: return "SSR";
-    case Rarity::UR:  return "UR";
-    default: return "?";
-    }
+    return math::ClampInt(iv, kMinIv, kMaxIv);
 }
 
-ColorRGB RarityColor(Rarity rarity)
+float IvStatScale(int iv)
 {
-    switch (rarity) {
-    case Rarity::N:   return ColorRGB(172, 180, 192);
-    case Rarity::R:   return ColorRGB(88, 164, 255);
-    case Rarity::SR:  return ColorRGB(190, 116, 255);
-    case Rarity::SSR: return ColorRGB(255, 196, 64);
-    case Rarity::UR:  return ColorRGB(255, 96, 128);
-    default: return ColorRGB(255, 255, 255);
-    }
+    // 0 → 0.60 倍、100 → 1.80 倍
+    return 0.60f + 0.012f * static_cast<float>(ClampIv(iv));
 }
 
-float RarityMultiplier(Rarity rarity)
+int IvMaxUpgrade(int iv)
 {
-    switch (rarity) {
-    case Rarity::N:   return 1.00f;
-    case Rarity::R:   return 1.35f;
-    case Rarity::SR:  return 1.85f;
-    case Rarity::SSR: return 2.55f;
-    case Rarity::UR:  return 3.50f;
-    default: return 1.0f;
-    }
+    // 0 → +4、100 → +14
+    return 4 + ClampIv(iv) / 10;
 }
 
-int RarityMaxUpgrade(Rarity rarity)
+float IvDurabilityBonus(int iv)
 {
-    switch (rarity) {
-    case Rarity::N:   return 5;
-    case Rarity::R:   return 7;
-    case Rarity::SR:  return 9;
-    case Rarity::SSR: return 11;
-    case Rarity::UR:  return 13;
-    default: return 5;
-    }
+    // 0 → +0、100 → +80
+    return 0.8f * static_cast<float>(ClampIv(iv));
+}
+
+ColorRGB IvColor(int iv)
+{
+    // 低い＝灰 → 中間＝水色 → 高い＝金 へ滑らかに変える
+    const ColorRGB low(160, 168, 180);
+    const ColorRGB mid(88, 198, 255);
+    const ColorRGB high(255, 196, 64);
+
+    const float t = static_cast<float>(ClampIv(iv)) / 100.0f;
+    if (t <= 0.5f) return ColorRGB::Lerp(low, mid, t * 2.0f);
+    return ColorRGB::Lerp(mid, high, (t - 0.5f) * 2.0f);
 }
 
 const char* EquipSlotName(EquipSlot slot)
@@ -99,8 +86,7 @@ EquipSlot OppositeWeaponSlot(EquipSlot slot)
 
 float EquipmentItem::MaxDurability() const
 {
-    return 100.0f + 20.0f * static_cast<float>(static_cast<int>(rarity))
-         + 4.0f * static_cast<float>(upgradeLevel);
+    return 100.0f + IvDurabilityBonus(iv) + 4.0f * static_cast<float>(upgradeLevel);
 }
 
 float EquipmentItem::DurabilityRatio() const
