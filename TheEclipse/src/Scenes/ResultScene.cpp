@@ -262,10 +262,10 @@ void ResultScene::DrawRewards(const GameContext& context) const
 
         ui::DrawItemRow(rect, item, false, false, false);
 
-        // 個体値が高い装備は光らせる
+        // 特に戦力の高い装備は光らせる（個体値そのものは表示しない）
         if (item.iv >= 70) {
             const float pulse = 0.6f + 0.4f * std::sin(time_ * 5.0f + static_cast<float>(row));
-            draw::StrokeRect(rect.Expanded(3.0f), item.IvDisplayColor(), 2.0f,
+            draw::StrokeRect(rect.Expanded(3.0f), palette::kAccentWarm, 2.0f,
                              static_cast<int>(180.0f * pulse));
         }
     }

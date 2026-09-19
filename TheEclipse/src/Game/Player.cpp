@@ -98,6 +98,8 @@ void Player::ApplyEquipment(const PlayerData& data)
     maxMp_ = math::MaxF(1.0f, stats.maxMp);
 
     weapon_ = data.CurrentWeaponType();
+    // ユニークスキル「神聖剣」は盾を持っている間だけガードが完全無効化になる
+    perfectGuard_ = data.HasPerfectGuard();
 
     // 装備スキンから見た目を組み立てる
     art = data.GetInventory().BuildAppearance();
@@ -569,9 +571,27 @@ int Player::ApplyHit(const HitBox& hitBox, CombatSystem& combat)
 
     // ガード中は大幅に軽減し、のけぞりも短い
     bool guarded = false;
+    bool nullified = false;
     if (guarding_ && fromFront) {
         guarded = true;
-        result.value = math::MaxI(1, static_cast<int>(static_cast<float>(result.value) * 0.28f));
+        if (perfectGuard_) {
+            // 神聖剣：盾での防御は完全無効化
+            nullified = true;
+            result.value = 0;
+            result.critical = false;
+        } else {
+            result.value = math::MaxI(1, static_cast<int>(static_cast<float>(result.value) * 0.28f));
+        }
+    }
+
+    if (nullified) {
+        invincibleTimer = 0.25f;
+        velocity.x = 0.0f;
+        const Vec2 shieldPos(pos.x + static_cast<float>(facing) * 46.0f, pos.y - height * 0.55f);
+        combat.AddPopup(Vec2(pos.x, pos.y - height * 0.95f), "NO DAMAGE", palette::kAccent, true);
+        combat.AddRing(shieldPos, 210.0f, palette::kAccent, 0.3f);
+        combat.AddImpact(shieldPos, palette::kAccent, 16, 420.0f);
+        return 0;
     }
 
     const float direction = (hitBox.area.CenterX() <= pos.x) ? 1.0f : -1.0f;

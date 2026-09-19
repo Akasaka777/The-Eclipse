@@ -169,7 +169,7 @@ void EquipPanel::DrawSlotColumn(const GameContext& context) const
         draw::StrokeRect(rect, selected ? palette::kAccent : palette::kBorder.Scaled(0.6f),
                          selected ? 3.0f : 1.0f, 255);
 
-        const ColorRGB iconColor = equipped ? equipped->IvDisplayColor() : palette::kTextDisabled;
+        const ColorRGB iconColor = equipped ? palette::kAccent : palette::kTextDisabled;
         DrawSlotIcon(Rect(rect.left + 6.0f, rect.top + 6.0f, rect.left + 56.0f, rect.bottom - 6.0f),
                      slot, iconColor);
 
@@ -297,10 +297,8 @@ void EquipPanel::DrawComparison(const GameContext& context) const
     if (selected) {
         draw::Line(detail.left + 24.0f, y, detail.right - 24.0f, y, palette::kBorder, 1.0f, 120);
         y += 14.0f;
-        draw::Text(FontSize::Small, detail.left + 24.0f, y, selected->IvDisplayColor(),
+        draw::Text(FontSize::Small, detail.left + 24.0f, y, palette::kAccent,
                    selected->DisplayName());
-        draw::Text(FontSize::Small, detail.right - 24.0f, y, selected->IvDisplayColor(),
-                   str::Format("個体値 %d", selected->iv), draw::TextAlign::Right);
         y += 26.0f;
         draw::Text(FontSize::Tiny, detail.left + 24.0f, y, palette::kTextDim,
                    str::Format("強化上限 +%d ／ 耐久力 最大 %d",

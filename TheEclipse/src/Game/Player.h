@@ -51,6 +51,8 @@ public:
     PlayerState State() const { return state_; }
     bool IsDead() const { return !alive; }
     bool IsGuarding() const { return guarding_; }
+    // 神聖剣＋盾でガードが完全無効化になる状態か
+    bool HasPerfectGuard() const { return perfectGuard_; }
     float Mp() const { return mp_; }
     float MaxMp() const { return maxMp_; }
     float MpRatio() const;
@@ -126,6 +128,7 @@ private:
     float parryCooldown_ = 0.0f;  // 再発動までの硬直
     float parryFlash_ = 0.0f;     // 成功演出の残り時間
     bool  parrySignal_ = false;   // シーンへ未通知の成功があるか
+    bool  perfectGuard_ = false;  // ユニークスキル「神聖剣」＋盾で有効
     int   parrySourceId_ = -1;    // 受け流した攻撃の発生元
     float jumpBuffer_ = 0.0f;
     float coyoteTimer_ = 0.0f;

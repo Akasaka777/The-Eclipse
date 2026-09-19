@@ -27,6 +27,24 @@ UniqueSkillDatabase::UniqueSkillDatabase()
         def.skillIds = { 9000, 9001, 9002 };
         entries_.push_back(def);
     }
+    {
+        UniqueSkillDef def;
+        def.type = UniqueSkillType::HolySword;
+        def.name = "神聖剣";
+        def.description = "盾での防御が完全無効化になる系統。";
+        def.unlockCondition = str::Format("パリィを %d 回成功させる", kHolySwordParryCount);
+        def.details = {
+            "・盾でガード中の被弾を完全に無効化",
+            "・盾を外している間は効果なし",
+            "・ソードスキルは通常どおり 4 つ",
+            "・専用スキルの代わりに特別クエスト",
+            "・専用のセット武器が確定で手に入る",
+        };
+        // 専用スキルは持たず、代わりに特別クエストへ挑める
+        def.skillIds = {};
+        def.specialQuestId = kHolySwordQuestId;
+        entries_.push_back(def);
+    }
 }
 
 const UniqueSkillDatabase& UniqueSkillDatabase::Instance()

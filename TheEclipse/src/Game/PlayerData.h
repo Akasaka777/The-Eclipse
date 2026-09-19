@@ -80,6 +80,9 @@ public:
     UniqueSkillType UniqueSkill() const { return uniqueSkill_; }
     bool HasUniqueSkill() const { return uniqueSkill_ != UniqueSkillType::None; }
     bool HasDualWield() const { return uniqueSkill_ == UniqueSkillType::DualWield; }
+    bool HasHolySword() const { return uniqueSkill_ == UniqueSkillType::HolySword; }
+    // 神聖剣を習得し、かつ盾を装備しているか（ガードが完全無効化になる条件）
+    bool HasPerfectGuard() const;
     // 解放条件を満たしたか（満たすとスキルメニューに現れる）
     bool IsUniqueSkillAvailable(UniqueSkillType type) const;
     // どれか 1 つでも解放条件を満たしていると、他は二度と手に入らない
@@ -89,8 +92,18 @@ public:
     bool MakeUniqueSkillAvailable(UniqueSkillType type, bool force = false);
     // 習得する。既に別のユニークスキルを習得済みなら失敗する（force で上書き）
     bool AcquireUniqueSkill(UniqueSkillType type, bool force = false);
+    // --- パリィの累計成功回数（神聖剣の解放条件）--------------------------------
+    int  ParrySuccessCount() const { return parrySuccessCount_; }
+    void AddParrySuccess(int count = 1);
+    // 解放条件を満たしていれば解放する（解放できたら true）
+    bool TryUnlockByParry();
+
     // デバッグ用: 全ユニークスキルを解放可能にする
     void DebugUnlockAllUniqueSkills();
+    // デバッグ用: 指定したユニークスキルを解放して習得する（締め切りを無視）
+    bool DebugAcquireUniqueSkill(UniqueSkillType type);
+    // デバッグ用: レベルを上げる（スキルポイントも付く）
+    void DebugAddLevel(int levels);
     // デバッグ用: 全武器のスキルツリーを解放する
     void DebugUnlockAllSkills();
 
@@ -109,7 +122,8 @@ public:
                          const std::vector<int>& clearedQuests,
                          const int skillLoadout[4],
                          UniqueSkillType uniqueSkill,
-                         const std::vector<int>& availableUniqueSkills);
+                         const std::vector<int>& availableUniqueSkills,
+                         int parrySuccessCount);
     const std::vector<int>& AvailableUniqueSkills() const { return availableUniqueSkills_; }
     // 装備を戻した後にスキル構成だけを復元し直す（系統は装備で決まるため）
     void RestoreSkillLoadout(const int skillLoadout[4]);
@@ -126,6 +140,7 @@ private:
     int skillPoints_ = 3;
     UniqueSkillType uniqueSkill_ = UniqueSkillType::None;
     std::vector<int> availableUniqueSkills_;
+    int parrySuccessCount_ = 0;
     std::vector<int> unlockedSkills_;
     std::vector<int> clearedQuests_;
 };

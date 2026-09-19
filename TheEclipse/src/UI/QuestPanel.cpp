@@ -9,6 +9,19 @@
 namespace ecl {
 namespace ui {
 
+namespace {
+// 一覧に出すクエスト（特別クエストはスキルツリーから挑むので除く）
+std::vector<const QuestDef*> ListedQuests()
+{
+    std::vector<const QuestDef*> list;
+    for (const QuestDef& quest : QuestDatabase::Instance().Quests()) {
+        if (quest.special) continue;
+        list.push_back(&quest);
+    }
+    return list;
+}
+} // namespace
+
 QuestPanel::QuestPanel()
 {
     Layout();
@@ -18,11 +31,10 @@ void QuestPanel::Layout()
 {
     window_ = Rect::FromXYWH(200.0f, 110.0f, 1520.0f, 860.0f);
 
-    const QuestDatabase& database = QuestDatabase::Instance();
     questButtons_.clear();
 
     float y = window_.top + 90.0f;
-    for (size_t i = 0; i < database.Quests().size(); ++i) {
+    for (size_t i = 0; i < ListedQuests().size(); ++i) {
         questButtons_.push_back(Button(Rect::FromXYWH(window_.left + 40.0f, y, 520.0f, 124.0f),
                                        "", FontSize::Normal));
         y += 140.0f;
@@ -50,11 +62,11 @@ void QuestPanel::Update(float dt, const Input& input, GameContext& context)
     closeRequested_ = false;
     startRequested_ = false;
 
-    const std::vector<QuestDef>& quests = QuestDatabase::Instance().Quests();
+    const std::vector<const QuestDef*> quests = ListedQuests();
     for (size_t i = 0; i < questButtons_.size() && i < quests.size(); ++i) {
-        questButtons_[i].SetSelected(quests[i].id == selectedQuestId_);
+        questButtons_[i].SetSelected(quests[i]->id == selectedQuestId_);
         if (questButtons_[i].Update(input, dt)) {
-            selectedQuestId_ = quests[i].id;
+            selectedQuestId_ = quests[i]->id;
             context.selectedQuestId = selectedQuestId_;
         }
     }
@@ -75,12 +87,12 @@ void QuestPanel::Draw(const GameContext& context) const
 
     DrawWindow(window_, "クエスト選択");
 
-    const std::vector<QuestDef>& quests = QuestDatabase::Instance().Quests();
+    const std::vector<const QuestDef*> quests = ListedQuests();
     const int playerPower = context.player.Power();
 
     // --- 一覧 ---------------------------------------------------------------
     for (size_t i = 0; i < questButtons_.size() && i < quests.size(); ++i) {
-        const QuestDef& quest = quests[i];
+        const QuestDef& quest = *quests[i];
         const Rect rect = questButtons_[i].GetRect();
         const bool selected = (quest.id == selectedQuestId_);
         const bool cleared = context.player.IsQuestCleared(quest.id);
@@ -169,11 +181,7 @@ void QuestPanel::Draw(const GameContext& context) const
         if (!tmpl) continue;
 
         const Rect row(detail.left + 24.0f, y, detail.right - 24.0f, y + 34.0f);
-        DrawIvBadge(Rect(row.left, row.top + 4.0f, row.left + 48.0f, row.bottom - 4.0f),
-                    entry.maxIv);
-        draw::Text(FontSize::Small, row.left + 62.0f, row.top + 5.0f, palette::kText, tmpl->name);
-        draw::Text(FontSize::Tiny, row.left + 62.0f + 320.0f, row.top + 8.0f, palette::kTextDim,
-                   str::Format("個体値 %d〜%d", entry.minIv, entry.maxIv));
+        draw::Text(FontSize::Small, row.left + 8.0f, row.top + 5.0f, palette::kText, tmpl->name);
         draw::Text(FontSize::Small, row.right, row.top + 5.0f, palette::kTextDim,
                    str::Format("%.0f%%", entry.chance * 100.0f), draw::TextAlign::Right);
         y += 38.0f;

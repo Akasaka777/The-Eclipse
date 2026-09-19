@@ -2,6 +2,7 @@
 
 #include "Common/MathUtil.h"
 #include "Game/ItemDatabase.h"
+#include "Game/UniqueSkill.h"
 
 namespace ecl {
 
@@ -235,6 +236,40 @@ QuestDatabase::QuestDatabase()
             { 203, 0.50f,  40, 100 },
             { 213, 0.50f,  40, 100 },
             { 222, 0.45f,  40,  80 },
+        };
+        quests_.push_back(quest);
+    }
+
+    //==========================================================================
+    // クエスト 4 : 聖剣の試練（ユニークスキル「神聖剣」専用の特別クエスト）
+    //   ボス戦のみ。専用のセット武器が 100% ドロップする。
+    //   クエスト選択タブには出さず、スキルツリーから 1 度だけ挑める。
+    //==========================================================================
+    {
+        QuestDef quest;
+        quest.id = kHolySwordQuestId;
+        quest.name = "聖剣の試練";
+        quest.subtitle = "TRIAL OF THE SACRED BLADE";
+        quest.description = "神聖剣に選ばれた者だけが立ち入れる聖堂。守護者との一騎討ち。";
+        quest.bossName = "聖剣の守護者 セイクリッド・ガーディアン";
+        quest.difficulty = 3;
+        quest.recommendedPower = 1200;
+        quest.enemyPowerScale = 1.0f;
+        quest.colReward = 800;
+        quest.expReward = 900;
+        quest.firstClearCol = 3000;
+        quest.special = true;
+
+        {
+            FloorDef floor = MakeFloor("試練の間", 3000.0f, StageTheme::Altar);
+            floor.bossId = 4;
+            quest.floors.push_back(floor);
+        }
+
+        // 専用のセット武器は 100% ドロップ（個体値も高めで固定）
+        quest.bossDrops = {
+            { kHolySwordSwordId,  1.00f, 80, 100 },
+            { kHolySwordShieldId, 1.00f, 80, 100 },
         };
         quests_.push_back(quest);
     }

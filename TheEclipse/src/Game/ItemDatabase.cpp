@@ -1,5 +1,7 @@
 #include "Game/ItemDatabase.h"
 
+#include "Game/UniqueSkill.h"
+
 #include "Common/MathUtil.h"
 
 namespace ecl {
@@ -68,6 +70,10 @@ ItemDatabase::ItemDatabase()
         { 141, "ストームパイク",       "突きの衝撃が空気を裂く。",                 EquipSlot::WeaponRight, SPR, 2, WeaponStats(47.0f, 0.08f, 0.16f, -0.02f) },
         { 142, "蝕の穿槍",             "届かぬものなしと謳われた穂先。",           EquipSlot::WeaponRight, SPR, 3, WeaponStats(66.0f, 0.10f, 0.22f,  0.00f) },
 
+        //--- ユニークスキル「神聖剣」専用のセット武器 -----------------------------
+        //   特別クエストでのみ入手できる。通常のドロップ抽選には出ない。
+        { 150, "神聖剣グレイス",       "聖別された白刃。持つ者の守りに応える。",   EquipSlot::WeaponRight, SWD, 3, WeaponStats(58.0f, 0.08f, 0.18f, 0.02f) },
+
         //--- 頭装備 -------------------------------------------------------------
         { 200, "レザーキャップ",       "軽い革の帽子。",                           EquipSlot::Head, SWD, 1, ArmorStats(6.0f,  40.0f, 10.0f) },
         { 201, "アイアンヘルム",       "視界は狭いが頑丈。",                       EquipSlot::Head, SWD, 2, ArmorStats(12.0f, 75.0f,  6.0f) },
@@ -84,6 +90,8 @@ ItemDatabase::ItemDatabase()
         { 220, "ラウンドシールド",     "取り回しの良い小盾。",                     EquipSlot::Shield, SWD, 1, ArmorStats(9.0f,  55.0f, 0.0f) },
         { 221, "カイトシールド",       "全身を隠せる大盾。",                       EquipSlot::Shield, SWD, 2, ArmorStats(18.0f, 105.0f, 0.0f, 0.0f, -6.0f) },
         { 222, "蝕の盾",               "受けた衝撃を闇へ逃がす。",                 EquipSlot::Shield, SWD, 3, ArmorStats(28.0f, 160.0f, 18.0f) },
+        // ユニークスキル「神聖剣」専用のセット武器（特別クエストでのみ入手）
+        { 223, "聖盾エーギス",         "神聖剣と対になる盾。あらゆる刃を受け止める。", EquipSlot::Shield, SWD, 3, ArmorStats(32.0f, 180.0f, 24.0f) },
 
         //--- 腕装備 -------------------------------------------------------------
         { 230, "レザーブレイサー",     "手首を守る革当て。",                       EquipSlot::Arm, SWD, 1, ArmorStats(5.0f, 30.0f, 6.0f, 0.02f) },
@@ -101,6 +109,8 @@ ItemDatabase::ItemDatabase()
     // 手装備の攻撃速度補正は個別に付与
     for (ItemTemplate& t : templates_) {
         if (t.slot == EquipSlot::Hand) t.base.attackSpeed = (t.id == 241) ? 0.10f : 0.05f;
+        // 神聖剣のセット武器は特別枠（ランダム抽選には出さない）
+        if (t.id == kHolySwordSwordId || t.id == kHolySwordShieldId) t.special = true;
     }
 
 }
@@ -150,6 +160,7 @@ EquipmentItem ItemDatabase::CreateRandom(EquipSlot slot, int iv, int maxTier) co
 {
     std::vector<int> candidates;
     for (const ItemTemplate& t : templates_) {
+        if (t.special) continue;   // 特別枠はランダム抽選に出さない
         if (t.slot == slot && t.tier <= maxTier) candidates.push_back(t.id);
     }
     if (candidates.empty()) return EquipmentItem();
@@ -162,6 +173,7 @@ EquipmentItem ItemDatabase::CreateRandomAny(int iv, int maxTier) const
 {
     std::vector<int> candidates;
     for (const ItemTemplate& t : templates_) {
+        if (t.special) continue;   // 特別枠はランダム抽選に出さない
         if (t.tier <= maxTier) candidates.push_back(t.id);
     }
     if (candidates.empty()) return EquipmentItem();

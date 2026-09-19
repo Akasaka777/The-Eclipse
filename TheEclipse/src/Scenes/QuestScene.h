@@ -57,7 +57,7 @@ private:
     void DrawBreakNotice() const;
     void UpdateFloorTransition(float dt, GameContext& context);
     // パリィ成功時の共通処理（攻撃者をよろけさせる）
-    void HandleParrySuccess();
+    void HandleParrySuccess(GameContext& context);
     // ID からアクターを探す
     Actor* FindActorById(int actorId);
     void FinishQuest(bool cleared, bool retired, GameContext& context);

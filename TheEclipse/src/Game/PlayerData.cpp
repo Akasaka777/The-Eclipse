@@ -247,8 +247,27 @@ bool PlayerData::UsesUniqueSkillSet() const
     // 二刀流 : 両手に片手剣を装備している間だけ。
     //          片手持ちに戻すと通常の片手剣スキルへ戻る。
     case UniqueSkillType::DualWield: return inventory_.IsDualWielding();
+    // 神聖剣 : 専用スキルを持たないので、スキルの系統は通常どおり。
     default: return false;
     }
+}
+
+bool PlayerData::HasPerfectGuard() const
+{
+    // 神聖剣の効果は「盾での防御」が前提。盾を外していると働かない。
+    return HasHolySword() && inventory_.Equipped(EquipSlot::Shield) != nullptr;
+}
+
+void PlayerData::AddParrySuccess(int count)
+{
+    if (count <= 0) return;
+    parrySuccessCount_ += count;
+}
+
+bool PlayerData::TryUnlockByParry()
+{
+    if (parrySuccessCount_ < kHolySwordParryCount) return false;
+    return MakeUniqueSkillAvailable(UniqueSkillType::HolySword);
 }
 
 bool PlayerData::MatchesCurrentSkillSet(const SwordSkill& skill) const
@@ -310,6 +329,22 @@ void PlayerData::DebugUnlockAllSkills()
         if (!IsSkillUnlocked(skill.id)) unlockedSkills_.push_back(skill.id);
     }
     RefreshSkillLoadout();
+}
+
+bool PlayerData::DebugAcquireUniqueSkill(UniqueSkillType type)
+{
+    if (type == UniqueSkillType::None) return false;
+    MakeUniqueSkillAvailable(type, true);
+    return AcquireUniqueSkill(type, true);
+}
+
+void PlayerData::DebugAddLevel(int levels)
+{
+    if (levels <= 0) return;
+    const int before = level_;
+    level_ = math::ClampInt(level_ + levels, 1, 99);
+    exp_ = 0;
+    AddSkillPoints(level_ - before);
 }
 
 void PlayerData::DebugUnlockAllUniqueSkills()
@@ -386,10 +421,12 @@ void PlayerData::RestoreProgress(int level, int exp, int skillPoints,
                                  const std::vector<int>& clearedQuests,
                                  const int skillLoadout[4],
                                  UniqueSkillType uniqueSkill,
-                                 const std::vector<int>& availableUniqueSkills)
+                                 const std::vector<int>& availableUniqueSkills,
+                                 int parrySuccessCount)
 {
     uniqueSkill_ = uniqueSkill;
     availableUniqueSkills_ = availableUniqueSkills;
+    parrySuccessCount_ = math::MaxI(0, parrySuccessCount);
     inventory_.SetDualWieldEnabled(HasDualWield());
 
     level_ = math::ClampInt(level, 1, 99);

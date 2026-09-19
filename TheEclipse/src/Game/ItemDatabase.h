@@ -21,6 +21,8 @@ struct ItemTemplate
     WeaponType  weaponType = WeaponType::OneHandSword;
     int         tier = 1; // 1〜3（出現フロアの目安）
     Stats       base;
+    // 特別枠（ユニークスキル用のセット武器など）。通常のランダム抽選には出ない
+    bool        special = false;
 };
 
 class ItemDatabase

@@ -441,12 +441,14 @@ Actor* QuestScene::FindActorById(int actorId)
     return nullptr;
 }
 
-void QuestScene::HandleParrySuccess()
+void QuestScene::HandleParrySuccess(GameContext& context)
 {
     int sourceId = -1;
     if (!player_.ConsumeParrySignal(&sourceId)) return;
 
     ++parryCount_;
+    // 神聖剣の解放条件はパリィの累計成功回数（UniqueSkill.h 参照）
+    context.player.AddParrySuccess();
     hitStop_ = math::MaxF(hitStop_, kParryHitStop);
     camera_.Shake(24.0f, 0.32f);
 
@@ -496,7 +498,7 @@ void QuestScene::ResolveHitBoxes(GameContext& context)
             hitBox.MarkHit(player_.id);
 
             // パリィが成立していれば被弾扱いにしない
-            HandleParrySuccess();
+            HandleParrySuccess(context);
 
             if (damage > 0) {
                 damageTaken_ += damage;
@@ -764,6 +766,11 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
         && context.player.MakeUniqueSkillAvailable(UniqueSkillType::DualWield)) {
         result.unlockedUniqueSkill = true;
         result.unlockedUniqueSkillName = UniqueSkillName(UniqueSkillType::DualWield);
+    }
+    // 神聖剣 : パリィの累計成功回数（クリアしなくても判定する）
+    else if (context.player.TryUnlockByParry()) {
+        result.unlockedUniqueSkill = true;
+        result.unlockedUniqueSkillName = UniqueSkillName(UniqueSkillType::HolySword);
     }
 }
 

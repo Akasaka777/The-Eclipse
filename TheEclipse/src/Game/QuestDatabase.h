@@ -41,6 +41,8 @@ struct QuestDef
     std::vector<FloorDef>  floors;
     std::vector<DropEntry> bossDrops;   // ボス撃破時の抽選
     std::vector<DropEntry> floorDrops;  // 道中の抽選
+    // 特別クエスト。クエスト選択タブには出さず、スキルツリーから挑む
+    bool special = false;
 
     int FloorCount() const { return static_cast<int>(floors.size()); }
 };

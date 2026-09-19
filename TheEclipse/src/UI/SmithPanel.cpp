@@ -218,16 +218,16 @@ void SmithPanel::Draw(const GameContext& context) const
     }
 
     float y = detail.top + 24.0f;
-    draw::Text(FontSize::Large, detail.left + 24.0f, y, item->IvDisplayColor(), item->DisplayName());
+    draw::Text(FontSize::Large, detail.left + 24.0f, y, palette::kAccent, item->DisplayName());
     y += 58.0f;
     draw::Text(FontSize::Small, detail.left + 24.0f, y, palette::kTextDim,
                str::Format("%s ／ 強化 %d / %d",
                            item->IsWeapon() ? WeaponTypeName(item->weaponType) : EquipSlotName(item->slot),
                            item->upgradeLevel, item->MaxUpgrade()));
     y += 30.0f;
-    // 個体値（強化上限と耐久力の最大値もここから決まる）
-    draw::Text(FontSize::Small, detail.left + 24.0f, y, item->IvDisplayColor(),
-               str::Format("個体値 %d / %d", item->iv, kMaxIv));
+    draw::Text(FontSize::Small, detail.left + 24.0f, y, palette::kTextDim,
+               str::Format("戦力 %d ／ 耐久力 最大 %d", item->Power(),
+                           item->MaxDurabilityDisplay()));
     y += 36.0f;
 
     // --- 耐久力 ---------------------------------------------------------------

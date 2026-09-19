@@ -46,12 +46,14 @@ constexpr int kTabCount = static_cast<int>(sizeof(kTabs) / sizeof(kTabs[0]));
 //------------------------------------------------------------------------------
 enum class DebugAction
 {
-    AddCol,       // col を増やす
-    AddMaterial,  // 強化素材を増やす
-    AddSkillPoint,// スキルポイントを増やす
-    AllWeapons,   // 全武器種の武器を入手する
-    UnlockSkills, // スキルを全解放
-    UnlockUnique, // ユニークスキルを解放
+    AddCol,        // col を増やす
+    AddMaterial,   // 強化素材を増やす
+    AddSkillPoint, // スキルポイントを増やす
+    AddLevel,      // レベルを上げる
+    AllWeapons,    // 全武器種の武器を入手する
+    AllArmors,     // 全防具を入手する
+    UnlockSkills,  // スキルを全解放
+    UnlockUnique,  // ユニークスキルを解放（プルダウンで選ぶ）
 };
 
 struct DebugButtonDef
@@ -64,9 +66,11 @@ const DebugButtonDef kDebugButtons[] = {
     { DebugAction::AddCol,        "col +10,000" },
     { DebugAction::AddMaterial,   "素材 +50" },
     { DebugAction::AddSkillPoint, "SP +10" },
+    { DebugAction::AddLevel,      "Lv +5" },
     { DebugAction::AllWeapons,    "全武器取得" },
+    { DebugAction::AllArmors,     "全防具取得" },
     { DebugAction::UnlockSkills,  "スキル全習得" },
-    { DebugAction::UnlockUnique,  "ユニーク解放" },
+    { DebugAction::UnlockUnique,  "ユニーク解放 ▼" },
 };
 
 constexpr int   kDebugButtonCount = static_cast<int>(sizeof(kDebugButtons) / sizeof(kDebugButtons[0]));
@@ -76,8 +80,13 @@ constexpr float kDebugButtonGap = 8.0f;
 constexpr int   kDebugColAmount = 10000;
 constexpr int   kDebugMaterialAmount = 50;
 constexpr int   kDebugSkillPointAmount = 10;
-// 全武器取得で配る個体値
-constexpr int kDebugWeaponIv = 70;
+constexpr int   kDebugLevelAmount = 5;
+// 装備を配るときの個体値
+constexpr int kDebugItemIv = 70;
+
+// プルダウンの位置（ユニーク解放ボタンの右隣に開く）
+constexpr float kDebugMenuGap = 24.0f;
+constexpr float kDebugMenuWidth = 240.0f;
 
 // 全武器種の武器を所持品に追加する（片手剣は二刀流を試せるよう 2 本ずつ）
 int GrantAllWeapons(Inventory& inventory)
@@ -87,9 +96,21 @@ int GrantAllWeapons(Inventory& inventory)
         if (!IsWeaponSlot(tmpl.slot)) continue;
         const int copies = (tmpl.weaponType == WeaponType::OneHandSword) ? 2 : 1;
         for (int i = 0; i < copies; ++i) {
-            inventory.AddItem(ItemDatabase::Instance().Create(tmpl.id, kDebugWeaponIv));
+            inventory.AddItem(ItemDatabase::Instance().Create(tmpl.id, kDebugItemIv));
             ++added;
         }
+    }
+    return added;
+}
+
+// 全ての防具（頭・体・盾・腕・手・足）を所持品に追加する
+int GrantAllArmors(Inventory& inventory)
+{
+    int added = 0;
+    for (const ItemTemplate& tmpl : ItemDatabase::Instance().Templates()) {
+        if (IsWeaponSlot(tmpl.slot)) continue;
+        inventory.AddItem(ItemDatabase::Instance().Create(tmpl.id, kDebugItemIv));
+        ++added;
     }
     return added;
 }
@@ -131,6 +152,36 @@ void HomeScene::BuildDebugButtons()
         button.SetAccent(palette::kAccentWarm);
         debugButtons_.push_back(button);
     }
+
+    // --- 「ユニーク解放」のプルダウン -------------------------------------------
+    //   先頭が「全ユニークスキル解放」、以降は個別のユニークスキル。
+    //   ユニークスキルを追加すると自動でここに並ぶ。
+    debugUniqueMenu_.clear();
+    if (!debugButtons_.empty()) {
+        const Rect anchor = debugButtons_.back().GetRect();
+        const float menuLeft = anchor.right + kDebugMenuGap;
+        const int rows = 1 + static_cast<int>(UniqueSkillDatabase::Instance().All().size());
+        const float menuTop = anchor.bottom
+                            - (kDebugButtonHeight + kDebugButtonGap) * static_cast<float>(rows)
+                            + kDebugButtonGap;
+
+        auto addRow = [&](int index, const std::string& label) {
+            const Rect rect = Rect::FromXYWH(menuLeft,
+                                             menuTop + (kDebugButtonHeight + kDebugButtonGap)
+                                                           * static_cast<float>(index),
+                                             kDebugMenuWidth, kDebugButtonHeight);
+            ui::Button row(rect, label, FontSize::Small);
+            row.SetAccent(palette::kExp);
+            debugUniqueMenu_.push_back(row);
+        };
+
+        addRow(0, "全ユニークスキル解放");
+        int index = 1;
+        for (const UniqueSkillDef& def : UniqueSkillDatabase::Instance().All()) {
+            addRow(index, def.name);
+            ++index;
+        }
+    }
 }
 
 void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& context)
@@ -139,6 +190,34 @@ void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& co
     if (!context.settings.debugMode) return;
 
     Inventory& inventory = context.player.GetInventory();
+
+    // --- 「ユニーク解放」のプルダウン -------------------------------------------
+    if (debugUniqueMenuOpen_) {
+        for (int i = 0; i < static_cast<int>(debugUniqueMenu_.size()); ++i) {
+            if (!debugUniqueMenu_[static_cast<size_t>(i)].Update(input, dt)) continue;
+
+            if (i == 0) {
+                context.player.DebugUnlockAllUniqueSkills();
+                debugMessage_ = str::Format("全ユニークスキルを解放しました（習得 : %s）",
+                                            UniqueSkillName(context.player.UniqueSkill()));
+            } else {
+                const std::vector<UniqueSkillDef>& all = UniqueSkillDatabase::Instance().All();
+                const size_t index = static_cast<size_t>(i - 1);
+                if (index < all.size()) {
+                    context.player.DebugAcquireUniqueSkill(all[index].type);
+                    player_.RefreshEquipment(context.player);
+                    debugMessage_ = str::Format("ユニークスキル「%s」を習得しました",
+                                                all[index].name.c_str());
+                }
+            }
+            debugMessageTimer_ = 2.8f;
+            debugUniqueMenuOpen_ = false;
+            return;
+        }
+
+        // プルダウンの外をクリックしたら閉じる
+        if (input.MouseClicked(MouseButton::Left)) debugUniqueMenuOpen_ = false;
+    }
 
     for (int i = 0; i < static_cast<int>(debugButtons_.size()); ++i) {
         if (!debugButtons_[static_cast<size_t>(i)].Update(input, dt)) continue;
@@ -158,9 +237,21 @@ void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& co
             debugMessage_ = str::Format("スキルポイントを %d 追加しました",
                                         kDebugSkillPointAmount);
             break;
+        case DebugAction::AddLevel:
+            context.player.DebugAddLevel(kDebugLevelAmount);
+            player_.Setup(context.player);
+            player_.FullHeal();
+            debugMessage_ = str::Format("レベルを %d 上げました（Lv %d）",
+                                        kDebugLevelAmount, context.player.Level());
+            break;
         case DebugAction::AllWeapons: {
             const int added = GrantAllWeapons(inventory);
             debugMessage_ = str::Format("全武器種の武器を %d 個入手しました", added);
+            break;
+        }
+        case DebugAction::AllArmors: {
+            const int added = GrantAllArmors(inventory);
+            debugMessage_ = str::Format("全防具を %d 個入手しました", added);
             break;
         }
         case DebugAction::UnlockSkills:
@@ -168,10 +259,9 @@ void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& co
             debugMessage_ = "スキルツリーを全て解放しました";
             break;
         case DebugAction::UnlockUnique:
-            context.player.DebugUnlockAllUniqueSkills();
-            debugMessage_ = str::Format("ユニークスキル「%s」を習得しました",
-                                        UniqueSkillName(context.player.UniqueSkill()));
-            break;
+            // プルダウンを開いて解放するユニークスキルを選ばせる
+            debugUniqueMenuOpen_ = !debugUniqueMenuOpen_;
+            return;
         }
         debugMessageTimer_ = 2.8f;
     }
@@ -192,10 +282,25 @@ void HomeScene::DrawDebugPanel(const GameContext& context) const
 
     for (const ui::Button& button : debugButtons_) button.Draw();
 
+    // --- 「ユニーク解放」のプルダウン -------------------------------------------
+    if (debugUniqueMenuOpen_ && !debugUniqueMenu_.empty()) {
+        const Rect firstRow = debugUniqueMenu_.front().GetRect();
+        const Rect lastRow = debugUniqueMenu_.back().GetRect();
+        const Rect menu(firstRow.left - 8.0f, firstRow.top - 30.0f, firstRow.right + 8.0f,
+                        lastRow.bottom + 8.0f);
+        draw::ChamferRect(menu, 10.0f, palette::kPanel, 235);
+        draw::StrokeRect(menu, palette::kExp, 2.0f, 220);
+        draw::Text(FontSize::Tiny, menu.left + 12.0f, menu.top + 8.0f, palette::kExp,
+                   "解放するユニークスキル");
+        for (const ui::Button& row : debugUniqueMenu_) row.Draw();
+    }
+
+    // 通知はパネルの上に出す（プルダウンと重ならないように）
     if (debugMessageTimer_ > 0.0f) {
-        draw::Text(FontSize::Tiny, panel.right + 14.0f, last.bottom - 20.0f, palette::kAccentWarm,
+        draw::Text(FontSize::Tiny, panel.left, panel.top - 24.0f, palette::kAccentWarm,
                    debugMessage_);
     }
+    (void)last;
 }
 
 void HomeScene::BuildField()
@@ -284,6 +389,11 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
         if (equipPanel_.CloseRequested()) activeTab_ = HomeTab::None;
     } else if (skillPanel_.IsOpen()) {
         skillPanel_.Update(dt, input, context);
+        // ユニークスキルの特別クエストへの出撃要求
+        if (const int specialQuestId = skillPanel_.SpecialQuestRequested()) {
+            context.selectedQuestId = specialQuestId;
+            startQuest_ = true;
+        }
         if (skillPanel_.CloseRequested()) activeTab_ = HomeTab::None;
     } else if (questPanel_.IsOpen()) {
         questPanel_.Update(dt, input, context);
@@ -339,6 +449,11 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
         const float mouseY = static_cast<float>(input.MouseY());
         for (const ui::Button& button : debugButtons_) {
             if (button.GetRect().Expanded(12.0f).Contains(mouseX, mouseY)) overDebugPanel = true;
+        }
+        if (debugUniqueMenuOpen_) {
+            for (const ui::Button& row : debugUniqueMenu_) {
+                if (row.GetRect().Expanded(12.0f).Contains(mouseX, mouseY)) overDebugPanel = true;
+            }
         }
     }
 

@@ -65,6 +65,9 @@ private:
 
     std::vector<ui::Button> tabButtons_;
     std::vector<ui::Button> debugButtons_;
+    // 「ユニーク解放」のプルダウン
+    std::vector<ui::Button> debugUniqueMenu_;
+    bool debugUniqueMenuOpen_ = false;
     HomeTab activeTab_ = HomeTab::None;
 
     ui::EquipPanel    equipPanel_;

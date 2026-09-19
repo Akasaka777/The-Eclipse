@@ -115,6 +115,25 @@ BossDatabase::BossDatabase()
                        BossAttackKind::JumpSlam, BossAttackKind::Burst, BossAttackKind::Swipe };
         bosses_.push_back(b);
     }
+    {
+        // ユニークスキル「神聖剣」の特別クエスト用ボス
+        BossDef b;
+        b.id = 4;
+        b.name = "セイクリッド・ガーディアン";
+        b.title = "聖剣の守護者";
+        b.style = ArtStyle::Knight;
+        b.main = ColorRGB(56, 60, 82);
+        b.accent = ColorRGB(248, 244, 226);
+        b.trim = ColorRGB(255, 214, 128);
+        b.weapon = WeaponType::OneHandSword;
+        b.maxHp = 11000.0f; b.attack = 112.0f; b.defense = 58.0f; b.moveSpeed = 215.0f;
+        b.halfWidth = 60.0f; b.height = 244.0f;
+        b.assetFolder = "sacred_guardian";
+        b.expReward = 900; b.colReward = 1500;
+        b.patterns = { BossAttackKind::Swipe, BossAttackKind::Combo, BossAttackKind::Charge,
+                       BossAttackKind::JumpSlam, BossAttackKind::Shot };
+        bosses_.push_back(b);
+    }
 }
 
 const BossDatabase& BossDatabase::Instance()

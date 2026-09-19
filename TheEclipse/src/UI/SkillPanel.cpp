@@ -3,6 +3,7 @@
 #include "Common/MathUtil.h"
 #include "Common/StringUtil.h"
 #include "Core/GameConfig.h"
+#include "Game/QuestDatabase.h"
 #include "Game/UniqueSkill.h"
 #include "Graphics/DrawUtil.h"
 
@@ -93,6 +94,15 @@ void SkillPanel::Layout()
                             "外す");
     closeButton_ = Button(Rect::FromXYWH(window_.right - 200.0f, window_.bottom - 86.0f,
                                          160.0f, 58.0f), "閉じる");
+
+    // --- ユニーク欄のボタン（ツリー欄の右列の下側に置く）------------------------
+    const float uniqueLeft = treeArea_.left + 300.0f;
+    acquireButton_ = Button(Rect::FromXYWH(uniqueLeft, treeArea_.bottom - 132.0f, 340.0f, 56.0f),
+                            "このユニークスキルを習得する", FontSize::Small);
+    acquireButton_.SetAccent(palette::kExp);
+    specialQuestButton_ = Button(Rect::FromXYWH(uniqueLeft, treeArea_.bottom - 66.0f, 340.0f, 56.0f),
+                                 "特別クエストへ出撃", FontSize::Small);
+    specialQuestButton_.SetAccent(palette::kAccentWarm);
 }
 
 Rect SkillPanel::NodeRect(int column, int tier) const
@@ -108,6 +118,7 @@ void SkillPanel::Open(const GameContext& context)
     open_ = true;
     closeRequested_ = false;
     loadoutChanged_ = false;
+    specialQuestId_ = 0;
     viewWeapon_ = context.player.CurrentWeaponType();
     // 今使える系統のタブを開いておく（二刀流中はユニークのタブ）
     uniqueTab_ = context.player.UsesUniqueSkillSet();
@@ -166,6 +177,7 @@ void SkillPanel::Update(float dt, const Input& input, GameContext& context)
 
     closeRequested_ = false;
     loadoutChanged_ = false;
+    specialQuestId_ = 0;
     time_ += dt;
     messageTimer_ = math::MaxF(0.0f, messageTimer_ - dt);
 
@@ -224,6 +236,36 @@ void SkillPanel::Update(float dt, const Input& input, GameContext& context)
         // --- スロット選択 ----------------------------------------------------
         for (int i = 0; i < kSkillSlotCount; ++i) {
             if (slotRects_[i].Contains(mouseX, mouseY)) targetSlot_ = i;
+        }
+    }
+
+    // --- 専用スキルを持たないユニークスキルの習得 / 特別クエスト ------------------
+    if (uniqueTab_ && uniqueType != UniqueSkillType::None) {
+        const UniqueSkillDef* def = UniqueSkillDatabase::Instance().Find(uniqueType);
+        const bool acquired = (player.UniqueSkill() == uniqueType);
+
+        // 専用スキルが無いユニークスキルは、ツリーではなくボタンで習得する
+        const bool showAcquire = def && !def->HasDedicatedSkills() && !acquired;
+        if (showAcquire) {
+            acquireButton_.SetEnabled(!player.HasUniqueSkill());
+            if (acquireButton_.Update(input, dt) && acquireButton_.Enabled()) {
+                if (player.AcquireUniqueSkill(uniqueType)) {
+                    message_ = str::Format("ユニークスキル「%s」を習得しました",
+                                           UniqueSkillName(uniqueType));
+                    messageTimer_ = 3.4f;
+                }
+            }
+        }
+
+        // 特別クエストは習得後、まだクリアしていない間だけ挑める
+        if (def && acquired && def->specialQuestId != 0
+            && !player.IsQuestCleared(def->specialQuestId)) {
+            if (specialQuestButton_.Update(input, dt)) {
+                specialQuestId_ = def->specialQuestId;
+                closeRequested_ = true;
+                open_ = false;
+                return;
+            }
         }
     }
 
@@ -470,7 +512,28 @@ void SkillPanel::DrawUniqueTree(const GameContext& context) const
 
     // 左列にノード、右列に効果と解放条件を並べる（重ならないよう列で分ける）
     draw::Text(FontSize::Tiny, NodeRect(0, 1).CenterX(), treeArea_.top + 6.0f, palette::kExp,
-               "ユニークスキル", draw::TextAlign::Center);
+               def->HasDedicatedSkills() ? "ユニークスキル" : "専用スキルなし",
+               draw::TextAlign::Center);
+
+    // 専用スキルを持たないユニークスキルは、左列に効果だけを大きく示す
+    if (!def->HasDedicatedSkills()) {
+        const Rect panel(NodeRect(0, 1).left, NodeRect(0, 1).top,
+                         NodeRect(0, 1).right, NodeRect(0, 3).bottom);
+        draw::GradientRectV(panel, palette::kPanelLight.Scaled(0.9f), palette::kPanelDark, 235, 10);
+        draw::StrokeRect(panel, acquired ? palette::kExp : palette::kTextDisabled, 2.0f, 255);
+        draw::Text(FontSize::Large, panel.CenterX(), panel.top + 40.0f,
+                   acquired ? palette::kExp : palette::kTextDim, def->name,
+                   draw::TextAlign::Center);
+        draw::Text(FontSize::Small, panel.CenterX(), panel.top + 110.0f, palette::kTextDim,
+                   "専用スキルはありません", draw::TextAlign::Center);
+        draw::Text(FontSize::Small, panel.CenterX(), panel.top + 144.0f,
+                   acquired ? palette::kHp : palette::kTextDisabled,
+                   acquired ? "習得済み" : "未習得", draw::TextAlign::Center);
+        if (acquired) {
+            draw::Text(FontSize::Tiny, panel.CenterX(), panel.top + 186.0f, palette::kAccentWarm,
+                       "効果は常に働きます", draw::TextAlign::Center);
+        }
+    }
 
     for (size_t i = 0; i < nodes.size(); ++i) {
         const SwordSkill* node = nodes[i];
@@ -529,8 +592,41 @@ void SkillPanel::DrawUniqueTree(const GameContext& context) const
         draw::Text(FontSize::Tiny, infoLeft, y, palette::kExp,
                    str::Format("解放条件 : %s", def->unlockCondition.c_str()));
         y += 26.0f;
-        draw::Text(FontSize::Tiny, infoLeft, y, palette::kAccent,
-                   str::Format("「%s」の解放で習得します", nodes.empty() ? "" : nodes[0]->name.c_str()));
+        if (def->HasDedicatedSkills()) {
+            draw::Text(FontSize::Tiny, infoLeft, y, palette::kAccent,
+                       str::Format("「%s」の解放で習得します",
+                                   nodes.empty() ? "" : nodes[0]->name.c_str()));
+        } else {
+            draw::Text(FontSize::Tiny, infoLeft, y, palette::kAccent,
+                       "下のボタンで習得します");
+        }
+    }
+
+    // --- 習得ボタン（専用スキルを持たないユニークスキルのみ）----------------------
+    if (!def->HasDedicatedSkills() && !acquired) {
+        acquireButton_.Draw();
+    }
+
+    // --- 特別クエスト（習得後、まだクリアしていない間だけ）------------------------
+    if (def->specialQuestId != 0) {
+        const bool clearedSpecial = player.IsQuestCleared(def->specialQuestId);
+        const QuestDef* quest = QuestDatabase::Instance().Find(def->specialQuestId);
+        // 習得ボタンは習得後に消えるので、その跡地に案内を出す
+        const float noteY = acquireButton_.GetRect().top + 16.0f;
+
+        if (acquired && !clearedSpecial) {
+            draw::Text(FontSize::Tiny, infoLeft, noteY, palette::kAccentWarm,
+                       str::Format("特別クエスト「%s」に挑めます",
+                                   quest ? quest->name.c_str() : ""));
+            specialQuestButton_.Draw();
+            const float pulse = 0.7f + 0.3f * std::sin(time_ * 4.0f);
+            draw::StrokeRect(specialQuestButton_.GetRect().Expanded(3.0f), palette::kAccentWarm,
+                             2.0f, static_cast<int>(200.0f * pulse));
+        } else if (acquired && clearedSpecial) {
+            draw::Text(FontSize::Tiny, infoLeft, noteY, palette::kTextDim,
+                       str::Format("特別クエスト「%s」クリア済み",
+                                   quest ? quest->name.c_str() : ""));
+        }
     }
 }
 

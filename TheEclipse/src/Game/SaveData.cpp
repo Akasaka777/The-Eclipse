@@ -26,7 +26,7 @@ namespace {
 
 // セーブ形式のバージョン（構造を変えたら上げる）
 // v3: 武器スロットを左右に分割し、ユニークスキルを追加
-constexpr int kSaveVersion = 5;
+constexpr int kSaveVersion = 6;
 
 std::string g_lastError;
 
@@ -156,6 +156,7 @@ bool SaveSystem::Save(const GameContext& context)
 
     // --- ユニークスキル -------------------------------------------------------
     file << "uniqueskill " << static_cast<int>(player.UniqueSkill()) << "\n";
+    file << "parrycount " << player.ParrySuccessCount() << "\n";
     for (int value : player.AvailableUniqueSkills()) {
         file << "uniqueavailable " << value << "\n";
     }
@@ -206,6 +207,7 @@ bool SaveSystem::Load(GameContext& context)
     int material = 0;
     int selectedQuest = 1;
     std::string playerName;
+    int parryCount = 0;
     GameSettings settings = context.settings;
 
     std::string line;
@@ -244,6 +246,8 @@ bool SaveSystem::Load(GameContext& context)
             if (slot >= 0 && slot < kSkillSlotCount) skillSlots[slot] = ToInt(arg(2));
         } else if (key == "unlocked") {
             unlocked.push_back(ToInt(arg(1)));
+        } else if (key == "parrycount") {
+            parryCount = ToInt(arg(1));
         } else if (key == "uniqueskill") {
             const int value = ToInt(arg(1));
             if (value > 0 && value < static_cast<int>(UniqueSkillType::Count)) {
@@ -314,7 +318,7 @@ bool SaveSystem::Load(GameContext& context)
     // v3 以前には名前が無いので、その場合は既定値のままにする
     if (!playerName.empty()) loaded.SetName(playerName);
     loaded.RestoreProgress(level, exp, skillPoints, unlocked, cleared, skillSlots,
-                           uniqueSkill, uniqueAvailable);
+                           uniqueSkill, uniqueAvailable, parryCount);
     inventory.SetCurrency(col, material);
     for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {
         if (equippedUid[i] == 0) continue;

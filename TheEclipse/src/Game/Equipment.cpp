@@ -33,18 +33,6 @@ float IvDurabilityBonus(int iv)
     return 0.8f * static_cast<float>(ClampIv(iv));
 }
 
-ColorRGB IvColor(int iv)
-{
-    // 低い＝灰 → 中間＝水色 → 高い＝金 へ滑らかに変える
-    const ColorRGB low(160, 168, 180);
-    const ColorRGB mid(88, 198, 255);
-    const ColorRGB high(255, 196, 64);
-
-    const float t = static_cast<float>(ClampIv(iv)) / 100.0f;
-    if (t <= 0.5f) return ColorRGB::Lerp(low, mid, t * 2.0f);
-    return ColorRGB::Lerp(mid, high, (t - 0.5f) * 2.0f);
-}
-
 const char* EquipSlotName(EquipSlot slot)
 {
     switch (slot) {

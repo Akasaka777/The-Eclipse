@@ -32,6 +32,8 @@ public:
     bool CloseRequested() const { return closeRequested_; }
     // このフレームでスキル構成が変わったか（戦闘中の反映に使う）
     bool LoadoutChanged() const { return loadoutChanged_; }
+    // ユニークスキルの特別クエストへ出撃したいか（0 なら要求なし）
+    int  SpecialQuestRequested() const { return specialQuestId_; }
 
 private:
     void Layout();
@@ -60,6 +62,10 @@ private:
     std::vector<Button> weaponButtons_;
     Button unlockButton_;
     Button uniqueTabButton_;
+    // 専用スキルを持たないユニークスキル用の習得ボタン
+    Button acquireButton_;
+    // 特別クエストへの出撃ボタン
+    Button specialQuestButton_;
     Button equipButton_;
     Button unequipButton_;
     Button closeButton_;
@@ -71,6 +77,7 @@ private:
     bool  open_ = false;
     bool  closeRequested_ = false;
     bool  loadoutChanged_ = false;
+    int   specialQuestId_ = 0;
 
     std::string message_;
     float messageTimer_ = 0.0f;

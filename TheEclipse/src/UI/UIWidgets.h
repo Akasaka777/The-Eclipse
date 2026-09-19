@@ -108,8 +108,6 @@ private:
 //------------------------------------------------------------------------------
 // 見出し付きのウィンドウ枠
 void DrawWindow(const Rect& rect, const std::string& title);
-// 個体値バッジ（数値と色で個体値の高さを示す）
-void DrawIvBadge(const Rect& rect, int iv);
 // 一覧用のアイテム行
 void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, bool equipped, bool hovered);
 // 武器種のアイコン

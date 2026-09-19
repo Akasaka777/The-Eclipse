@@ -174,16 +174,6 @@ void DrawWindow(const Rect& rect, const std::string& title)
     draw::Text(FontSize::Medium, rect.left + 24.0f, rect.top + 10.0f, palette::kText, title);
 }
 
-void DrawIvBadge(const Rect& rect, int iv)
-{
-    const ColorRGB color = IvColor(iv);
-    draw::GradientRectV(rect, color.Scaled(0.9f), color.Scaled(0.45f), 255, 6);
-    draw::StrokeRect(rect, color.Scaled(1.2f), 1.0f, 255);
-    draw::Text(FontSize::Small, rect.CenterX(),
-               rect.CenterY() - static_cast<float>(draw::TextHeight(FontSize::Small)) * 0.5f,
-               palette::kBlack, str::Format("%d", ClampIv(iv)), draw::TextAlign::Center);
-}
-
 void DrawWeaponIcon(const Rect& rect, WeaponType type, const ColorRGB& color)
 {
     const float cx = rect.CenterX();
@@ -260,22 +250,20 @@ void DrawSlotIcon(const Rect& rect, EquipSlot slot, const ColorRGB& color)
 
 void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, bool equipped, bool hovered)
 {
-    const ColorRGB ivColor = item.IvDisplayColor();
+    // 個体値は画面に出さない（能力値と耐久力の違いとして感じ取ってもらう）
+    const ColorRGB accent = item.IsWeapon() ? palette::kAccent : palette::kAccentWarm;
 
     ColorRGB fill = palette::kPanelDark;
-    if (selected) fill = ColorRGB::Lerp(palette::kPanelLight, ivColor.Scaled(0.5f), 0.55f);
+    if (selected) fill = ColorRGB::Lerp(palette::kPanelLight, accent.Scaled(0.5f), 0.55f);
     else if (hovered) fill = palette::kPanelLight;
 
     draw::GradientRectH(rect, fill, fill.Scaled(0.75f), 235, 12);
-    draw::StrokeRect(rect, selected ? ivColor : palette::kBorder.Scaled(0.7f), selected ? 2.0f : 1.0f, 255);
-    // 左端の帯は個体値の高さを表す（高いほど長い）
-    const float bandHeight = rect.Height() * (0.25f + 0.75f * static_cast<float>(ClampIv(item.iv)) / 100.0f);
-    draw::FillRect(Rect(rect.left, rect.top, rect.left + 6.0f, rect.bottom), palette::kPanelDark, 255);
-    draw::FillRect(Rect(rect.left, rect.bottom - bandHeight, rect.left + 6.0f, rect.bottom), ivColor, 255);
+    draw::StrokeRect(rect, selected ? accent : palette::kBorder.Scaled(0.7f), selected ? 2.0f : 1.0f, 255);
+    draw::FillRect(Rect(rect.left, rect.top, rect.left + 6.0f, rect.bottom), accent, 255);
 
     const Rect iconRect(rect.left + 12.0f, rect.top + 6.0f, rect.left + 62.0f, rect.bottom - 6.0f);
-    if (item.IsWeapon()) DrawWeaponIcon(iconRect, item.weaponType, ivColor);
-    else DrawSlotIcon(iconRect, item.slot, ivColor);
+    if (item.IsWeapon()) DrawWeaponIcon(iconRect, item.weaponType, accent);
+    else DrawSlotIcon(iconRect, item.slot, accent);
 
     draw::Text(FontSize::Normal, rect.left + 74.0f, rect.top + 8.0f, palette::kText, item.DisplayName());
 
@@ -287,10 +275,10 @@ void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, boo
                       static_cast<int>(item.TotalStats().maxHp));
     draw::Text(FontSize::Small, rect.left + 74.0f, rect.top + 36.0f, palette::kTextDim, sub);
 
-    DrawIvBadge(Rect(rect.right - 62.0f, rect.top + 8.0f, rect.right - 12.0f, rect.top + 34.0f),
-                item.iv);
-    draw::Text(FontSize::Tiny, rect.right - 12.0f, rect.top + 38.0f, palette::kTextDim,
+    draw::Text(FontSize::Small, rect.right - 12.0f, rect.top + 10.0f, palette::kText,
                str::Format("戦力 %d", item.Power()), draw::TextAlign::Right);
+    draw::Text(FontSize::Tiny, rect.right - 12.0f, rect.top + 38.0f, palette::kTextDim,
+               str::Format("強化上限 +%d", item.MaxUpgrade()), draw::TextAlign::Right);
 
     // --- 耐久力 ---------------------------------------------------------------
     const Rect durabilityBar(rect.right - 200.0f, rect.bottom - 16.0f, rect.right - 12.0f,
