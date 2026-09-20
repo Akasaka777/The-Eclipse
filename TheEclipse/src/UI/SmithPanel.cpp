@@ -50,16 +50,19 @@ void SmithPanel::Layout()
     window_ = Rect::FromXYWH(200.0f, 100.0f, 1520.0f, 880.0f);
 
     const float buttonY = window_.bottom - 92.0f;
-    upgradeButton_ = Button(Rect::FromXYWH(window_.right - 820.0f, buttonY, 200.0f, 62.0f),
+    upgradeButton_ = Button(Rect::FromXYWH(window_.right - 1040.0f, buttonY, 190.0f, 62.0f),
                             "強化する");
     upgradeButton_.SetAccent(palette::kAccentWarm);
-    repairButton_ = Button(Rect::FromXYWH(window_.right - 600.0f, buttonY, 200.0f, 62.0f),
+    repairButton_ = Button(Rect::FromXYWH(window_.right - 830.0f, buttonY, 190.0f, 62.0f),
                            "修理する");
     repairButton_.SetAccent(palette::kHp);
-    repairAllButton_ = Button(Rect::FromXYWH(window_.right - 380.0f, buttonY, 200.0f, 62.0f),
+    repairAllButton_ = Button(Rect::FromXYWH(window_.right - 620.0f, buttonY, 190.0f, 62.0f),
                               "すべて修理");
     repairAllButton_.SetAccent(palette::kHp);
-    closeButton_ = Button(Rect::FromXYWH(window_.right - 160.0f, buttonY, 120.0f, 62.0f), "閉じる");
+    // 売却は鍛冶屋だけで行う（装備メニューからは無くした）
+    sellButton_ = Button(Rect::FromXYWH(window_.right - 410.0f, buttonY, 190.0f, 62.0f), "売却");
+    sellButton_.SetAccent(palette::kAccentWarm);
+    closeButton_ = Button(Rect::FromXYWH(window_.right - 200.0f, buttonY, 160.0f, 62.0f), "閉じる");
     filterButton_ = Button(Rect::FromXYWH(window_.left + 40.0f, window_.top + 74.0f, 220.0f, 44.0f),
                            "表示 : すべて", FontSize::Small);
 
@@ -91,6 +94,7 @@ void SmithPanel::Open()
     scroll_ = 0;
     resultTimer_ = 0.0f;
     crystals_ = 1;
+    confirmSellUid_ = 0;
     lastResultUid_ = 0;
     message_.clear();
 }
@@ -143,6 +147,7 @@ void SmithPanel::Update(float dt, const Input& input, GameContext& context)
             if (index >= 0 && index < static_cast<int>(items.size())) {
                 if (selectedUid_ != items[static_cast<size_t>(index)]->uid) lastResultUid_ = 0;
                 selectedUid_ = items[static_cast<size_t>(index)]->uid;
+                confirmSellUid_ = 0;
                 resultTimer_ = 0.0f;
             }
         }
@@ -218,6 +223,31 @@ void SmithPanel::Update(float dt, const Input& input, GameContext& context)
         }
     }
 
+    // --- 売却 ---------------------------------------------------------------
+    //   装備中のものは売れない。強化した装備を誤って手放さないよう 2 度押しで確定する。
+    const bool sellable = selectedUid_ != 0 && inventory.FindByUid(selectedUid_) != nullptr
+                       && !inventory.IsEquipped(selectedUid_);
+    sellButton_.SetEnabled(sellable);
+    if (!sellable) confirmSellUid_ = 0;
+    if (sellButton_.Update(input, dt) && sellable) {
+        if (confirmSellUid_ != selectedUid_) {
+            confirmSellUid_ = selectedUid_;
+            message_ = "もう一度「売却」を押すと確定します";
+            lastSuccess_ = false;
+            resultTimer_ = 1.6f;
+        } else {
+            const int value = inventory.SellValue(selectedUid_);
+            if (inventory.Sell(selectedUid_)) {
+                lastSuccess_ = true;
+                resultTimer_ = 1.6f;
+                message_ = str::Format("売却しました（+%s col）", str::Comma(value).c_str());
+                selectedUid_ = 0;
+                lastResultUid_ = 0;
+            }
+            confirmSellUid_ = 0;
+        }
+    }
+
     if (closeButton_.Update(input, dt) || input.Pressed(GameAction::Cancel)) {
         closeRequested_ = true;
         open_ = false;
@@ -282,8 +312,10 @@ void SmithPanel::Draw(const GameContext& context) const
         upgradeButton_.Draw();
         repairButton_.Draw();
         repairAllButton_.Draw();
+        sellButton_.Draw();
         closeButton_.Draw();
         DrawRepairSummary(context);
+        DrawSellInfo(context);
         return;
     }
 
@@ -435,8 +467,10 @@ void SmithPanel::Draw(const GameContext& context) const
     upgradeButton_.Draw();
     repairButton_.Draw();
     repairAllButton_.Draw();
+    sellButton_.Draw();
     closeButton_.Draw();
     DrawRepairSummary(context);
+    DrawSellInfo(context);
 }
 
 void SmithPanel::DrawGrowthLine(float x, float y, const char* label, float before, float after,
@@ -463,12 +497,35 @@ void SmithPanel::DrawGrowthLine(float x, float y, const char* label, float befor
                draw::TextAlign::Right);
 }
 
+void SmithPanel::DrawSellInfo(const GameContext& context) const
+{
+    const Inventory& inventory = context.player.GetInventory();
+    const EquipmentItem* item = inventory.FindByUid(selectedUid_);
+
+    std::string text = "売却する装備を選んでください";
+    ColorRGB color = palette::kTextDisabled;
+    if (item && inventory.IsEquipped(item->uid)) {
+        text = "装備中のものは売却できません";
+        color = palette::kTextDim;
+    } else if (item && confirmSellUid_ == item->uid) {
+        text = str::Format("もう一度「売却」を押すと確定します（+%s col）",
+                           str::Comma(inventory.SellValue(item->uid)).c_str());
+        color = palette::kDanger;
+    } else if (item) {
+        text = str::Format("売却額  %s col ／ 強化結晶 +%d",
+                           str::Comma(inventory.SellValue(item->uid)).c_str(), 1 + item->iv / 25);
+        color = palette::kAccentWarm;
+    }
+
+    draw::Text(FontSize::Tiny, window_.left + 40.0f, window_.bottom - 148.0f, color, text);
+}
+
 void SmithPanel::DrawRepairSummary(const GameContext& context) const
 {
     const Inventory& inventory = context.player.GetInventory();
     const int allCost = inventory.RepairAllCost();
 
-    const Rect info(window_.left + 40.0f, window_.bottom - 92.0f, window_.right - 840.0f,
+    const Rect info(window_.left + 40.0f, window_.bottom - 92.0f, window_.right - 1060.0f,
                     window_.bottom - 30.0f);
     draw::FillRect(info, palette::kPanelDark, 190);
     draw::StrokeRect(info, palette::kBorder.Scaled(0.6f), 1.0f, 150);

@@ -1,6 +1,6 @@
 //==============================================================================
 // SmithPanel.h : 鍛冶屋タブ
-//   装備の強化と、耐久力の修理を行う。
+//   装備の強化と、耐久力の修理、そして売却を行う。
 //==============================================================================
 #pragma once
 
@@ -33,6 +33,8 @@ private:
     std::vector<const EquipmentItem*> SortedItems(const GameContext& context) const;
     // 一括修理の費用などをまとめて表示する
     void DrawRepairSummary(const GameContext& context) const;
+    // 選択中の装備の売却額を案内する
+    void DrawSellInfo(const GameContext& context) const;
     // 強化の伸びを 1 行描く（結果が無ければ「???」）
     void DrawGrowthLine(float x, float y, const char* label, float before, float after,
                         bool hasResult, bool percent) const;
@@ -42,6 +44,7 @@ private:
     Button upgradeButton_;
     Button repairButton_;
     Button repairAllButton_;
+    Button sellButton_;
     Button filterButton_;
     // 装備の種類で絞り込むタブ
     std::vector<Button> categoryButtons_;
@@ -53,6 +56,7 @@ private:
     int   scroll_ = 0;
     int   categoryIndex_ = 0;   // 0 = すべて、以降は EquipSlot に対応
     int   crystals_ = 1;        // 使う強化結晶の個数
+    int   confirmSellUid_ = 0;  // 売却の確認待ち（誤操作で強化品を失わないように 2 度押し）
     bool  equippedOnly_ = false;
     bool  open_ = false;
     bool  closeRequested_ = false;

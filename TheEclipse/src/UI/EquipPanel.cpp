@@ -33,8 +33,6 @@ void EquipPanel::Layout()
     const float listLeft = window_.left + 372.0f;
     equipButton_ = Button(Rect::FromXYWH(listLeft, window_.bottom - 82.0f, 180.0f, 54.0f), "装備する");
     unequipButton_ = Button(Rect::FromXYWH(listLeft + 196.0f, window_.bottom - 82.0f, 180.0f, 54.0f), "外す");
-    sellButton_ = Button(Rect::FromXYWH(listLeft + 392.0f, window_.bottom - 82.0f, 180.0f, 54.0f), "売却");
-    sellButton_.SetAccent(palette::kAccentWarm);
     closeButton_ = Button(Rect::FromXYWH(window_.right - 200.0f, window_.bottom - 82.0f, 160.0f, 54.0f),
                           "閉じる");
 }
@@ -100,8 +98,6 @@ void EquipPanel::Update(float dt, const Input& input, GameContext& context)
                            && inventory.EquippedUid(selectedSlot_) != selectedUid_;
     equipButton_.SetEnabled(canEquipHere);
     unequipButton_.SetEnabled(inventory.EquippedUid(selectedSlot_) != 0);
-    sellButton_.SetEnabled(sellEnabled_ && selected != nullptr
-                           && !inventory.IsEquipped(selectedUid_));
 
     if (equipButton_.Update(input, dt) && equipButton_.Enabled()) {
         if (inventory.EquipTo(selectedUid_, selectedSlot_)) {
@@ -118,14 +114,6 @@ void EquipPanel::Update(float dt, const Input& input, GameContext& context)
         equipmentChanged_ = true;
         message_ = "装備を外しました";
         messageTimer_ = 2.0f;
-    }
-    if (sellEnabled_ && sellButton_.Update(input, dt) && sellButton_.Enabled()) {
-        const int value = inventory.SellValue(selectedUid_);
-        if (inventory.Sell(selectedUid_)) {
-            message_ = str::Format("売却しました（+%s col）", str::Comma(value).c_str());
-            messageTimer_ = 2.0f;
-            selectedUid_ = 0;
-        }
     }
 
     if (closeButton_.Update(input, dt) || input.Pressed(GameAction::Cancel)) {
@@ -145,8 +133,11 @@ void EquipPanel::Draw(const GameContext& context) const
 
     equipButton_.Draw();
     unequipButton_.Draw();
-    if (sellEnabled_) sellButton_.Draw();
     closeButton_.Draw();
+
+    // 売却は鍛冶屋に一本化したので、ここでは案内だけ出す
+    draw::Text(FontSize::Tiny, window_.left + 764.0f, window_.bottom - 68.0f, palette::kTextDim,
+               "売却は「鍛冶屋」で行えます");
 
     if (messageTimer_ > 0.0f) {
         draw::Text(FontSize::Small, window_.left + 372.0f, window_.bottom - 112.0f, palette::kAccent,

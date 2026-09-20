@@ -81,11 +81,8 @@ constexpr int   kDebugColAmount = 10000;
 constexpr int   kDebugMaterialAmount = 50;
 constexpr int   kDebugSkillPointAmount = 10;
 constexpr int   kDebugLevelAmount = 5;
-// デバッグで配る装備の個体値は完全ランダムにする
-int RandomDebugIv()
-{
-    return math::RandInt(kMinIv, kMaxIv);
-}
+// 装備を配るときの個体値
+constexpr int kDebugItemIv = 70;
 
 // プルダウンの位置（ユニーク解放ボタンの右隣に開く）
 constexpr float kDebugMenuGap = 24.0f;
@@ -99,7 +96,7 @@ int GrantAllWeapons(Inventory& inventory)
         if (!IsWeaponSlot(tmpl.slot)) continue;
         const int copies = (tmpl.weaponType == WeaponType::OneHandSword) ? 2 : 1;
         for (int i = 0; i < copies; ++i) {
-            inventory.AddItem(ItemDatabase::Instance().Create(tmpl.id, RandomDebugIv()));
+            inventory.AddItem(ItemDatabase::Instance().Create(tmpl.id, kDebugItemIv));
             ++added;
         }
     }
@@ -112,7 +109,7 @@ int GrantAllArmors(Inventory& inventory)
     int added = 0;
     for (const ItemTemplate& tmpl : ItemDatabase::Instance().Templates()) {
         if (IsWeaponSlot(tmpl.slot)) continue;
-        inventory.AddItem(ItemDatabase::Instance().Create(tmpl.id, RandomDebugIv()));
+        inventory.AddItem(ItemDatabase::Instance().Create(tmpl.id, kDebugItemIv));
         ++added;
     }
     return added;

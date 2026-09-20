@@ -87,8 +87,6 @@ void BattleMenu::Update(float dt, const Input& input, GameContext& context)
     }
     if (equipButton_.Update(input, dt)) {
         equipment_.Open();
-        // 戦闘中は売却させない（誤操作防止）
-        equipment_.SetSellEnabled(false);
     }
     if (skillButton_.Update(input, dt)) {
         skills_.Open(context);
