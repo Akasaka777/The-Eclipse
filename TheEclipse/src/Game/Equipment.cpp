@@ -50,8 +50,20 @@ const char* EquipSlotName(EquipSlot slot)
 
 Stats EquipmentItem::TotalStats() const
 {
-    // 強化1段階ごとに +9%
-    return baseStats.Scaled(1.0f + 0.09f * static_cast<float>(upgradeLevel));
+    // 強化 1 段階ごとに +9%。
+    // ただし攻撃力・クリティカル率・クリティカル倍率は、強化のたびに抽選した
+    // 伸び率（growth*）を使うのでランダムに変わる。
+    Stats stats = baseStats.Scaled(1.0f + 0.09f * static_cast<float>(upgradeLevel));
+    stats.attack = baseStats.attack * (1.0f + growthAttack);
+    stats.critRate = baseStats.critRate * (1.0f + growthCritRate);
+    stats.critDamage = baseStats.critDamage * (1.0f + growthCritDamage);
+
+    // 耐久力が尽きた装備は攻撃力・防御力が大きく落ちる（修理すれば元通り）
+    if (IsBroken()) {
+        stats.attack *= kBrokenStatRate;
+        stats.defense *= kBrokenStatRate;
+    }
+    return stats;
 }
 
 std::string EquipmentItem::DisplayName() const

@@ -277,8 +277,6 @@ void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, boo
 
     draw::Text(FontSize::Small, rect.right - 12.0f, rect.top + 10.0f, palette::kText,
                str::Format("戦力 %d", item.Power()), draw::TextAlign::Right);
-    draw::Text(FontSize::Tiny, rect.right - 12.0f, rect.top + 38.0f, palette::kTextDim,
-               str::Format("強化上限 +%d", item.MaxUpgrade()), draw::TextAlign::Right);
 
     // --- 耐久力 ---------------------------------------------------------------
     const Rect durabilityBar(rect.right - 200.0f, rect.bottom - 16.0f, rect.right - 12.0f,
@@ -290,6 +288,11 @@ void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, boo
                item.DurabilityColor(),
                str::Format("耐久 %d/%d", item.DurabilityDisplay(), item.MaxDurabilityDisplay()),
                draw::TextAlign::Right);
+
+    if (item.IsWeakened()) {
+        draw::Text(FontSize::Tiny, rect.right - 12.0f, rect.top + 36.0f, palette::kDanger,
+                   "性能低下中（要修理）", draw::TextAlign::Right);
+    }
 
     if (equipped) {
         draw::FillRect(Rect(rect.left + 6.0f, rect.top, rect.left + 68.0f, rect.top + 22.0f),

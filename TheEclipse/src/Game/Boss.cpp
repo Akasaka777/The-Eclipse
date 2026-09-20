@@ -399,6 +399,8 @@ void Boss::UpdateAttackPhase(float dt, CombatSystem& combat, const Vec2& playerP
     case BossAttackKind::Charge:
         // 突進の減速
         velocity.x *= 0.985f;
+        // 判定を本体に追従させる（置いていくと突進が当たらなくなる）
+        combat.MoveHitBoxes(id, Rect::FromFoot(pos.x, pos.y, halfWidth * 1.25f, height), z);
         combat.AddDust(Vec2(pos.x, pos.y), facing, 1);
         break;
 

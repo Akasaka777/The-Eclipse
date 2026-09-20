@@ -17,9 +17,28 @@ namespace ecl {
 struct UpgradeCost
 {
     int   col = 0;
-    int   material = 0;
+    int   material = 0;      // 使う強化結晶の個数（プレイヤーが選ぶ）
     float successRate = 1.0f;
     bool  possible = false;
+    // この強化で伸びる割合の下限・上限（結晶が多いほど幅が広がる）
+    float minGrowth = 0.0f;
+    float maxGrowth = 0.0f;
+};
+
+//------------------------------------------------------------------------------
+// 強化で使える強化結晶の個数
+//------------------------------------------------------------------------------
+constexpr int kMinUpgradeCrystals = 1;
+constexpr int kMaxUpgradeCrystals = 10;
+
+//------------------------------------------------------------------------------
+// 1 回の強化の結果（攻撃力・クリティカル率・クリティカル倍率の伸び）
+//------------------------------------------------------------------------------
+struct UpgradeResult
+{
+    bool  success = false;
+    Stats before;   // 強化前の能力値
+    Stats after;    // 強化後の能力値
 };
 
 class Inventory
@@ -66,9 +85,10 @@ public:
     ActorArt BuildAppearance() const;
 
     // --- 強化 ---------------------------------------------------------------
-    UpgradeCost CalcUpgradeCost(int uid) const;
-    // 戻り値 : 強化に成功したか（失敗時も素材は消費）
-    bool TryUpgrade(int uid, bool& outSuccess);
+    // 使う強化結晶の個数（1〜10）を指定して費用と伸び幅を求める
+    UpgradeCost CalcUpgradeCost(int uid, int crystals) const;
+    // 強化を実行する。戻り値は「実行できたか」（失敗時も col と結晶は消費）
+    bool TryUpgrade(int uid, int crystals, UpgradeResult& outResult);
 
     // --- 耐久力 -------------------------------------------------------------
     // 装備中のスロットの装備を摩耗させる

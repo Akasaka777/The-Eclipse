@@ -249,40 +249,55 @@ ActorArt Inventory::BuildAppearance() const
     return art;
 }
 
-UpgradeCost Inventory::CalcUpgradeCost(int uid) const
+UpgradeCost Inventory::CalcUpgradeCost(int uid, int crystals) const
 {
     UpgradeCost cost;
     const EquipmentItem* item = FindByUid(uid);
     if (!item) return cost;
     if (item->upgradeLevel >= item->MaxUpgrade()) return cost;
 
+    const int use = math::ClampInt(crystals, kMinUpgradeCrystals, kMaxUpgradeCrystals);
     const int level = item->upgradeLevel;
     // 個体値が高い装備ほど強化費用も上がる（0 → 1.00 倍 / 100 → 3.20 倍）
     const float ivFactor = 1.0f + 0.022f * static_cast<float>(item->iv);
+    // 結晶を多く使うほど col も増える（1 個 → 1.0 倍 / 10 個 → 4.6 倍）
+    const float crystalFactor = 0.6f + 0.4f * static_cast<float>(use);
 
-    cost.col = static_cast<int>((160.0f + 130.0f * static_cast<float>(level) * (1.0f + level * 0.25f)) * ivFactor);
-    cost.material = 1 + level / 2 + item->iv / 50;
+    const float base = 160.0f + 130.0f * static_cast<float>(level) * (1.0f + level * 0.25f);
+    cost.col = static_cast<int>(base * ivFactor * crystalFactor);
+    cost.material = use;
 
-    // +3 までは確実に成功、以降は段階的に低下
+    // --- 伸び率の幅（結晶が多いほど下限も上限も大きくなる）----------------------
+    //   1 個  :  1% 〜 10%
+    //   10 個 : 5.5% 〜 50.5%
+    const float steps = static_cast<float>(use - 1);
+    cost.minGrowth = 0.010f + 0.005f * steps;
+    cost.maxGrowth = 0.100f + 0.045f * steps;
+
+    // +3 までは確実に成功、以降は段階的に低下。結晶を多く使うほど成功しやすい。
     if (level < 3) {
         cost.successRate = 1.0f;
     } else {
-        cost.successRate = math::Clamp(1.0f - 0.10f * static_cast<float>(level - 2), 0.35f, 1.0f);
+        const float bonus = 0.02f * steps;
+        cost.successRate =
+            math::Clamp(1.0f - 0.10f * static_cast<float>(level - 2) + bonus, 0.35f, 1.0f);
     }
     cost.possible = true;
     return cost;
 }
 
-bool Inventory::TryUpgrade(int uid, bool& outSuccess)
+bool Inventory::TryUpgrade(int uid, int crystals, UpgradeResult& outResult)
 {
-    outSuccess = false;
+    outResult = UpgradeResult();
 
     EquipmentItem* item = FindByUid(uid);
     if (!item) return false;
 
-    const UpgradeCost cost = CalcUpgradeCost(uid);
+    const UpgradeCost cost = CalcUpgradeCost(uid, crystals);
     if (!cost.possible) return false;
     if (col_ < cost.col || material_ < cost.material) return false;
+
+    outResult.before = item->TotalStats();
 
     col_ -= cost.col;
     material_ -= cost.material;
@@ -292,8 +307,16 @@ bool Inventory::TryUpgrade(int uid, bool& outSuccess)
         const float ratio = item->DurabilityRatio();
         item->upgradeLevel += 1;
         item->durability = item->MaxDurability() * ratio;
-        outSuccess = true;
+
+        // 攻撃力・クリティカル率・クリティカル倍率は 1 つずつ別に抽選する。
+        // 同じ装備でも伸び方が毎回変わり、上振れ・下振れが生まれる。
+        item->growthAttack += math::RandFloat(cost.minGrowth, cost.maxGrowth);
+        item->growthCritRate += math::RandFloat(cost.minGrowth, cost.maxGrowth);
+        item->growthCritDamage += math::RandFloat(cost.minGrowth, cost.maxGrowth);
+
+        outResult.success = true;
     }
+    outResult.after = item->TotalStats();
     return true;
 }
 
@@ -323,7 +346,8 @@ std::vector<std::string> Inventory::DestroyBrokenItems()
     std::vector<std::string> destroyed;
 
     for (size_t i = 0; i < items_.size();) {
-        if (!items_[i].IsBroken()) {
+        // 壊れない装備は耐久力 0 でも残る（性能が落ちるだけ）
+        if (!items_[i].IsBroken() || items_[i].indestructible) {
             ++i;
             continue;
         }

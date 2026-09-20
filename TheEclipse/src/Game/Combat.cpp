@@ -41,6 +41,16 @@ void CombatSystem::AddHitBox(const HitBox& hitBox)
     hitBoxes_.push_back(hitBox);
 }
 
+void CombatSystem::MoveHitBoxes(int sourceId, const Rect& area, float z)
+{
+    // 同じ発生元の持続判定を、今の位置へ動かす
+    for (HitBox& hitBox : hitBoxes_) {
+        if (hitBox.sourceId != sourceId) continue;
+        hitBox.area = area;
+        hitBox.z = z;
+    }
+}
+
 void CombatSystem::AddProjectile(const Projectile& projectile)
 {
     projectiles_.push_back(projectile);

@@ -72,7 +72,7 @@ ItemDatabase::ItemDatabase()
 
         //--- ユニークスキル「神聖剣」専用のセット武器 -----------------------------
         //   特別クエストでのみ入手できる。通常のドロップ抽選には出ない。
-        { 150, "神聖剣グレイス",       "聖別された白刃。持つ者の守りに応える。",   EquipSlot::WeaponRight, SWD, 3, WeaponStats(58.0f, 0.08f, 0.18f, 0.02f) },
+        { 150, "神聖剣グレイス",       "聖別された白刃。折れることなく持ち主を守る。", EquipSlot::WeaponRight, SWD, 3, WeaponStats(96.0f, 0.12f, 0.30f, 0.06f) },
 
         //--- 頭装備 -------------------------------------------------------------
         { 200, "レザーキャップ",       "軽い革の帽子。",                           EquipSlot::Head, SWD, 1, ArmorStats(6.0f,  40.0f, 10.0f) },
@@ -91,7 +91,7 @@ ItemDatabase::ItemDatabase()
         { 221, "カイトシールド",       "全身を隠せる大盾。",                       EquipSlot::Shield, SWD, 2, ArmorStats(18.0f, 105.0f, 0.0f, 0.0f, -6.0f) },
         { 222, "蝕の盾",               "受けた衝撃を闇へ逃がす。",                 EquipSlot::Shield, SWD, 3, ArmorStats(28.0f, 160.0f, 18.0f) },
         // ユニークスキル「神聖剣」専用のセット武器（特別クエストでのみ入手）
-        { 223, "聖盾エーギス",         "神聖剣と対になる盾。あらゆる刃を受け止める。", EquipSlot::Shield, SWD, 3, ArmorStats(32.0f, 180.0f, 24.0f) },
+        { 223, "聖盾エーギス",         "神聖剣と対になる盾。あらゆる刃を受け止める。", EquipSlot::Shield, SWD, 3, ArmorStats(125.0f, 480.0f, 70.0f) },
 
         //--- 腕装備 -------------------------------------------------------------
         { 230, "レザーブレイサー",     "手首を守る革当て。",                       EquipSlot::Arm, SWD, 1, ArmorStats(5.0f, 30.0f, 6.0f, 0.02f) },
@@ -109,8 +109,12 @@ ItemDatabase::ItemDatabase()
     // 手装備の攻撃速度補正は個別に付与
     for (ItemTemplate& t : templates_) {
         if (t.slot == EquipSlot::Hand) t.base.attackSpeed = (t.id == 241) ? 0.10f : 0.05f;
-        // 神聖剣のセット武器は特別枠（ランダム抽選には出さない）
-        if (t.id == kHolySwordSwordId || t.id == kHolySwordShieldId) t.special = true;
+        // 神聖剣のセット武器は特別枠（ランダム抽選には出さない）。
+        // さらに耐久力が 0 になっても消滅せず、性能が落ちるだけにする。
+        if (t.id == kHolySwordSwordId || t.id == kHolySwordShieldId) {
+            t.special = true;
+            t.indestructible = true;
+        }
     }
 
 }
@@ -143,6 +147,7 @@ EquipmentItem ItemDatabase::Create(int templateId, int iv) const
     item.weaponType = tmpl->weaponType;
     item.iv = ClampIv(iv);
     item.upgradeLevel = 0;
+    item.indestructible = tmpl->indestructible;
 
     // 能力値は個体値だけで決まる（同じ個体値なら必ず同じ性能になる）
     const float scale = IvStatScale(item.iv);

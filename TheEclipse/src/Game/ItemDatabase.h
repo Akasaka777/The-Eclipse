@@ -23,6 +23,8 @@ struct ItemTemplate
     Stats       base;
     // 特別枠（ユニークスキル用のセット武器など）。通常のランダム抽選には出ない
     bool        special = false;
+    // 耐久力が 0 になっても消滅しない（代わりに性能が大きく落ちる）
+    bool        indestructible = false;
 };
 
 class ItemDatabase

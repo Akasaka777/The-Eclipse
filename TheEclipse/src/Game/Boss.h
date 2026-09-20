@@ -98,6 +98,9 @@ public:
     bool  IsIntroFinished() const { return state_ != BossState::Intro; }
     bool  IsRemovable() const { return !alive && deathTimer > 2.6f; }
     const std::string& CurrentActionName() const { return actionName_; }
+    // 今どの攻撃パターンを出しているか（HUD の表示やテストで使う）
+    BossAttackKind CurrentAttack() const { return currentKind_; }
+    bool IsAttacking() const { return state_ == BossState::Attack; }
 
 private:
     void ChoosePattern(float distance);

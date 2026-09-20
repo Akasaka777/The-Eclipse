@@ -26,7 +26,7 @@ namespace {
 
 // セーブ形式のバージョン（構造を変えたら上げる）
 // v3: 武器スロットを左右に分割し、ユニークスキルを追加
-constexpr int kSaveVersion = 6;
+constexpr int kSaveVersion = 7;
 
 std::string g_lastError;
 
@@ -132,13 +132,16 @@ bool SaveSystem::Save(const GameContext& context)
     // --- 所持品 -------------------------------------------------------------
     //   item <uid> <templateId> <個体値> <upgradeLevel> <攻撃> <防御> <HP> <MP>
     //        <クリ率> <クリ倍率> <MP回復> <移動> <攻撃速度> <耐久力>
+    //        <強化の伸び:攻撃> <強化の伸び:クリ率> <強化の伸び:クリ倍率>
     for (const EquipmentItem& item : inventory.Items()) {
         const Stats& base = item.baseStats;
         file << "item " << item.uid << ' ' << item.templateId << ' '
              << item.iv << ' ' << item.upgradeLevel << ' '
              << base.attack << ' ' << base.defense << ' ' << base.maxHp << ' ' << base.maxMp << ' '
              << base.critRate << ' ' << base.critDamage << ' ' << base.mpRegen << ' '
-             << base.moveSpeed << ' ' << base.attackSpeed << ' ' << item.durability << "\n";
+             << base.moveSpeed << ' ' << base.attackSpeed << ' ' << item.durability << ' '
+             << item.growthAttack << ' ' << item.growthCritRate << ' '
+             << item.growthCritDamage << "\n";
     }
 
     // --- 装備中 -------------------------------------------------------------
@@ -295,8 +298,21 @@ bool SaveSystem::Load(GameContext& context)
             } else {
                 item.RestoreDurability();
             }
-            // 壊れた状態では保存されない想定だが、念のため最低 1 は残す
-            if (item.durability <= 0.0f) item.durability = 1.0f;
+            // 壊れない装備は耐久力 0 のまま残る。それ以外は最低 1 を残す。
+            item.indestructible = tmpl->indestructible;
+            if (!item.indestructible && item.durability <= 0.0f) item.durability = 1.0f;
+
+            // 強化で伸びた割合（v6 以前には無いので、旧仕様の +9%/段 を復元する）
+            if (tokens.size() > 17) {
+                item.growthAttack = ToFloat(arg(15));
+                item.growthCritRate = ToFloat(arg(16));
+                item.growthCritDamage = ToFloat(arg(17));
+            } else {
+                const float legacy = 0.09f * static_cast<float>(item.upgradeLevel);
+                item.growthAttack = legacy;
+                item.growthCritRate = legacy;
+                item.growthCritDamage = legacy;
+            }
 
             inventory.AddItem(item);
         }

@@ -145,6 +145,8 @@ public:
 
     // --- 生成 ---------------------------------------------------------------
     void AddHitBox(const HitBox& hitBox);
+    // 持続する判定を追従させる（突進など、動きながら当てる攻撃で毎フレーム呼ぶ）
+    void MoveHitBoxes(int sourceId, const Rect& area, float z);
     void AddProjectile(const Projectile& projectile);
     void AddDamageNumber(const Vec2& pos, int value, bool critical, const ColorRGB& color);
     void AddHealNumber(const Vec2& pos, int value);

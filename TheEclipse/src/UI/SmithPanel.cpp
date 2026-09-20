@@ -12,6 +12,30 @@ namespace ecl {
 namespace ui {
 
 namespace {
+
+// 装備の種類で絞り込むタブ（先頭は「すべて」）
+struct CategoryDef
+{
+    const char* label;
+    EquipSlot   slot;   // Count なら「すべて」
+};
+
+const CategoryDef kCategories[] = {
+    { "すべて", EquipSlot::Count },
+    { "武器",   EquipSlot::WeaponRight },
+    { "頭装備", EquipSlot::Head },
+    { "体装備", EquipSlot::Body },
+    { "盾",     EquipSlot::Shield },
+    { "腕装備", EquipSlot::Arm },
+    { "手装備", EquipSlot::Hand },
+    { "足装備", EquipSlot::Foot },
+};
+
+constexpr int kCategoryCount = static_cast<int>(sizeof(kCategories) / sizeof(kCategories[0]));
+
+} // namespace
+
+namespace {
 constexpr int   kVisibleRows = 9;
 constexpr float kRowHeight = 66.0f;
 } // namespace
@@ -38,6 +62,25 @@ void SmithPanel::Layout()
     closeButton_ = Button(Rect::FromXYWH(window_.right - 160.0f, buttonY, 120.0f, 62.0f), "閉じる");
     filterButton_ = Button(Rect::FromXYWH(window_.left + 40.0f, window_.top + 74.0f, 220.0f, 44.0f),
                            "表示 : すべて", FontSize::Small);
+
+    // --- 装備の種類で絞り込むタブ（「表示 : ...」の右隣に並べる）-----------------
+    categoryButtons_.clear();
+    const float tabWidth = 90.0f;
+    const float tabGap = 6.0f;
+    const float tabLeft = filterButton_.GetRect().right + 12.0f;
+    for (int i = 0; i < kCategoryCount; ++i) {
+        const Rect rect = Rect::FromXYWH(tabLeft + (tabWidth + tabGap) * static_cast<float>(i),
+                                         window_.top + 74.0f, tabWidth, 44.0f);
+        categoryButtons_.push_back(Button(rect, kCategories[i].label, FontSize::Tiny));
+    }
+
+    // --- 使う強化結晶の個数 -----------------------------------------------------
+    const float detailLeft = window_.left + 790.0f;
+    const float crystalY = window_.top + 130.0f + 490.0f;
+    crystalMinusButton_ = Button(Rect::FromXYWH(detailLeft + 250.0f, crystalY, 44.0f, 34.0f),
+                                 "-", FontSize::Small);
+    crystalPlusButton_ = Button(Rect::FromXYWH(detailLeft + 348.0f, crystalY, 44.0f, 34.0f),
+                                "+", FontSize::Small);
 }
 
 void SmithPanel::Open()
@@ -47,6 +90,8 @@ void SmithPanel::Open()
     selectedUid_ = 0;
     scroll_ = 0;
     resultTimer_ = 0.0f;
+    crystals_ = 1;
+    lastResultUid_ = 0;
     message_.clear();
 }
 
@@ -55,8 +100,11 @@ std::vector<const EquipmentItem*> SmithPanel::SortedItems(const GameContext& con
     const Inventory& inventory = context.player.GetInventory();
 
     std::vector<const EquipmentItem*> items;
+    const EquipSlot category = kCategories[math::ClampInt(categoryIndex_, 0, kCategoryCount - 1)].slot;
     for (const EquipmentItem& item : inventory.Items()) {
         if (equippedOnly_ && !inventory.IsEquipped(item.uid)) continue;
+        // 武器タブは左右どちらの手の武器もまとめて出す
+        if (category != EquipSlot::Count && item.slot != category) continue;
         items.push_back(&item);
     }
 
@@ -93,6 +141,7 @@ void SmithPanel::Update(float dt, const Input& input, GameContext& context)
         if (input.MouseClicked(MouseButton::Left)) {
             const int index = scroll_ + static_cast<int>((mouseY - listArea.top) / kRowHeight);
             if (index >= 0 && index < static_cast<int>(items.size())) {
+                if (selectedUid_ != items[static_cast<size_t>(index)]->uid) lastResultUid_ = 0;
                 selectedUid_ = items[static_cast<size_t>(index)]->uid;
                 resultTimer_ = 0.0f;
             }
@@ -106,18 +155,38 @@ void SmithPanel::Update(float dt, const Input& input, GameContext& context)
         scroll_ = 0;
     }
 
+    // --- 装備の種類タブ -------------------------------------------------------
+    for (int i = 0; i < static_cast<int>(categoryButtons_.size()); ++i) {
+        categoryButtons_[static_cast<size_t>(i)].SetSelected(i == categoryIndex_);
+        if (categoryButtons_[static_cast<size_t>(i)].Update(input, dt)) {
+            categoryIndex_ = i;
+            scroll_ = 0;
+        }
+    }
+
+    // --- 使う強化結晶の個数 ---------------------------------------------------
+    crystals_ = math::ClampInt(crystals_, kMinUpgradeCrystals, kMaxUpgradeCrystals);
+    crystalMinusButton_.SetEnabled(crystals_ > kMinUpgradeCrystals);
+    crystalPlusButton_.SetEnabled(crystals_ < kMaxUpgradeCrystals);
+    if (crystalMinusButton_.Update(input, dt) && crystalMinusButton_.Enabled()) --crystals_;
+    if (crystalPlusButton_.Update(input, dt) && crystalPlusButton_.Enabled()) ++crystals_;
+
     // --- 強化実行 -----------------------------------------------------------
-    const UpgradeCost cost = inventory.CalcUpgradeCost(selectedUid_);
+    const UpgradeCost cost = inventory.CalcUpgradeCost(selectedUid_, crystals_);
     const bool affordable = cost.possible && inventory.Col() >= cost.col
                           && inventory.Material() >= cost.material;
     upgradeButton_.SetEnabled(affordable);
 
     if (upgradeButton_.Update(input, dt) && affordable) {
-        bool success = false;
-        if (inventory.TryUpgrade(selectedUid_, success)) {
-            lastSuccess_ = success;
+        UpgradeResult result;
+        if (inventory.TryUpgrade(selectedUid_, crystals_, result)) {
+            lastSuccess_ = result.success;
             resultTimer_ = 1.6f;
-            message_ = success ? "強化成功！" : "強化失敗… 素材を消費しました";
+            // 伸び率は強化してから分かる
+            lastResultUid_ = result.success ? selectedUid_ : 0;
+            lastBefore_ = result.before;
+            lastAfter_ = result.after;
+            message_ = result.success ? "強化成功！" : "強化失敗… 素材を消費しました";
         }
     }
 
@@ -170,6 +239,7 @@ void SmithPanel::Draw(const GameContext& context) const
                str::Format("強化結晶 %d", inventory.Material()), draw::TextAlign::Right);
 
     filterButton_.Draw();
+    for (const Button& button : categoryButtons_) button.Draw();
 
     // --- 一覧 ---------------------------------------------------------------
     const std::vector<const EquipmentItem*> items = SortedItems(context);
@@ -267,55 +337,85 @@ void SmithPanel::Draw(const GameContext& context) const
         y += 40.0f;
     }
 
-    // --- 強化後の変化 --------------------------------------------------------
+    // --- 強化による伸び ------------------------------------------------------
+    //   攻撃力・クリティカル率・クリティカル倍率はランダムなので、
+    //   強化するまでは「???」。強化すると「強化前 → 強化後」を表示する。
     const Stats current = item->TotalStats();
-    EquipmentItem preview = *item;
-    preview.upgradeLevel = math::MinI(item->upgradeLevel + 1, item->MaxUpgrade());
-    const Stats next = preview.TotalStats();
+    const bool hasResult = (lastResultUid_ == selectedUid_ && selectedUid_ != 0);
+    const Stats shownBefore = hasResult ? lastBefore_ : current;
+    const Stats shownAfter = hasResult ? lastAfter_ : current;
 
-    draw::Text(FontSize::Normal, detail.left + 24.0f, y, palette::kAccent, "強化後の変化");
-    y += 42.0f;
-    if (item->IsWeapon()) {
-        DrawStatDiffLine(detail.left + 24.0f, y, "攻撃力", current.attack, next.attack, false); y += 32.0f;
-        DrawStatDiffLine(detail.left + 24.0f, y, "クリティカル率", current.critRate, next.critRate, true); y += 32.0f;
-        DrawStatDiffLine(detail.left + 24.0f, y, "クリティカル倍率", current.critDamage, next.critDamage, true); y += 32.0f;
-    } else {
-        DrawStatDiffLine(detail.left + 24.0f, y, "防御力", current.defense, next.defense, false); y += 32.0f;
-        DrawStatDiffLine(detail.left + 24.0f, y, "最大HP", current.maxHp, next.maxHp, false); y += 32.0f;
-        DrawStatDiffLine(detail.left + 24.0f, y, "最大MP", current.maxMp, next.maxMp, false); y += 32.0f;
+    draw::Text(FontSize::Normal, detail.left + 24.0f, y, palette::kAccent, "強化による伸び");
+    draw::Text(FontSize::Tiny, detail.right - 24.0f, y + 6.0f, palette::kTextDim,
+               hasResult ? "前回の強化結果" : "強化するまで分かりません", draw::TextAlign::Right);
+    y += 40.0f;
+
+    DrawGrowthLine(detail.left + 24.0f, y, "攻撃力", shownBefore.attack, shownAfter.attack,
+                   hasResult, false);
+    y += 30.0f;
+    DrawGrowthLine(detail.left + 24.0f, y, "クリティカル率", shownBefore.critRate,
+                   shownAfter.critRate, hasResult, true);
+    y += 30.0f;
+    DrawGrowthLine(detail.left + 24.0f, y, "クリティカル倍率", shownBefore.critDamage,
+                   shownAfter.critDamage, hasResult, true);
+    y += 34.0f;
+
+    // 防御力などは強化値どおりに伸びるので、予測を出す
+    {
+        EquipmentItem preview = *item;
+        preview.upgradeLevel = math::MinI(item->upgradeLevel + 1, item->MaxUpgrade());
+        const Stats next = preview.TotalStats();
+        DrawStatDiffLine(detail.left + 24.0f, y, "防御力", current.defense, next.defense, false);
+        y += 28.0f;
+        DrawStatDiffLine(detail.left + 24.0f, y, "最大HP", current.maxHp, next.maxHp, false);
+        y += 28.0f;
+        DrawStatDiffLine(detail.left + 24.0f, y, "最大MP", current.maxMp, next.maxMp, false);
+        y += 30.0f;
     }
-    y += 22.0f;
 
     // --- コスト -------------------------------------------------------------
-    const UpgradeCost cost = inventory.CalcUpgradeCost(selectedUid_);
+    const UpgradeCost cost = inventory.CalcUpgradeCost(selectedUid_, crystals_);
     draw::Line(detail.left + 24.0f, y, detail.right - 24.0f, y, palette::kBorder, 1.0f, 120);
-    y += 16.0f;
+    y += 14.0f;
 
     if (!cost.possible) {
-        draw::Text(FontSize::Normal, detail.left + 24.0f, y, palette::kAccentWarm, "強化上限に達しています");
+        draw::Text(FontSize::Normal, detail.left + 24.0f, y, palette::kAccentWarm,
+                   "強化上限に達しています");
     } else {
         const bool colOk = inventory.Col() >= cost.col;
         const bool matOk = inventory.Material() >= cost.material;
 
-        draw::Text(FontSize::Small, detail.left + 24.0f, y, palette::kTextDim, "必要 col");
-        draw::Text(FontSize::Small, detail.left + 320.0f, y, colOk ? palette::kText : palette::kDanger,
-                   str::Comma(cost.col), draw::TextAlign::Right);
-        y += 32.0f;
+        // 使う強化結晶の個数（多いほど伸びも費用も大きくなる）
+        draw::Text(FontSize::Small, detail.left + 24.0f, y, palette::kTextDim, "使う強化結晶");
+        crystalMinusButton_.Draw();
+        crystalPlusButton_.Draw();
+        draw::Text(FontSize::Normal, detail.left + 320.0f, y - 2.0f,
+                   matOk ? palette::kText : palette::kDanger,
+                   str::Format("%d", crystals_), draw::TextAlign::Center);
+        draw::Text(FontSize::Tiny, detail.left + 404.0f, y + 4.0f, palette::kTextDim,
+                   str::Format("／ 最大 %d（所持 %d）", kMaxUpgradeCrystals, inventory.Material()));
+        y += 44.0f;
 
-        draw::Text(FontSize::Small, detail.left + 24.0f, y, palette::kTextDim, "必要 強化結晶");
-        draw::Text(FontSize::Small, detail.left + 320.0f, y, matOk ? palette::kText : palette::kDanger,
-                   str::Format("%d", cost.material), draw::TextAlign::Right);
-        y += 32.0f;
+        draw::Text(FontSize::Small, detail.left + 24.0f, y, palette::kTextDim, "伸びる割合");
+        draw::Text(FontSize::Small, detail.left + 360.0f, y, palette::kAccentWarm,
+                   str::Format("%.1f%% 〜 %.1f%%", cost.minGrowth * 100.0f,
+                               cost.maxGrowth * 100.0f), draw::TextAlign::Right);
+        y += 30.0f;
+
+        draw::Text(FontSize::Small, detail.left + 24.0f, y, palette::kTextDim, "必要 col");
+        draw::Text(FontSize::Small, detail.left + 360.0f, y, colOk ? palette::kText : palette::kDanger,
+                   str::Comma(cost.col), draw::TextAlign::Right);
+        y += 30.0f;
 
         draw::Text(FontSize::Small, detail.left + 24.0f, y, palette::kTextDim, "成功率");
         const ColorRGB rateColor = (cost.successRate >= 0.99f) ? palette::kHp
                                  : (cost.successRate >= 0.6f ? palette::kAccentWarm : palette::kDanger);
-        draw::Text(FontSize::Small, detail.left + 320.0f, y, rateColor,
+        draw::Text(FontSize::Small, detail.left + 360.0f, y, rateColor,
                    str::Format("%.0f%%", cost.successRate * 100.0f), draw::TextAlign::Right);
-        y += 40.0f;
+        y += 28.0f;
 
         draw::Text(FontSize::Tiny, detail.left + 24.0f, y, palette::kTextDim,
-                   "※ 失敗しても強化値は下がりません（col と結晶のみ消費）");
+                   "※ 伸び率は 3 つとも別々に抽選されます（失敗しても強化値は下がりません）");
     }
 
     // --- 結果演出 -----------------------------------------------------------
@@ -337,6 +437,30 @@ void SmithPanel::Draw(const GameContext& context) const
     repairAllButton_.Draw();
     closeButton_.Draw();
     DrawRepairSummary(context);
+}
+
+void SmithPanel::DrawGrowthLine(float x, float y, const char* label, float before, float after,
+                               bool hasResult, bool percent) const
+{
+    auto format = [percent](float value) {
+        return percent ? str::Format("%.1f%%", value * 100.0f)
+                       : str::Format("%d", static_cast<int>(value));
+    };
+
+    draw::Text(FontSize::Small, x, y, palette::kTextDim, label);
+    draw::Text(FontSize::Small, x + 300.0f, y, palette::kText, format(before),
+               draw::TextAlign::Right);
+    draw::Text(FontSize::Small, x + 324.0f, y, palette::kTextDim, "→");
+
+    if (!hasResult) {
+        draw::Text(FontSize::Small, x + 470.0f, y, palette::kTextDisabled, "???",
+                   draw::TextAlign::Right);
+        return;
+    }
+
+    const bool up = (after > before + 0.0001f);
+    draw::Text(FontSize::Small, x + 470.0f, y, up ? palette::kHp : palette::kText, format(after),
+               draw::TextAlign::Right);
 }
 
 void SmithPanel::DrawRepairSummary(const GameContext& context) const

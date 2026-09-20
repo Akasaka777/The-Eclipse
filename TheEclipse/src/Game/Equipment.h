@@ -31,6 +31,13 @@ float IvDurabilityBonus(int iv);
 int  ClampIv(int iv);
 
 //------------------------------------------------------------------------------
+// 耐久力が尽きた装備の性能
+//   通常の装備は消滅するが、壊れない装備（神聖剣のセット武器など）はこの倍率まで
+//   攻撃力・防御力が落ちる。修理すれば元通りになる。
+//------------------------------------------------------------------------------
+constexpr float kBrokenStatRate = 0.20f; // 80% 減
+
+//------------------------------------------------------------------------------
 // 装備スロット
 //------------------------------------------------------------------------------
 enum class EquipSlot
@@ -67,6 +74,14 @@ struct EquipmentItem
     int         upgradeLevel = 0;
     Stats       baseStats;        // +0 時点の能力値
     float       durability = -1.0f; // 現在の耐久力（負値なら生成時に最大値で初期化）
+    // 耐久力が 0 でも消滅しない装備か（神聖剣のセット武器など）
+    bool        indestructible = false;
+
+    // --- 強化で伸びた割合（強化のたびに抽選して足し込む）------------------------
+    //   攻撃力・クリティカル率・クリティカル倍率だけはランダムに伸びる。
+    float       growthAttack = 0.0f;
+    float       growthCritRate = 0.0f;
+    float       growthCritDamage = 0.0f;
 
     bool  IsValid() const { return uid != 0; }
     // 武器カテゴリのアイテムは slot に WeaponRight を持つ（左右どちらにも装備できる）
@@ -86,6 +101,8 @@ struct EquipmentItem
     int   DurabilityDisplay() const;
     int   MaxDurabilityDisplay() const { return static_cast<int>(MaxDurability()); }
     bool  IsBroken() const { return durability <= 0.0f; }
+    // 耐久力が尽きて性能が落ちている状態か（壊れない装備のみ）
+    bool  IsWeakened() const { return indestructible && IsBroken(); }
     // 残り 25% 以下
     bool  IsWorn() const { return DurabilityRatio() <= 0.25f; }
     // 耐久力を減らす（0 未満にはならない）
