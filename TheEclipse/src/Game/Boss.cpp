@@ -263,6 +263,9 @@ void Boss::ChoosePattern(float distance)
     StartWindup(def_->patterns[static_cast<size_t>(pick)]);
 }
 
+// 予備動作を始める。
+//   この時点で向いている方向が、そのまま「この攻撃の狙った方向」になる
+//   （予備動作中は振り向かない）。
 void Boss::StartWindup(BossAttackKind kind)
 {
     currentKind_ = kind;
@@ -544,9 +547,10 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
         break;
     }
     case BossState::Windup: {
+        // 攻撃モーションに入った時点で向きを固定する（振り向きながら当ててこない）。
+        // 奥行きだけは予備動作の前半で寄せる。
         velocity.x *= 0.85f;
         if (stateTimer_ < windupTime_ * 0.5f) {
-            FaceTowards(playerPos.x);
             TrackDepth(dt, playerZ, stage);
         }
         if (stateTimer_ >= windupTime_) {

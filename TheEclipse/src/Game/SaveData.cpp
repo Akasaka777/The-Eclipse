@@ -1,6 +1,7 @@
 #include "Game/SaveData.h"
 
 #include "Common/StringUtil.h"
+#include "Game/Ability.h"
 #include "Game/GameContext.h"
 #include "Common/MathUtil.h"
 #include "Game/ItemDatabase.h"
@@ -26,7 +27,8 @@ namespace {
 
 // セーブ形式のバージョン（構造を変えたら上げる）
 // v3: 武器スロットを左右に分割し、ユニークスキルを追加
-constexpr int kSaveVersion = 7;
+// v8: 振り分けステータス（STR / AGI / VIT / INT / LUK）と MP 回復量の見直し
+constexpr int kSaveVersion = 8;
 
 std::string g_lastError;
 
@@ -126,6 +128,13 @@ bool SaveSystem::Save(const GameContext& context)
     file << "level " << player.Level() << "\n";
     file << "exp " << player.Exp() << "\n";
     file << "skillpoints " << player.SkillPoints() << "\n";
+
+    // --- 振り分けステータス ---------------------------------------------------
+    file << "abilitypoints " << player.AbilityPoints() << "\n";
+    for (int i = 0; i < kAbilityCount; ++i) {
+        file << "ability " << i << ' '
+             << player.Abilities().values[i] << "\n";
+    }
     file << "col " << inventory.Col() << "\n";
     file << "material " << inventory.Material() << "\n";
 
@@ -211,6 +220,8 @@ bool SaveSystem::Load(GameContext& context)
     int selectedQuest = 1;
     std::string playerName;
     int parryCount = 0;
+    AbilityScores abilities;
+    int abilityPoints = 0;
     GameSettings settings = context.settings;
 
     std::string line;
@@ -234,6 +245,13 @@ bool SaveSystem::Load(GameContext& context)
         else if (key == "level") level = ToInt(arg(1), 1);
         else if (key == "exp") exp = ToInt(arg(1));
         else if (key == "skillpoints") skillPoints = ToInt(arg(1));
+        else if (key == "abilitypoints") abilityPoints = ToInt(arg(1));
+        else if (key == "ability") {
+            const int index = ToInt(arg(1), -1);
+            if (index >= 0 && index < kAbilityCount) {
+                abilities.Set(static_cast<Ability>(index), ToInt(arg(2), kAbilityInitialValue));
+            }
+        }
         else if (key == "col") col = ToInt(arg(1));
         else if (key == "material") material = ToInt(arg(1));
         else if (key == "selectedquest") selectedQuest = ToInt(arg(1), 1);
@@ -289,6 +307,8 @@ bool SaveSystem::Load(GameContext& context)
             item.baseStats.critRate = ToFloat(arg(9));
             item.baseStats.critDamage = ToFloat(arg(10));
             item.baseStats.mpRegen = ToFloat(arg(11));
+            // v7 以前は MP 回復量の桁が違うので、定義し直した値へ読み替える
+            if (version > 0 && version < 8) item.baseStats.mpRegen = tmpl->base.mpRegen;
             item.baseStats.moveSpeed = ToFloat(arg(12));
             item.baseStats.attackSpeed = (tokens.size() > 13) ? ToFloat(arg(13)) : 0.0f;
 
@@ -335,6 +355,12 @@ bool SaveSystem::Load(GameContext& context)
     if (!playerName.empty()) loaded.SetName(playerName);
     loaded.RestoreProgress(level, exp, skillPoints, unlocked, cleared, skillSlots,
                            uniqueSkill, uniqueAvailable, parryCount);
+    // v7 以前にはステータスが無いので、レベルぶんのポイントを未割り振りで配る
+    if (version > 0 && version < 8) {
+        abilities = AbilityScores();
+        abilityPoints = (loaded.Level() - 1) * kAbilityPointsPerLevel;
+    }
+    loaded.RestoreAbilities(abilities, abilityPoints);
     inventory.SetCurrency(col, material);
     for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {
         if (equippedUid[i] == 0) continue;

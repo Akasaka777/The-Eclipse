@@ -34,6 +34,7 @@ struct QuestResult
     int         materialGained = 0;
     int         levelsGained = 0;
     int         skillPointsGained = 0;
+    int         abilityPointsGained = 0;   // 振り分けステータス用
     bool        firstClear = false;
     std::vector<EquipmentItem> drops;
     // 耐久力が尽きて消滅した装備

@@ -111,8 +111,9 @@ void BattleHud::DrawPlayerStatus(const Player& player, const PlayerData& data) c
 
     // --- HP -----------------------------------------------------------------
     const Rect hpBar = Rect::FromXYWH(icon.right + 18.0f, panel.top + 42.0f, 460.0f, 28.0f);
-    draw::SkewBar(hpBar, player.HpRatio(), palette::kHp, palette::kPanelDark, 10.0f, hpDelay_,
-                  palette::kHpLoss);
+    // 残り 25% ごとに色が変わる（緑 → 黄緑 → 黄 → 赤）
+    draw::SkewBar(hpBar, player.HpRatio(), palette::HpColor(player.HpRatio()), palette::kPanelDark,
+                  10.0f, hpDelay_, palette::kHpLoss);
     draw::StrokeRect(hpBar, palette::kBorder.Scaled(0.8f), 1.0f, 150);
     draw::Text(FontSize::Tiny, hpBar.left + 8.0f, hpBar.top + 4.0f, palette::kText, "HP");
     draw::TextShadow(FontSize::Small, hpBar.right - 8.0f, hpBar.top + 2.0f, palette::kText,
@@ -169,8 +170,8 @@ void BattleHud::DrawBossStatus(const Boss& boss) const
     }
 
     const Rect bar = Rect::FromXYWH(panel.left + 20.0f, panel.bottom - 30.0f, panel.Width() - 40.0f, 20.0f);
-    draw::Bar(bar, boss.HpRatio(), palette::kBossHp, palette::kPanelDark, bossHpDelay_,
-              ColorRGB(255, 190, 120));
+    draw::Bar(bar, boss.HpRatio(), palette::HpColor(boss.HpRatio()), palette::kPanelDark,
+              bossHpDelay_, ColorRGB(255, 190, 120));
     draw::StrokeRect(bar, palette::kBorder.Scaled(0.7f), 1.0f, 160);
 
     // フェーズ境界の目盛り

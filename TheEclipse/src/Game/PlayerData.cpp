@@ -55,8 +55,11 @@ int PlayerData::AddExp(int amount)
     }
     if (level_ >= 99) exp_ = 0;
 
-    // レベルアップ 1 回につきスキルポイント 1
-    if (gained > 0) AddSkillPoints(gained);
+    // レベルアップ 1 回につきスキルポイント 1 とステータスポイント
+    if (gained > 0) {
+        AddSkillPoints(gained);
+        AddAbilityPoints(gained * kAbilityPointsPerLevel);
+    }
     return gained;
 }
 
@@ -70,15 +73,49 @@ Stats PlayerData::BaseStats() const
     stats.defense = 14.0f + 3.2f * lv;
     stats.critRate = 0.05f;
     stats.critDamage = 0.30f;
-    stats.mpRegen = 4.5f + 0.15f * lv;
+    // MP は 10 秒に 1 回復する（0.1 / 秒）。装備で少しだけ上乗せできる。
+    stats.mpRegen = 0.1f;
     stats.moveSpeed = 460.0f;
     stats.attackSpeed = 0.0f;
     return stats;
 }
 
-Stats PlayerData::TotalStats() const
+Stats PlayerData::EquippedStats() const
 {
     return BaseStats() + inventory_.EquippedStats();
+}
+
+Stats PlayerData::TotalStats() const
+{
+    // 振り分けステータス（STR / AGI / VIT / INT）を最後に掛ける
+    return ApplyAbilities(EquippedStats(), abilities_);
+}
+
+//------------------------------------------------------------------------------
+// 振り分けステータス
+//------------------------------------------------------------------------------
+void PlayerData::AddAbilityPoints(int amount)
+{
+    if (amount <= 0) return;
+    abilityPoints_ += amount;
+}
+
+bool PlayerData::SpendAbilityPoint(ecl::Ability ability, int amount)
+{
+    if (amount <= 0 || amount > abilityPoints_) return false;
+    const int index = static_cast<int>(ability);
+    if (index < 0 || index >= kAbilityCount) return false;
+    if (abilities_.Get(ability) >= kAbilityMaxValue) return false;
+
+    abilities_.Add(ability, amount);
+    abilityPoints_ -= amount;
+    return true;
+}
+
+void PlayerData::RestoreAbilities(const AbilityScores& scores, int abilityPoints)
+{
+    abilities_ = scores;
+    abilityPoints_ = math::MaxI(0, abilityPoints);
 }
 
 //------------------------------------------------------------------------------
@@ -345,6 +382,7 @@ void PlayerData::DebugAddLevel(int levels)
     level_ = math::ClampInt(level_ + levels, 1, 99);
     exp_ = 0;
     AddSkillPoints(level_ - before);
+    AddAbilityPoints((level_ - before) * kAbilityPointsPerLevel);
 }
 
 void PlayerData::DebugUnlockAllUniqueSkills()

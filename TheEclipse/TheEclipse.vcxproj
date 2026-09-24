@@ -203,6 +203,7 @@
     <ClCompile Include="src\Core\Input.cpp" />
     <ClCompile Include="src\Core\ResourceManager.cpp" />
     <ClCompile Include="src\Core\SceneManager.cpp" />
+    <ClCompile Include="src\Game\Ability.cpp" />
     <ClCompile Include="src\Game\Actor.cpp" />
     <ClCompile Include="src\Game\ActorAssets.cpp" />
     <ClCompile Include="src\Game\Boss.cpp" />
@@ -232,10 +233,12 @@
     <ClCompile Include="src\UI\BattleMenu.cpp" />
     <ClCompile Include="src\UI\EquipPanel.cpp" />
     <ClCompile Include="src\UI\NamePanel.cpp" />
+    <ClCompile Include="src\UI\PlayerPanel.cpp" />
     <ClCompile Include="src\UI\QuestPanel.cpp" />
     <ClCompile Include="src\UI\SettingsPanel.cpp" />
     <ClCompile Include="src\UI\SkillPanel.cpp" />
     <ClCompile Include="src\UI\SmithPanel.cpp" />
+    <ClCompile Include="src\UI\StatusPanel.cpp" />
     <ClCompile Include="src\UI\UIWidgets.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
@@ -252,6 +255,7 @@
     <ClInclude Include="src\Core\ResourceManager.h" />
     <ClInclude Include="src\Core\Scene.h" />
     <ClInclude Include="src\Core\SceneManager.h" />
+    <ClInclude Include="src\Game\Ability.h" />
     <ClInclude Include="src\Game\Actor.h" />
     <ClInclude Include="src\Game\ActorAssets.h" />
     <ClInclude Include="src\Game\Boss.h" />
@@ -282,10 +286,12 @@
     <ClInclude Include="src\UI\BattleMenu.h" />
     <ClInclude Include="src\UI\EquipPanel.h" />
     <ClInclude Include="src\UI\NamePanel.h" />
+    <ClInclude Include="src\UI\PlayerPanel.h" />
     <ClInclude Include="src\UI\QuestPanel.h" />
     <ClInclude Include="src\UI\SettingsPanel.h" />
     <ClInclude Include="src\UI\SkillPanel.h" />
     <ClInclude Include="src\UI\SmithPanel.h" />
+    <ClInclude Include="src\UI\StatusPanel.h" />
     <ClInclude Include="src\UI\UIWidgets.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

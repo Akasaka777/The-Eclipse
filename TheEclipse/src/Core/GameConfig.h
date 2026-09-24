@@ -53,8 +53,14 @@ extern const ColorRGB kAccentWarm;   // アクセント（オレンジ）
 extern const ColorRGB kText;         // 標準テキスト
 extern const ColorRGB kTextDim;      // 補助テキスト
 extern const ColorRGB kTextDisabled; // 無効テキスト
-extern const ColorRGB kHp;           // HP バー
+extern const ColorRGB kHp;           // HP バー（100〜76%）
+extern const ColorRGB kHpMid;        // HP バー（75〜51%）
+extern const ColorRGB kHpLow;        // HP バー（50〜26%）
+extern const ColorRGB kHpCritical;   // HP バー（25〜0%）
 extern const ColorRGB kHpLoss;       // HP 減少残像
+
+// 残量 25% ごとに色を変える（緑 → 黄緑 → 黄 → 赤）
+ColorRGB HpColor(float ratio);
 extern const ColorRGB kMp;           // MP バー
 extern const ColorRGB kExp;          // EXP バー
 extern const ColorRGB kBossHp;       // ボス HP

@@ -56,8 +56,9 @@ public:
     const QuestDef* Find(int id) const;
 
     // ドロップ抽選（クリア時はボスドロップを含む）
+    //   dropRate は LUK などによる倍率。1.0 で定義どおりの確率になる。
     std::vector<EquipmentItem> RollDrops(const QuestDef& quest, bool bossDefeated,
-                                         int enemiesDefeated) const;
+                                         int enemiesDefeated, float dropRate = 1.0f) const;
 
 private:
     QuestDatabase();

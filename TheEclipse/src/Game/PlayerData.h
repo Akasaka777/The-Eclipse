@@ -3,6 +3,7 @@
 //==============================================================================
 #pragma once
 
+#include "Game/Ability.h"
 #include "Game/Inventory.h"
 #include "Game/SwordSkill.h"
 #include "Game/UniqueSkill.h"
@@ -34,9 +35,21 @@ public:
 
     // レベルのみから決まる基礎能力
     Stats BaseStats() const;
-    // 基礎 + 装備
+    // 基礎 + 装備（ステータス振り分けは反映しない）
+    Stats EquippedStats() const;
+    // 基礎 + 装備 + ステータス振り分け
     Stats TotalStats() const;
     int   Power() const { return TotalStats().Power(); }
+
+    // --- 振り分けステータス（STR / AGI / VIT / INT / LUK）----------------------
+    const AbilityScores& Abilities() const { return abilities_; }
+    int  Ability(ecl::Ability ability) const { return abilities_.Get(ability); }
+    int  AbilityPoints() const { return abilityPoints_; }
+    // 1 ポイント使って伸ばす（ポイントが無ければ false）
+    bool SpendAbilityPoint(ecl::Ability ability, int amount = 1);
+    void AddAbilityPoints(int amount);
+    // ドロップ率の倍率（LUK で上がる）
+    float DropRateMultiplier() const { return AbilityDropRate(abilities_); }
 
     Inventory&       GetInventory() { return inventory_; }
     const Inventory& GetInventory() const { return inventory_; }
@@ -124,6 +137,8 @@ public:
                          UniqueSkillType uniqueSkill,
                          const std::vector<int>& availableUniqueSkills,
                          int parrySuccessCount);
+    // セーブから振り分けステータスを戻す
+    void RestoreAbilities(const AbilityScores& scores, int abilityPoints);
     const std::vector<int>& AvailableUniqueSkills() const { return availableUniqueSkills_; }
     // 装備を戻した後にスキル構成だけを復元し直す（系統は装備で決まるため）
     void RestoreSkillLoadout(const int skillLoadout[4]);
@@ -141,6 +156,8 @@ private:
     UniqueSkillType uniqueSkill_ = UniqueSkillType::None;
     std::vector<int> availableUniqueSkills_;
     int parrySuccessCount_ = 0;
+    AbilityScores abilities_;
+    int abilityPoints_ = 0;
     std::vector<int> unlockedSkills_;
     std::vector<int> clearedQuests_;
 };

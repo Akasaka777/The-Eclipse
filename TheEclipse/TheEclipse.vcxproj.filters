@@ -34,6 +34,9 @@
     <ClCompile Include="src\Core\SceneManager.cpp">
       <Filter></Filter>
     </ClCompile>
+    <ClCompile Include="src\Game\Ability.cpp">
+      <Filter></Filter>
+    </ClCompile>
     <ClCompile Include="src\Game\Actor.cpp">
       <Filter></Filter>
     </ClCompile>
@@ -121,6 +124,9 @@
     <ClCompile Include="src\UI\NamePanel.cpp">
       <Filter></Filter>
     </ClCompile>
+    <ClCompile Include="src\UI\PlayerPanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
     <ClCompile Include="src\UI\QuestPanel.cpp">
       <Filter></Filter>
     </ClCompile>
@@ -131,6 +137,9 @@
       <Filter></Filter>
     </ClCompile>
     <ClCompile Include="src\UI\SmithPanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\StatusPanel.cpp">
       <Filter></Filter>
     </ClCompile>
     <ClCompile Include="src\UI\UIWidgets.cpp">
@@ -175,6 +184,9 @@
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\Core\SceneManager.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Ability.h">
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Actor.h">
@@ -267,6 +279,9 @@
     <ClInclude Include="src\UI\NamePanel.h">
       <Filter></Filter>
     </ClInclude>
+    <ClInclude Include="src\UI\PlayerPanel.h">
+      <Filter></Filter>
+    </ClInclude>
     <ClInclude Include="src\UI\QuestPanel.h">
       <Filter></Filter>
     </ClInclude>
@@ -277,6 +292,9 @@
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\UI\SmithPanel.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\StatusPanel.h">
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\UI\UIWidgets.h">

@@ -9,10 +9,9 @@
 #include "Game/Combat.h"
 #include "Game/Player.h"
 #include "Game/Stage.h"
-#include "UI/EquipPanel.h"
+#include "UI/PlayerPanel.h"
 #include "UI/QuestPanel.h"
 #include "UI/SettingsPanel.h"
-#include "UI/SkillPanel.h"
 #include "UI/UIWidgets.h"
 #include "UI/SmithPanel.h"
 
@@ -27,8 +26,7 @@ namespace ecl {
 enum class HomeTab
 {
     None,
-    Equipment, // 装備
-    Skill,     // スキルツリー
+    Player,    // プレイヤー（ステータス / 装備 / アイテム / スキル）
     Quest,     // クエスト選択
     Smith,     // 鍛冶屋（強化・修理）
     Settings   // 設定
@@ -70,8 +68,7 @@ private:
     bool debugUniqueMenuOpen_ = false;
     HomeTab activeTab_ = HomeTab::None;
 
-    ui::EquipPanel    equipPanel_;
-    ui::SkillPanel    skillPanel_;
+    ui::PlayerPanel   playerPanel_;
     ui::QuestPanel    questPanel_;
     ui::SmithPanel    smithPanel_;
     ui::SettingsPanel settingsPanel_;

@@ -9,6 +9,17 @@
 
 namespace ecl {
 
+namespace {
+// 近接型が保つ間合い。
+//   これより近づくと攻撃判定がプレイヤーに重なってしまい、見てから避けられない。
+//   お互いの体の幅ぶん＋この余白だけ必ず離れる。
+constexpr float kBodyGap = 30.0f;
+// 足を止める間合い（attackRange に対する割合）
+constexpr float kApproachStopRate = 0.92f;
+// プレイヤーの体の半分（Player::Setup の halfWidth と合わせる）
+constexpr float kPlayerHalfWidth = 30.0f;
+} // namespace
+
 void Enemy::Setup(const EnemyDef& def, const Vec2& position, float powerScale)
 {
     def_ = &def;
@@ -153,12 +164,22 @@ void Enemy::Update(float dt, const Stage& stage, CombatSystem& combat,
             const float step = def_->moveSpeed * config::kDepthMoveRate * dt;
             MoveDepth(math::Clamp(depthGap, -step, step), stage);
         }
+
+        // 踏み込みすぎないよう、体が重ならない距離を必ず空ける。
+        //   ただし攻撃が届かなくなっては意味がないので attackRange は超えない。
+        const float keepOut = math::MinF(halfWidth + kPlayerHalfWidth + kBodyGap,
+                                         def_->attackRange);
+        const float stopDistance = math::MaxF(keepOut, def_->attackRange * kApproachStopRate);
+
         if (inRange && attackCooldown_ <= 0.0f) {
             state_ = EnemyState::Windup;
             stateTimer_ = 0.0f;
             velocity.x = 0.0f;
             animator.Play(PoseKind::Attack, true);
-        } else if (distance > def_->attackRange * 0.75f) {
+        } else if (distance < keepOut) {
+            // 近づきすぎたら下がる
+            velocity.x = -static_cast<float>(facing) * def_->moveSpeed * 0.6f;
+        } else if (distance > stopDistance) {
             velocity.x = static_cast<float>(facing) * def_->moveSpeed;
         } else {
             velocity.x *= 0.8f;
@@ -171,8 +192,8 @@ void Enemy::Update(float dt, const Stage& stage, CombatSystem& combat,
         break;
     }
     case EnemyState::Windup: {
+        // 攻撃モーションに入ったら向きは変えない（振り向きながら当ててこない）
         velocity.x *= 0.82f;
-        FaceTowards(playerPos.x);
         if (stateTimer_ >= def_->attackWindup) {
             SpawnAttack(combat);
             state_ = EnemyState::Attack;
@@ -326,7 +347,7 @@ void Enemy::Draw(const Camera& camera) const
                         def_->name, alpha, draw::TextAlign::Center);
 
         draw::FillRect(bar.Expanded(2.0f), palette::kBlack, math::ClampInt(alpha * 3 / 4, 0, 255));
-        draw::Bar(bar, HpRatio(), palette::kHpLoss, ColorRGB(40, 40, 48), -1.0f,
+        draw::Bar(bar, HpRatio(), palette::HpColor(HpRatio()), ColorRGB(40, 40, 48), -1.0f,
                   palette::kHpLoss, alpha);
     }
 }

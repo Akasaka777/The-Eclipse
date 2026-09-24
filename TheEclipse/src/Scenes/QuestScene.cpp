@@ -731,7 +731,9 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
 
     // ドロップ抽選
     if (quest_) {
-        result.drops = QuestDatabase::Instance().RollDrops(*quest_, cleared, enemiesDefeated_);
+        // LUK でドロップ率が上がる
+        result.drops = QuestDatabase::Instance().RollDrops(
+            *quest_, cleared, enemiesDefeated_, context.player.DropRateMultiplier());
     }
 
     result.expGained = exp;
@@ -747,6 +749,7 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
     inventory.AddCol(col);
     inventory.AddMaterial(result.materialGained);
     const int spBefore = context.player.SkillPoints();
+    const int apBefore = context.player.AbilityPoints();
     result.levelsGained = context.player.AddExp(exp);
 
     // 初回クリアでスキルポイントを追加で付与
@@ -754,6 +757,7 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
         context.player.AddSkillPoints(2);
     }
     result.skillPointsGained = context.player.SkillPoints() - spBefore;
+    result.abilityPointsGained = context.player.AbilityPoints() - apBefore;
 
     if (cleared && quest_) context.player.MarkQuestCleared(quest_->id);
 

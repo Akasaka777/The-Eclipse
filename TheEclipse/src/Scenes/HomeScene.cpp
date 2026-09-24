@@ -32,11 +32,10 @@ struct TabDef
 };
 
 const TabDef kTabs[] = {
-    { HomeTab::Equipment, "装備" },
-    { HomeTab::Skill,     "スキル" },
-    { HomeTab::Quest,     "クエスト" },
-    { HomeTab::Smith,     "鍛冶屋" },
-    { HomeTab::Settings,  "設定" },
+    { HomeTab::Player,   "プレイヤー" },
+    { HomeTab::Quest,    "クエスト" },
+    { HomeTab::Smith,    "鍛冶屋" },
+    { HomeTab::Settings, "設定" },
 };
 
 constexpr int kTabCount = static_cast<int>(sizeof(kTabs) / sizeof(kTabs[0]));
@@ -345,14 +344,13 @@ void HomeScene::OnEnter(GameContext& context)
 
 bool HomeScene::AnyPanelOpen() const
 {
-    return equipPanel_.IsOpen() || skillPanel_.IsOpen() || questPanel_.IsOpen()
+    return playerPanel_.IsOpen() || questPanel_.IsOpen()
         || smithPanel_.IsOpen() || settingsPanel_.IsOpen();
 }
 
 void HomeScene::CloseAllTabs()
 {
-    equipPanel_.Close();
-    skillPanel_.Close();
+    playerPanel_.Close();
     questPanel_.Close();
     smithPanel_.Close();
     settingsPanel_.Close();
@@ -365,11 +363,10 @@ void HomeScene::OpenTab(HomeTab tab, GameContext& context)
     activeTab_ = tab;
 
     switch (tab) {
-    case HomeTab::Equipment: equipPanel_.Open(); break;
-    case HomeTab::Skill:     skillPanel_.Open(context); break;
-    case HomeTab::Quest:     questPanel_.Open(context); break;
-    case HomeTab::Smith:     smithPanel_.Open(); break;
-    case HomeTab::Settings:  settingsPanel_.Open(context.settings); break;
+    case HomeTab::Player:   playerPanel_.Open(context); break;
+    case HomeTab::Quest:    questPanel_.Open(context); break;
+    case HomeTab::Smith:    smithPanel_.Open(); break;
+    case HomeTab::Settings: settingsPanel_.Open(context.settings); break;
     default: break;
     }
 }
@@ -381,20 +378,17 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
     const Input& input = Input::Instance();
 
     // --- パネル操作 ----------------------------------------------------------
-    if (equipPanel_.IsOpen()) {
-        equipPanel_.Update(dt, input, context);
-        // 装備変更を見た目へ即反映
+    if (playerPanel_.IsOpen()) {
+        playerPanel_.Update(dt, input, context);
+        // 装備やステータスの変更を見た目と能力へ即反映
         player_.Setup(context.player);
         player_.FullHeal();
-        if (equipPanel_.CloseRequested()) activeTab_ = HomeTab::None;
-    } else if (skillPanel_.IsOpen()) {
-        skillPanel_.Update(dt, input, context);
         // ユニークスキルの特別クエストへの出撃要求
-        if (const int specialQuestId = skillPanel_.SpecialQuestRequested()) {
+        if (const int specialQuestId = playerPanel_.SpecialQuestRequested()) {
             context.selectedQuestId = specialQuestId;
             startQuest_ = true;
         }
-        if (skillPanel_.CloseRequested()) activeTab_ = HomeTab::None;
+        if (playerPanel_.CloseRequested()) activeTab_ = HomeTab::None;
     } else if (questPanel_.IsOpen()) {
         questPanel_.Update(dt, input, context);
         if (questPanel_.StartRequested()) {
@@ -430,8 +424,6 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
         for (int i = 0; i < 4 && i < kTabCount; ++i) {
             if (input.Pressed(keys[i])) OpenTab(kTabs[i].tab, context);
         }
-        // 5 番目以降は生キーで受け付ける
-        if (kTabCount >= 5 && input.KeyPressed(KEY_INPUT_5)) OpenTab(kTabs[4].tab, context);
         if (input.Pressed(GameAction::Menu)) OpenTab(HomeTab::Settings, context);
     }
 
@@ -498,8 +490,7 @@ void HomeScene::Draw(GameContext& context)
     // --- パネル -------------------------------------------------------------
     if (AnyPanelOpen()) {
         ui::DrawDimOverlay(160);
-        equipPanel_.Draw(context);
-        skillPanel_.Draw(context);
+        playerPanel_.Draw(context);
         questPanel_.Draw(context);
         smithPanel_.Draw(context);
         settingsPanel_.Draw();
@@ -631,9 +622,9 @@ void HomeScene::DrawTabBar(const GameContext& context) const
             continue;
         }
 
-        // 未使用のスキルポイントがあればスキルタブに知らせる
-        if (kTabs[i].tab != HomeTab::Skill) continue;
-        const int points = context.player.SkillPoints();
+        // 未使用のスキルポイント / ステータスポイントをプレイヤータブに知らせる
+        if (kTabs[i].tab != HomeTab::Player) continue;
+        const int points = context.player.SkillPoints() + context.player.AbilityPoints();
         if (points <= 0) continue;
 
         const Rect rect = tabButtons_[static_cast<size_t>(i)].GetRect();

@@ -70,20 +70,20 @@ QuestDatabase::QuestDatabase()
         }
 
         quest.floorDrops = {
-            { 100, 0.10f,   0,  40  },
-            { 200, 0.10f,   0,  40  },
-            { 210, 0.10f,   0,  40  },
-            { 250, 0.08f,   0,  40  },
+            { 100, 0.02f,   0,  40  },
+            { 200, 0.02f,   0,  40  },
+            { 210, 0.02f,   0,  40  },
+            { 250, 0.016f,   0,  40  },
         };
         quest.bossDrops = {
-            { 101, 0.55f,  20,  60 },
-            { 111, 0.30f,  20,  60 },
-            { 121, 0.30f,  20,  60 },
-            { 131, 0.30f,  20,  60 },
-            { 141, 0.30f,  20,  60 },
-            { 201, 0.45f,  20,  60 },
-            { 211, 0.45f,  20,  60 },
-            { 221, 0.35f,  20,  60 },
+            { 101, 0.11f,  20,  60 },
+            { 111, 0.06f,  20,  60 },
+            { 121, 0.06f,  20,  60 },
+            { 131, 0.06f,  20,  60 },
+            { 141, 0.06f,  20,  60 },
+            { 201, 0.09f,  20,  60 },
+            { 211, 0.09f,  20,  60 },
+            { 221, 0.07f,  20,  60 },
         };
         quests_.push_back(quest);
     }
@@ -145,21 +145,21 @@ QuestDatabase::QuestDatabase()
         }
 
         quest.floorDrops = {
-            { 101, 0.10f,   0,  60 },
-            { 201, 0.10f,   0,  60 },
-            { 211, 0.10f,   0,  60 },
-            { 231, 0.10f,   0,  40  },
+            { 101, 0.02f,   0,  60 },
+            { 201, 0.02f,   0,  60 },
+            { 211, 0.02f,   0,  60 },
+            { 231, 0.02f,   0,  40  },
         };
         quest.bossDrops = {
-            { 102, 0.40f,  40,  80 },
-            { 112, 0.30f,  40,  80 },
-            { 122, 0.30f,  40,  80 },
-            { 132, 0.30f,  40,  80 },
-            { 142, 0.30f,  40,  80 },
-            { 212, 0.45f,  20,  80 },
-            { 221, 0.50f,  20,  60  },
-            { 241, 0.40f,  20,  60  },
-            { 251, 0.40f,  20,  60  },
+            { 102, 0.08f,  40,  80 },
+            { 112, 0.06f,  40,  80 },
+            { 122, 0.06f,  40,  80 },
+            { 132, 0.06f,  40,  80 },
+            { 142, 0.06f,  40,  80 },
+            { 212, 0.09f,  20,  80 },
+            { 221, 0.1f,  20,  60  },
+            { 241, 0.08f,  20,  60  },
+            { 251, 0.08f,  20,  60  },
         };
         quests_.push_back(quest);
     }
@@ -222,20 +222,20 @@ QuestDatabase::QuestDatabase()
         }
 
         quest.floorDrops = {
-            { 102, 0.10f,  20,  80 },
-            { 203, 0.10f,  20,  80 },
-            { 213, 0.10f,  20,  80 },
-            { 222, 0.10f,  20,  60  },
+            { 102, 0.02f,  20,  80 },
+            { 203, 0.02f,  20,  80 },
+            { 213, 0.02f,  20,  80 },
+            { 222, 0.02f,  20,  60  },
         };
         quest.bossDrops = {
-            { 102, 0.45f,  60, 100 },
-            { 112, 0.35f,  60, 100 },
-            { 122, 0.35f,  60, 100 },
-            { 132, 0.35f,  60, 100 },
-            { 142, 0.35f,  60, 100 },
-            { 203, 0.50f,  40, 100 },
-            { 213, 0.50f,  40, 100 },
-            { 222, 0.45f,  40,  80 },
+            { 102, 0.09f,  60, 100 },
+            { 112, 0.07f,  60, 100 },
+            { 122, 0.07f,  60, 100 },
+            { 132, 0.07f,  60, 100 },
+            { 142, 0.07f,  60, 100 },
+            { 203, 0.1f,  40, 100 },
+            { 213, 0.1f,  40, 100 },
+            { 222, 0.09f,  40,  80 },
         };
         quests_.push_back(quest);
     }
@@ -306,16 +306,22 @@ int QuestDatabase::RollIv(const DropEntry& entry, int difficulty) const
 }
 
 std::vector<EquipmentItem> QuestDatabase::RollDrops(const QuestDef& quest, bool bossDefeated,
-                                                    int enemiesDefeated) const
+                                                    int enemiesDefeated, float dropRate) const
 {
     std::vector<EquipmentItem> drops;
     const ItemDatabase& items = ItemDatabase::Instance();
+
+    // LUK による倍率（確率は 100% を超えない）
+    const float rate = math::MaxF(0.0f, dropRate);
+    auto roll = [rate](float chance) {
+        return math::RandChance(math::MinF(1.0f, chance * rate));
+    };
 
     // 道中ドロップ（倒した数だけ抽選）
     const int rolls = math::MinI(enemiesDefeated, 12);
     for (int i = 0; i < rolls; ++i) {
         for (const DropEntry& entry : quest.floorDrops) {
-            if (!math::RandChance(entry.chance)) continue;
+            if (!roll(entry.chance)) continue;
             EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
             if (item.IsValid()) drops.push_back(item);
             break; // 1 回の抽選につき最大 1 個
@@ -326,15 +332,16 @@ std::vector<EquipmentItem> QuestDatabase::RollDrops(const QuestDef& quest, bool 
     if (bossDefeated) {
         bool gotAny = false;
         for (const DropEntry& entry : quest.bossDrops) {
-            if (!math::RandChance(entry.chance)) continue;
+            if (!roll(entry.chance)) continue;
             EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
             if (item.IsValid()) {
                 drops.push_back(item);
                 gotAny = true;
             }
         }
-        // 最低 1 個は必ず落とす
-        if (!gotAny && !quest.bossDrops.empty()) {
+        // 特別クエスト（ユニークスキル用のセット武器）だけは必ず 1 個落とす。
+        //   通常クエストは確率どおりで、何も落ちないこともある。
+        if (!gotAny && quest.special && !quest.bossDrops.empty()) {
             const DropEntry& entry = quest.bossDrops[0];
             EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
             if (item.IsValid()) drops.push_back(item);

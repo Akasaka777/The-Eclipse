@@ -101,6 +101,11 @@ public:
     // 今どの攻撃パターンを出しているか（HUD の表示やテストで使う）
     BossAttackKind CurrentAttack() const { return currentKind_; }
     bool IsAttacking() const { return state_ == BossState::Attack; }
+    // 予備動作に入ってから攻撃が終わるまで（この間は向きを変えない）
+    bool IsCommittedToAttack() const
+    {
+        return state_ == BossState::Windup || state_ == BossState::Attack;
+    }
 
 private:
     void ChoosePattern(float distance);

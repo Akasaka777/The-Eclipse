@@ -267,7 +267,10 @@ void EquipPanel::DrawComparison(const GameContext& context) const
     Stats next = current;
     const EquipmentItem* selected = inventory.FindByUid(selectedUid_);
     if (selected && inventory.CanEquipTo(selectedUid_, selectedSlot_)) {
-        next = context.player.BaseStats() + inventory.PreviewStats(selectedUid_, selectedSlot_);
+        // 比較にもステータス振り分けを反映する
+        next = ApplyAbilities(context.player.BaseStats()
+                                  + inventory.PreviewStats(selectedUid_, selectedSlot_),
+                              context.player.Abilities());
     }
 
     float y = preview.bottom + 22.0f;
