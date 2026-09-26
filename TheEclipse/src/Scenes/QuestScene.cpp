@@ -480,7 +480,8 @@ void QuestScene::ResolveHitBoxes(GameContext& context)
                 ++combo_;
                 comboTimer_ = kComboHold;
                 maxCombo_ = math::MaxI(maxCombo_, combo_);
-                WearEquipment(context, EquipSlot::WeaponRight, kWeaponWearPerHit);
+                // 二刀流なら左右どちらの武器も消耗する
+                WearWeapons(context, kWeaponWearPerHit);
 
                 hitStop_ = math::MaxF(hitStop_, hitBox.hitStop);
                 camera_.Shake(hitBox.hitStop * 90.0f, 0.18f);
@@ -606,6 +607,13 @@ void QuestScene::WearEquipment(GameContext& context, EquipSlot slot, float amoun
 {
     Inventory& inventory = context.player.GetInventory();
     inventory.ApplyWear(slot, amount);
+    HandleBrokenEquipment(context);
+}
+
+void QuestScene::WearWeapons(GameContext& context, float amount)
+{
+    Inventory& inventory = context.player.GetInventory();
+    inventory.ApplyWeaponWear(amount);
     HandleBrokenEquipment(context);
 }
 

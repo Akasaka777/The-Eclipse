@@ -332,6 +332,16 @@ void Inventory::ApplyWear(EquipSlot slot, float amount)
     if (item) item->Wear(amount);
 }
 
+void Inventory::ApplyWeaponWear(float amount)
+{
+    // 右手だけでなく左手の武器も摩耗させる（二刀流で片方だけ減らない不具合の対策）
+    for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {
+        const EquipSlot slot = static_cast<EquipSlot>(i);
+        if (!IsWeaponSlot(slot)) continue;
+        ApplyWear(slot, amount);
+    }
+}
+
 void Inventory::ApplyArmorWear(float amount)
 {
     for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {

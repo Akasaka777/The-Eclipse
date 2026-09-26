@@ -51,6 +51,8 @@ private:
     void CleanupDead(GameContext& context);
     // 装備を消耗させ、壊れたらその場で反映する
     void WearEquipment(GameContext& context, EquipSlot slot, float amount);
+    // 持っている武器すべて（二刀流なら左右とも）を摩耗させる
+    void WearWeapons(GameContext& context, float amount);
     void WearArmor(GameContext& context, float amount);
     // 壊れた装備を取り除き、プレイヤーへ反映する
     void HandleBrokenEquipment(GameContext& context);

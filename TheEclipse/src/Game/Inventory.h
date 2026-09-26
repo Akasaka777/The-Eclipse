@@ -93,6 +93,9 @@ public:
     // --- 耐久力 -------------------------------------------------------------
     // 装備中のスロットの装備を摩耗させる
     void ApplyWear(EquipSlot slot, float amount);
+    // 装備中の武器すべてを摩耗させる
+    //   二刀流で両手に持っている場合は、左右どちらの武器も摩耗する。
+    void ApplyWeaponWear(float amount);
     // 装備中の防具すべてを摩耗させる
     void ApplyArmorWear(float amount);
     // 耐久力が尽きた装備を消滅させる（消えた装備名を返す）

@@ -248,9 +248,11 @@ void DrawSlotIcon(const Rect& rect, EquipSlot slot, const ColorRGB& color)
     }
 }
 
-void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, bool equipped, bool hovered)
+void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, bool equipped,
+                 bool hovered, bool showIv)
 {
-    // 個体値は画面に出さない（能力値と耐久力の違いとして感じ取ってもらう）
+    // 個体値は通常は画面に出さない（能力値と耐久力の違いとして感じ取ってもらう）。
+    // 開発者モードのときだけ showIv を立てて確認できるようにする。
     const ColorRGB accent = item.IsWeapon() ? palette::kAccent : palette::kAccentWarm;
 
     ColorRGB fill = palette::kPanelDark;
@@ -277,6 +279,11 @@ void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, boo
 
     draw::Text(FontSize::Small, rect.right - 12.0f, rect.top + 10.0f, palette::kText,
                str::Format("戦力 %d", item.Power()), draw::TextAlign::Right);
+
+    if (showIv) {
+        draw::Text(FontSize::Tiny, rect.right - 119.0f, rect.top + 12.0f, palette::kExp,
+                   str::Format("IV %d", item.iv), draw::TextAlign::Right);
+    }
 
     // --- 耐久力 ---------------------------------------------------------------
     const Rect durabilityBar(rect.right - 200.0f, rect.bottom - 16.0f, rect.right - 12.0f,

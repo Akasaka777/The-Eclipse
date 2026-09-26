@@ -286,7 +286,8 @@ void SmithPanel::Draw(const GameContext& context) const
         const EquipmentItem& item = *items[static_cast<size_t>(index)];
         const Rect rect(listArea.left, listArea.top + kRowHeight * static_cast<float>(row),
                         listArea.right, listArea.top + kRowHeight * static_cast<float>(row + 1) - 6.0f);
-        DrawItemRow(rect, item, item.uid == selectedUid_, inventory.IsEquipped(item.uid), false);
+        DrawItemRow(rect, item, item.uid == selectedUid_, inventory.IsEquipped(item.uid), false,
+                    context.settings.debugMode);
     }
 
     if (static_cast<int>(items.size()) > kVisibleRows) {
@@ -328,8 +329,11 @@ void SmithPanel::Draw(const GameContext& context) const
                            item->upgradeLevel, item->MaxUpgrade()));
     y += 30.0f;
     draw::Text(FontSize::Small, detail.left + 24.0f, y, palette::kTextDim,
-               str::Format("戦力 %d ／ 耐久力 最大 %d", item->Power(),
-                           item->MaxDurabilityDisplay()));
+               context.settings.debugMode
+                   ? str::Format("戦力 %d ／ 耐久力 最大 %d ／ 個体値 %d", item->Power(),
+                                 item->MaxDurabilityDisplay(), item->iv)
+                   : str::Format("戦力 %d ／ 耐久力 最大 %d", item->Power(),
+                                 item->MaxDurabilityDisplay()));
     y += 36.0f;
 
     // --- 耐久力 ---------------------------------------------------------------

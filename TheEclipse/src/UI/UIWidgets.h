@@ -109,7 +109,9 @@ private:
 // 見出し付きのウィンドウ枠
 void DrawWindow(const Rect& rect, const std::string& title);
 // 一覧用のアイテム行
-void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, bool equipped, bool hovered);
+// showIv を立てると個体値を表示する（開発者モード専用。通常は隠す）
+void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, bool equipped,
+                 bool hovered, bool showIv = false);
 // 武器種のアイコン
 void DrawWeaponIcon(const Rect& rect, WeaponType type, const ColorRGB& color);
 // スロットのアイコン

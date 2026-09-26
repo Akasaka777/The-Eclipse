@@ -220,7 +220,8 @@ void EquipPanel::DrawItemList(const GameContext& context) const
         const EquipmentItem& item = *items[static_cast<size_t>(index)];
         const Rect rect(listArea.left, listArea.top + kRowHeight * static_cast<float>(row),
                         listArea.right, listArea.top + kRowHeight * static_cast<float>(row + 1) - 6.0f);
-        DrawItemRow(rect, item, item.uid == selectedUid_, inventory.IsEquipped(item.uid), false);
+        DrawItemRow(rect, item, item.uid == selectedUid_, inventory.IsEquipped(item.uid), false,
+                    context.settings.debugMode);
     }
 
     // スクロールバー
@@ -295,8 +296,11 @@ void EquipPanel::DrawComparison(const GameContext& context) const
                    selected->DisplayName());
         y += 26.0f;
         draw::Text(FontSize::Tiny, detail.left + 24.0f, y, palette::kTextDim,
-                   str::Format("強化上限 +%d ／ 耐久力 最大 %d",
-                               selected->MaxUpgrade(), selected->MaxDurabilityDisplay()));
+                   context.settings.debugMode
+                       ? str::Format("個体値 %d ／ 強化上限 +%d ／ 耐久力 最大 %d", selected->iv,
+                                     selected->MaxUpgrade(), selected->MaxDurabilityDisplay())
+                       : str::Format("強化上限 +%d ／ 耐久力 最大 %d",
+                                     selected->MaxUpgrade(), selected->MaxDurabilityDisplay()));
         y += 22.0f;
         draw::Text(FontSize::Tiny, detail.left + 24.0f, y, palette::kTextDim, selected->flavor);
     }
