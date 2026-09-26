@@ -112,7 +112,8 @@ void QuestPanel::Draw(const GameContext& context) const
                    draw::TextAlign::Right);
 
         draw::Text(FontSize::Small, rect.left + 20.0f, rect.bottom - 34.0f, palette::kTextDim,
-                   str::Format("推奨戦力 %d ／ %dフロア", quest.recommendedPower, quest.FloorCount()));
+                   str::Format("推奨戦力 %s ／ %dフロア",
+                               str::Comma(quest.recommendedPower).c_str(), quest.FloorCount()));
 
         if (cleared) {
             draw::Text(FontSize::Small, rect.right - 20.0f, rect.bottom - 34.0f, palette::kHp,
@@ -150,7 +151,8 @@ void QuestPanel::Draw(const GameContext& context) const
     {
         const bool enough = playerPower >= quest->recommendedPower;
         draw::Text(FontSize::Normal, detail.right - 24.0f, y, enough ? palette::kHp : palette::kDanger,
-                   str::Format("%d  （現在 %d）", quest->recommendedPower, playerPower),
+                   str::Format("%s  （現在 %s）", str::Comma(quest->recommendedPower).c_str(),
+                               str::Comma(playerPower).c_str()),
                    draw::TextAlign::Right);
     }
     y += 40.0f;
@@ -168,6 +170,13 @@ void QuestPanel::Draw(const GameContext& context) const
     }
 
     // --- 主なドロップ --------------------------------------------------------
+    //   hideDrops が立っているクエストは、何が落ちるかを伏せる
+    if (quest->hideDrops) {
+        startButton_.Draw();
+        closeButton_.Draw();
+        return;
+    }
+
     draw::Line(detail.left + 24.0f, y, detail.right - 24.0f, y, palette::kBorder, 1.0f, 120);
     y += 16.0f;
     draw::Text(FontSize::Normal, detail.left + 24.0f, y, palette::kAccent, "主なボスドロップ");

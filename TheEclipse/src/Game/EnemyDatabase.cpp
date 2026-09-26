@@ -90,6 +90,50 @@ EnemyDatabase::EnemyDatabase()
         e.expReward = 58; e.colReward = 72;
         enemies_.push_back(e);
     }
+    {
+        // 竜王の火山 : 火を吐きながら距離を取る飛竜
+        EnemyDef e;
+        e.id = 7; e.name = "レッドドレイク";
+        e.style = ArtStyle::Wisp;
+        e.main = ColorRGB(128, 38, 30); e.accent = ColorRGB(255, 190, 120); e.trim = ColorRGB(255, 120, 48);
+        e.maxHp = 7600.0f; e.attack = 2700.0f; e.defense = 180.0f; e.moveSpeed = 210.0f;
+        e.halfWidth = 42.0f; e.height = 112.0f;
+        e.aggroRange = 860.0f;
+        e.attackRange = 660.0f; e.attackWindup = 0.55f; e.attackRecover = 0.6f; e.attackCooldown = 1.9f;
+        e.damageMultiplier = 1.0f; e.knockback = 300.0f; e.knockbackResist = 0.2f;
+        e.ranged = true; e.projectileSpeed = 620.0f; e.floating = true;
+        e.assetFolder = "red_drake";
+        e.expReward = 940; e.colReward = 1180;
+        enemies_.push_back(e);
+    }
+    {
+        // 竜王の火山 : 小型で手数が多い幼竜
+        EnemyDef e;
+        e.id = 8; e.name = "ドラゴンハッチリング";
+        e.style = ArtStyle::Imp;
+        e.main = ColorRGB(96, 52, 40); e.accent = ColorRGB(255, 214, 150); e.trim = ColorRGB(255, 156, 72);
+        e.maxHp = 5200.0f; e.attack = 2300.0f; e.defense = 120.0f; e.moveSpeed = 320.0f;
+        e.halfWidth = 28.0f; e.height = 104.0f;
+        e.attackRange = 104.0f; e.attackWindup = 0.26f; e.attackRecover = 0.32f; e.attackCooldown = 0.85f;
+        e.damageMultiplier = 0.9f; e.knockback = 200.0f;
+        e.assetFolder = "hatchling";
+        e.expReward = 720; e.colReward = 880;
+        enemies_.push_back(e);
+    }
+    {
+        // 竜王の火山 : 鈍いが硬く、一撃が重い
+        EnemyDef e;
+        e.id = 9; e.name = "マグマリザード";
+        e.style = ArtStyle::Beast;
+        e.main = ColorRGB(58, 40, 44); e.accent = ColorRGB(255, 132, 64); e.trim = ColorRGB(255, 96, 40);
+        e.maxHp = 11000.0f; e.attack = 3400.0f; e.defense = 320.0f; e.moveSpeed = 180.0f;
+        e.halfWidth = 52.0f; e.height = 126.0f;
+        e.attackRange = 148.0f; e.attackWindup = 0.62f; e.attackRecover = 0.72f; e.attackCooldown = 1.7f;
+        e.damageMultiplier = 1.35f; e.knockback = 360.0f; e.knockbackResist = 0.45f;
+        e.assetFolder = "magma_lizard";
+        e.expReward = 1280; e.colReward = 1560;
+        enemies_.push_back(e);
+    }
 }
 
 const EnemyDatabase& EnemyDatabase::Instance()

@@ -273,6 +273,96 @@ QuestDatabase::QuestDatabase()
         };
         quests_.push_back(quest);
     }
+
+    //==========================================================================
+    // クエスト 5 : 竜王の火山
+    //   推奨戦力 14,000 の最上位クエスト。5 フロア構成。
+    //   ボスドロップは部位ごとに 1 つずつ用意してあり、
+    //   1 回の撃破で手に入るのはそのうち 1 部位だけ。
+    //==========================================================================
+    {
+        QuestDef quest;
+        quest.id = 5;
+        quest.name = "竜王の火山";
+        quest.subtitle = "VOLCANO OF THE DRAGON KING";
+        quest.description = "溶岩が脈打つ火口。頂にはこの層の主が眠っている。";
+        quest.bossName = "竜王 ヴァルグリム・ザ・エンシェントドラゴン";
+        quest.difficulty = 5;
+        quest.recommendedPower = 14000;
+        quest.enemyPowerScale = 1.0f;
+        quest.colReward = 4200;
+        quest.expReward = 6500;
+        quest.firstClearCol = 15000;
+        // 何が落ちるかはクエスト詳細に出さない
+        quest.hideDrops = true;
+
+        {
+            FloorDef floor = MakeFloor("FLOOR 1 - 焼けた裾野", 4200.0f, StageTheme::Volcano);
+            floor.spawns = {
+                EnemySpawn(1100.0f, 8),
+                EnemySpawn(1700.0f, 8),
+                EnemySpawn(2400.0f, 9),
+                EnemySpawn(3000.0f, 7, 620.0f),
+                EnemySpawn(3600.0f, 8),
+            };
+            quest.floors.push_back(floor);
+        }
+        {
+            FloorDef floor = MakeFloor("FLOOR 2 - 溶岩の回廊", 4400.0f, StageTheme::Volcano);
+            floor.spawns = {
+                EnemySpawn(1000.0f, 9),
+                EnemySpawn(1600.0f, 8),
+                EnemySpawn(2100.0f, 7, 660.0f),
+                EnemySpawn(2800.0f, 9),
+                EnemySpawn(3500.0f, 8),
+                EnemySpawn(4000.0f, 7, 600.0f),
+            };
+            quest.floors.push_back(floor);
+        }
+        {
+            FloorDef floor = MakeFloor("FLOOR 3 - 竜の巣", 4600.0f, StageTheme::Volcano);
+            floor.spawns = {
+                EnemySpawn(1100.0f, 8),
+                EnemySpawn(1500.0f, 8),
+                EnemySpawn(2200.0f, 9),
+                EnemySpawn(2700.0f, 7, 640.0f),
+                EnemySpawn(3300.0f, 9),
+                EnemySpawn(4000.0f, 8),
+            };
+            quest.floors.push_back(floor);
+        }
+        {
+            FloorDef floor = MakeFloor("FLOOR 4 - 火口への道", 4200.0f, StageTheme::Volcano);
+            floor.spawns = {
+                EnemySpawn(1200.0f, 9),
+                EnemySpawn(1800.0f, 7, 600.0f),
+                EnemySpawn(2400.0f, 9),
+                EnemySpawn(2900.0f, 7, 680.0f),
+                EnemySpawn(3500.0f, 9),
+            };
+            quest.floors.push_back(floor);
+        }
+        {
+            FloorDef floor = MakeFloor("FINAL FLOOR - 竜王の玉座", 3600.0f, StageTheme::Volcano);
+            floor.bossId = 5;
+            quest.floors.push_back(floor);
+        }
+
+        // 雑魚敵はドロップなし
+        quest.floorDrops.clear();
+
+        // 部位ごとに 1 つずつ。撃破 1 回で落ちるのはどれか 1 部位だけ。
+        quest.bossDrops = {
+            { kDragonSwordId,  0.55f, 70, 100 },
+            { kDragonHelmId,   0.55f, 70, 100 },
+            { kDragonMailId,   0.55f, 70, 100 },
+            { kDragonShieldId, 0.55f, 70, 100 },
+            { kDragonArmId,    0.55f, 70, 100 },
+            { kDragonGloveId,  0.55f, 70, 100 },
+            { kDragonBootsId,  0.55f, 70, 100 },
+        };
+        quests_.push_back(quest);
+    }
 }
 
 const QuestDatabase& QuestDatabase::Instance()
@@ -328,23 +418,61 @@ std::vector<EquipmentItem> QuestDatabase::RollDrops(const QuestDef& quest, bool 
         }
     }
 
-    // ボスドロップ
-    if (bossDefeated) {
-        bool gotAny = false;
-        for (const DropEntry& entry : quest.bossDrops) {
-            if (!roll(entry.chance)) continue;
-            EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
-            if (item.IsValid()) {
-                drops.push_back(item);
-                gotAny = true;
+    // --- ボスドロップ --------------------------------------------------------
+    //   まず「武器 / 頭 / 体 / 盾 / 腕 / 手 / 足」の中から 1 つの部位を抽選し、
+    //   その部位の候補だけを引く。頭装備が当たったフロアでは、武器や体装備は
+    //   絶対に落ちない。
+    //   特別クエスト（ユニークスキル用のセット武器）はセットで渡したいので、
+    //   この部位抽選を通さず今までどおり全候補を引く。
+    if (bossDefeated && !quest.bossDrops.empty()) {
+        if (quest.special) {
+            bool gotAny = false;
+            for (const DropEntry& entry : quest.bossDrops) {
+                if (!roll(entry.chance)) continue;
+                EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
+                if (item.IsValid()) {
+                    drops.push_back(item);
+                    gotAny = true;
+                }
             }
-        }
-        // 特別クエスト（ユニークスキル用のセット武器）だけは必ず 1 個落とす。
-        //   通常クエストは確率どおりで、何も落ちないこともある。
-        if (!gotAny && quest.special && !quest.bossDrops.empty()) {
-            const DropEntry& entry = quest.bossDrops[0];
-            EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
-            if (item.IsValid()) drops.push_back(item);
+            // 特別クエストだけは必ず 1 個落とす
+            if (!gotAny) {
+                const DropEntry& entry = quest.bossDrops[0];
+                EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
+                if (item.IsValid()) drops.push_back(item);
+            }
+        } else {
+            // 候補に含まれている部位を集める（武器は左右をまとめて 1 部位とする）
+            std::vector<EquipSlot> slots;
+            for (const DropEntry& entry : quest.bossDrops) {
+                const ItemTemplate* tmpl = items.Find(entry.templateId);
+                if (!tmpl) continue;
+                const EquipSlot slot = IsWeaponSlot(tmpl->slot) ? EquipSlot::WeaponRight : tmpl->slot;
+                bool known = false;
+                for (EquipSlot s : slots) known = known || (s == slot);
+                if (!known) slots.push_back(slot);
+            }
+
+            if (!slots.empty()) {
+                const EquipSlot picked =
+                    slots[static_cast<size_t>(math::RandInt(0, static_cast<int>(slots.size()) - 1))];
+
+                // 選ばれた部位の候補だけを、定義どおりの確率で引く
+                for (const DropEntry& entry : quest.bossDrops) {
+                    const ItemTemplate* tmpl = items.Find(entry.templateId);
+                    if (!tmpl) continue;
+                    const EquipSlot slot =
+                        IsWeaponSlot(tmpl->slot) ? EquipSlot::WeaponRight : tmpl->slot;
+                    if (slot != picked) continue;
+                    if (!roll(entry.chance)) continue;
+                    EquipmentItem item = items.Create(entry.templateId,
+                                                     RollIv(entry, quest.difficulty));
+                    if (item.IsValid()) {
+                        drops.push_back(item);
+                        break;   // 1 部位につき 1 個まで
+                    }
+                }
+            }
         }
     }
 

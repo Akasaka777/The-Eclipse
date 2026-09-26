@@ -43,6 +43,8 @@ struct QuestDef
     std::vector<DropEntry> floorDrops;  // 道中の抽選
     // 特別クエスト。クエスト選択タブには出さず、スキルツリーから挑む
     bool special = false;
+    // クエスト詳細にボスドロップを載せない（何が落ちるかは倒してからのお楽しみ）
+    bool hideDrops = false;
 
     int FloorCount() const { return static_cast<int>(floors.size()); }
 };

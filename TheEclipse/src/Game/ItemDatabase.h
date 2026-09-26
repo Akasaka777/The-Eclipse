@@ -12,6 +12,21 @@ namespace ecl {
 //------------------------------------------------------------------------------
 // 装備の定義（個体値を掛ける前の素の値）
 //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+// 竜王の火山のボスドロップ（部位ごとに 1 つずつ）
+//   ボスドロップ専用なので、通常のランダム抽選には出さない。
+//------------------------------------------------------------------------------
+constexpr int kDragonSwordId  = 160;  // 片手剣
+constexpr int kDragonHelmId   = 204;  // 頭
+constexpr int kDragonMailId   = 214;  // 体
+constexpr int kDragonShieldId = 224;  // 盾
+constexpr int kDragonArmId    = 232;  // 腕
+constexpr int kDragonGloveId  = 242;  // 手
+constexpr int kDragonBootsId  = 252;  // 足
+
+// 竜王のセットか
+bool IsDragonSetItem(int templateId);
+
 struct ItemTemplate
 {
     int         id = 0;

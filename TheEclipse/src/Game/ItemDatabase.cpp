@@ -6,6 +6,14 @@
 
 namespace ecl {
 
+bool IsDragonSetItem(int templateId)
+{
+    return templateId == kDragonSwordId || templateId == kDragonHelmId
+        || templateId == kDragonMailId  || templateId == kDragonShieldId
+        || templateId == kDragonArmId   || templateId == kDragonGloveId
+        || templateId == kDragonBootsId;
+}
+
 namespace {
 
 // 武器用ステータス生成
@@ -74,17 +82,22 @@ ItemDatabase::ItemDatabase()
         //   特別クエストでのみ入手できる。通常のドロップ抽選には出ない。
         { 150, "神聖剣グレイス",       "聖別された白刃。折れることなく持ち主を守る。", EquipSlot::WeaponRight, SWD, 3, WeaponStats(96.0f, 0.12f, 0.30f, 0.06f) },
 
+        //--- 竜王の火山のボスドロップ（部位ごとに 1 つずつ）----------------------
+        { 160, "ヴァルグリム・ドラゴンソード", "竜王の牙から鍛えた大剣。振るうたびに熱を帯びる。", EquipSlot::WeaponRight, SWD, 3, WeaponStats(132.0f, 0.11f, 0.34f, 0.05f) },
+
         //--- 頭装備 -------------------------------------------------------------
         { 200, "レザーキャップ",       "軽い革の帽子。",                           EquipSlot::Head, SWD, 1, ArmorStats(6.0f,  40.0f, 10.0f) },
         { 201, "アイアンヘルム",       "視界は狭いが頑丈。",                       EquipSlot::Head, SWD, 2, ArmorStats(12.0f, 75.0f,  6.0f) },
         { 202, "月光のサークレット",   "MP の巡りを良くする装飾。",                 EquipSlot::Head, SWD, 2, ArmorStats(8.0f,  45.0f, 38.0f, 0.02f, 0.0f, 0.05f) },
         { 203, "蝕の兜",               "闇を見通す視界を得る。",                   EquipSlot::Head, SWD, 3, ArmorStats(19.0f, 110.0f, 24.0f, 0.03f) },
+        { 204, "エンシェントドラゴンヘルム", "竜鱗を重ねた兜。灼熱の息すら通さない。", EquipSlot::Head, SWD, 3, ArmorStats(42.0f, 280.0f, 60.0f, 0.04f) },
 
         //--- 体装備 -------------------------------------------------------------
         { 210, "レザーアーマー",       "動きを妨げない革鎧。",                     EquipSlot::Body, SWD, 1, ArmorStats(11.0f, 80.0f,  8.0f, 0.0f, 6.0f) },
         { 211, "チェインメイル",       "斬撃に強い鎖帷子。",                       EquipSlot::Body, SWD, 2, ArmorStats(21.0f, 140.0f, 4.0f) },
         { 212, "月光のコート",         "魔力を織り込んだ外套。",                   EquipSlot::Body, SWD, 2, ArmorStats(15.0f, 100.0f, 52.0f, 0.0f, 10.0f, 0.08f) },
         { 213, "蝕の鎧",               "蝕の夜を纏うかのような漆黒。",             EquipSlot::Body, SWD, 3, ArmorStats(32.0f, 210.0f, 30.0f, 0.02f, 8.0f) },
+        { 214, "エンシェントドラゴンメイル", "古竜の背鱗を並べた鎧。重さを感じさせない。", EquipSlot::Body, SWD, 3, ArmorStats(68.0f, 520.0f, 70.0f, 0.02f, 6.0f) },
 
         //--- 盾 -----------------------------------------------------------------
         { 220, "ラウンドシールド",     "取り回しの良い小盾。",                     EquipSlot::Shield, SWD, 1, ArmorStats(9.0f,  55.0f, 0.0f) },
@@ -92,29 +105,39 @@ ItemDatabase::ItemDatabase()
         { 222, "蝕の盾",               "受けた衝撃を闇へ逃がす。",                 EquipSlot::Shield, SWD, 3, ArmorStats(28.0f, 160.0f, 18.0f) },
         // ユニークスキル「神聖剣」専用のセット武器（特別クエストでのみ入手）
         { 223, "聖盾エーギス",         "神聖剣と対になる盾。あらゆる刃を受け止める。", EquipSlot::Shield, SWD, 3, ArmorStats(125.0f, 480.0f, 70.0f) },
+        { 224, "エンシェントドラゴンシールド", "竜の翼膜を張った盾。炎を受け流す。", EquipSlot::Shield, SWD, 3, ArmorStats(58.0f, 380.0f, 40.0f) },
 
         //--- 腕装備 -------------------------------------------------------------
         { 230, "レザーブレイサー",     "手首を守る革当て。",                       EquipSlot::Arm, SWD, 1, ArmorStats(5.0f, 30.0f, 6.0f, 0.02f) },
         { 231, "鋼の篭手",             "打撃の威力を底上げする。",                 EquipSlot::Arm, SWD, 2, ArmorStats(10.0f, 55.0f, 0.0f, 0.04f) },
+        { 232, "エンシェントドラゴンアーム", "竜爪を模した篭手。急所を的確に捉える。", EquipSlot::Arm, SWD, 3, ArmorStats(26.0f, 160.0f, 30.0f, 0.06f) },
 
         //--- 手装備 -------------------------------------------------------------
         { 240, "戦士のグローブ",       "武器を握る力が増す。",                     EquipSlot::Hand, SWD, 1, ArmorStats(4.0f, 24.0f, 4.0f, 0.03f) },
         { 241, "疾風の手甲",           "振りの速度が上がる。",                     EquipSlot::Hand, SWD, 2, ArmorStats(7.0f, 38.0f, 8.0f, 0.03f) },
+        { 242, "エンシェントドラゴングローブ", "竜の握力を宿す手甲。武器がぴたりと吸い付く。", EquipSlot::Hand, SWD, 3, ArmorStats(20.0f, 120.0f, 24.0f, 0.05f) },
 
         //--- 足装備 -------------------------------------------------------------
         { 250, "レザーブーツ",         "長時間の探索に向く。",                     EquipSlot::Foot, SWD, 1, ArmorStats(5.0f, 28.0f, 4.0f, 0.0f, 18.0f) },
         { 251, "韋駄天のブーツ",       "駆け抜ける者のための靴。",                 EquipSlot::Foot, SWD, 2, ArmorStats(9.0f, 46.0f, 8.0f, 0.0f, 34.0f) },
+        { 252, "エンシェントドラゴンブーツ", "溶岩の上でも足を取られない具足。", EquipSlot::Foot, SWD, 3, ArmorStats(24.0f, 150.0f, 26.0f, 0.0f, 52.0f) },
     };
 
     // 手装備の攻撃速度補正は個別に付与
     for (ItemTemplate& t : templates_) {
-        if (t.slot == EquipSlot::Hand) t.base.attackSpeed = (t.id == 241) ? 0.10f : 0.05f;
+        if (t.slot == EquipSlot::Hand) {
+            if (t.id == 242) t.base.attackSpeed = 0.14f;
+            else if (t.id == 241) t.base.attackSpeed = 0.10f;
+            else t.base.attackSpeed = 0.05f;
+        }
         // 神聖剣のセット武器は特別枠（ランダム抽選には出さない）。
         // さらに耐久力が 0 になっても消滅せず、性能が落ちるだけにする。
         if (t.id == kHolySwordSwordId || t.id == kHolySwordShieldId) {
             t.special = true;
             t.indestructible = true;
         }
+        // 竜王のセットもボスドロップ専用（ランダム抽選には出さない）
+        if (IsDragonSetItem(t.id)) t.special = true;
     }
 
 }

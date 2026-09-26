@@ -64,6 +64,15 @@ ThemeColors ColorsFor(StageTheme theme)
         c.groundEdge = ColorRGB(150, 96, 220);
         c.accent = ColorRGB(206, 122, 255);
         break;
+    case StageTheme::Volcano:
+        c.skyTop = ColorRGB(22, 8, 8);
+        c.skyBottom = ColorRGB(88, 26, 18);
+        c.far_ = ColorRGB(52, 20, 18);
+        c.mid = ColorRGB(34, 14, 14);
+        c.ground = ColorRGB(38, 24, 22);
+        c.groundEdge = ColorRGB(198, 86, 40);
+        c.accent = ColorRGB(255, 142, 56);
+        break;
     case StageTheme::Home:
     default:
         c.skyTop = ColorRGB(10, 14, 30);
@@ -213,6 +222,12 @@ void Stage::DrawFarLayer(const Camera& camera) const
             draw::Triangle(Vec2(x - w * 0.4f, baseY - h + 60.0f), Vec2(x + w * 0.4f, baseY - h + 60.0f),
                            Vec2(x, baseY - h + 160.0f), colors.far_, true, 255);
             break;
+        case StageTheme::Volcano:
+            // 噴煙を上げる火山
+            draw::Triangle(Vec2(x - w * 0.7f, baseY), Vec2(x + w * 0.7f, baseY),
+                           Vec2(x, baseY - h), colors.far_, true, 255);
+            draw::Glow(x, baseY - h + 20.0f, 54.0f, colors.accent, 90, 4);
+            break;
         case StageTheme::Home:
         default:
             // 遠景の街並み
@@ -261,6 +276,14 @@ void Stage::DrawMidLayer(const Camera& camera) const
             const float pulse = 0.6f + 0.4f * std::sin(time_ * 2.2f + static_cast<float>(i));
             draw::Circle(x, baseY - h * 0.55f, 10.0f, colors.accent, true, 1.0f,
                          static_cast<int>(200.0f * pulse));
+            break;
+        }
+        case StageTheme::Volcano: {
+            // 固まった溶岩の柱と、噴き出す炎
+            draw::Triangle(Vec2(x - w * 0.45f, baseY), Vec2(x + w * 0.45f, baseY),
+                           Vec2(x, baseY - h), colors.mid, true, 255);
+            const float burst = 0.6f + 0.4f * std::sin(time_ * 3.4f + static_cast<float>(i) * 1.7f);
+            draw::Glow(x, baseY - h * 0.35f, 46.0f * burst, colors.accent, 120, 4);
             break;
         }
         case StageTheme::Home:
@@ -333,6 +356,19 @@ void Stage::DrawGround(const Camera& camera) const
         const float x = static_cast<float>(i) * tile - offset;
         draw::Line(x, screenGroundY, x, screenGroundY + 46.0f, colors.groundEdge, 1.0f, 70);
     }
+    // 溶岩の裂け目
+    if (def_.theme == StageTheme::Volcano) {
+        for (int i = 0; i < 70; ++i) {
+            const float worldX = Hash01(i * 13 + 5) * def_.width;
+            const float x = worldX - viewLeft;
+            if (x < -60.0f || x > static_cast<float>(config::kScreenWidth) + 60.0f) continue;
+            const float w = 24.0f + Hash01(i * 13 + 6) * 60.0f;
+            const float glow = 0.55f + 0.45f * std::sin(time_ * 2.0f + static_cast<float>(i) * 0.9f);
+            const float y = screenGroundY + 10.0f + Hash01(i * 13 + 7) * 30.0f;
+            draw::Line(x, y, x + w, y, colors.accent, 3.0f, static_cast<int>(170.0f * glow));
+        }
+    }
+
     // 草／苔の表現
     if (def_.theme == StageTheme::Forest) {
         for (int i = 0; i < 80; ++i) {

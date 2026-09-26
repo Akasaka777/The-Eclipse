@@ -134,6 +134,25 @@ BossDatabase::BossDatabase()
                        BossAttackKind::JumpSlam, BossAttackKind::Shot };
         bosses_.push_back(b);
     }
+    {
+        // 竜王の火山のボス。全パターンを使う最上位個体。
+        BossDef b;
+        b.id = 5;
+        b.name = "ヴァルグリム・ザ・エンシェントドラゴン";
+        b.title = "竜王";
+        b.style = ArtStyle::Beast;
+        b.main = ColorRGB(94, 30, 26);
+        b.accent = ColorRGB(255, 200, 128);
+        b.trim = ColorRGB(255, 108, 40);
+        b.weapon = WeaponType::OneHandSword;
+        b.maxHp = 68000.0f; b.attack = 8600.0f; b.defense = 880.0f; b.moveSpeed = 245.0f;
+        b.halfWidth = 86.0f; b.height = 300.0f;
+        b.assetFolder = "valgrim";
+        b.expReward = 9200; b.colReward = 12000;
+        b.patterns = { BossAttackKind::Swipe, BossAttackKind::Charge, BossAttackKind::JumpSlam,
+                       BossAttackKind::Shot, BossAttackKind::Combo, BossAttackKind::Burst };
+        bosses_.push_back(b);
+    }
 }
 
 const BossDatabase& BossDatabase::Instance()
