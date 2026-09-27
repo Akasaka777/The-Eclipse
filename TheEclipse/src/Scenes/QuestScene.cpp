@@ -739,9 +739,10 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
 
     // ドロップ抽選
     if (quest_) {
-        // LUK でドロップ率が上がる
+        // LUK でドロップ率が上がる。初回クリアはボスドロップから必ず 1 つ落ちる。
         result.drops = QuestDatabase::Instance().RollDrops(
-            *quest_, cleared, enemiesDefeated_, context.player.DropRateMultiplier());
+            *quest_, cleared, enemiesDefeated_, context.player.DropRateMultiplier(),
+            result.firstClear);
     }
 
     result.expGained = exp;

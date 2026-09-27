@@ -43,7 +43,7 @@ struct QuestDef
     std::vector<DropEntry> floorDrops;  // 道中の抽選
     // 特別クエスト。クエスト選択タブには出さず、スキルツリーから挑む
     bool special = false;
-    // クエスト詳細にボスドロップを載せない（何が落ちるかは倒してからのお楽しみ）
+    // クエスト詳細にボスドロップの中身を載せず「不明」とだけ出す
     bool hideDrops = false;
 
     int FloorCount() const { return static_cast<int>(floors.size()); }
@@ -58,9 +58,11 @@ public:
     const QuestDef* Find(int id) const;
 
     // ドロップ抽選（クリア時はボスドロップを含む）
-    //   dropRate は LUK などによる倍率。1.0 で定義どおりの確率になる。
+    //   dropRate  : LUK などによる倍率。1.0 で定義どおりの確率になる。
+    //   firstClear: 初回クリアなら、ボスドロップの候補から必ず 1 つ落とす。
     std::vector<EquipmentItem> RollDrops(const QuestDef& quest, bool bossDefeated,
-                                         int enemiesDefeated, float dropRate = 1.0f) const;
+                                         int enemiesDefeated, float dropRate = 1.0f,
+                                         bool firstClear = false) const;
 
 private:
     QuestDatabase();

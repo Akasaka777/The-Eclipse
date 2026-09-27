@@ -62,7 +62,7 @@ struct DebugButtonDef
 };
 
 const DebugButtonDef kDebugButtons[] = {
-    { DebugAction::AddCol,        "col +10,000" },
+    { DebugAction::AddCol,        "col 追加 ▼" },
     { DebugAction::AddMaterial,   "素材 +50" },
     { DebugAction::AddSkillPoint, "SP +10" },
     { DebugAction::AddLevel,      "Lv +5" },
@@ -76,16 +76,20 @@ constexpr int   kDebugButtonCount = static_cast<int>(sizeof(kDebugButtons) / siz
 constexpr float kDebugButtonWidth = 220.0f;
 constexpr float kDebugButtonHeight = 44.0f;
 constexpr float kDebugButtonGap = 8.0f;
-constexpr int   kDebugColAmount = 10000;
 constexpr int   kDebugMaterialAmount = 50;
 constexpr int   kDebugSkillPointAmount = 10;
 constexpr int   kDebugLevelAmount = 5;
 // 装備を配るときの個体値
 constexpr int kDebugItemIv = 70;
 
-// プルダウンの位置（ユニーク解放ボタンの右隣に開く）
+// プルダウンの位置（押したボタンの右隣に開く）
 constexpr float kDebugMenuGap = 24.0f;
 constexpr float kDebugMenuWidth = 240.0f;
+
+// 「col 追加」のプルダウンで選べる量
+constexpr int kDebugColAmounts[] = { 10000, 100000, 1000000 };
+constexpr int kDebugColAmountCount =
+    static_cast<int>(sizeof(kDebugColAmounts) / sizeof(kDebugColAmounts[0]));
 
 // 全武器種の武器を所持品に追加する（片手剣は二刀流を試せるよう 2 本ずつ）
 int GrantAllWeapons(Inventory& inventory)
@@ -152,34 +156,45 @@ void HomeScene::BuildDebugButtons()
         debugButtons_.push_back(button);
     }
 
-    // --- 「ユニーク解放」のプルダウン -------------------------------------------
-    //   先頭が「全ユニークスキル解放」、以降は個別のユニークスキル。
-    //   ユニークスキルを追加すると自動でここに並ぶ。
+    // --- プルダウン -------------------------------------------------------------
+    //   押したボタンの右隣に開く。行を足すヘルパだけ共通にしておく。
+    auto buildMenu = [](std::vector<ui::Button>& out, const Rect& anchor,
+                        const std::vector<std::string>& labels, bool alignBottom) {
+        out.clear();
+        const float menuLeft = anchor.right + kDebugMenuGap;
+        const int rows = static_cast<int>(labels.size());
+        const float pitch = kDebugButtonHeight + kDebugButtonGap;
+        const float menuTop = alignBottom
+            ? anchor.bottom - pitch * static_cast<float>(rows) + kDebugButtonGap
+            : anchor.top;
+
+        for (int i = 0; i < rows; ++i) {
+            const Rect rect = Rect::FromXYWH(menuLeft, menuTop + pitch * static_cast<float>(i),
+                                             kDebugMenuWidth, kDebugButtonHeight);
+            ui::Button row(rect, labels[static_cast<size_t>(i)], FontSize::Small);
+            row.SetAccent(palette::kExp);
+            out.push_back(row);
+        }
+    };
+
+    // 「col 追加」: 10,000 / 100,000 / 1,000,000
+    debugColMenu_.clear();
+    if (!debugButtons_.empty()) {
+        std::vector<std::string> labels;
+        for (int i = 0; i < kDebugColAmountCount; ++i) {
+            labels.push_back(str::Format("col +%s", str::Comma(kDebugColAmounts[i]).c_str()));
+        }
+        buildMenu(debugColMenu_, debugButtons_.front().GetRect(), labels, false);
+    }
+
+    // 「ユニーク解放」: 個別のユニークスキル（追加すると自動で並ぶ）
     debugUniqueMenu_.clear();
     if (!debugButtons_.empty()) {
-        const Rect anchor = debugButtons_.back().GetRect();
-        const float menuLeft = anchor.right + kDebugMenuGap;
-        const int rows = 1 + static_cast<int>(UniqueSkillDatabase::Instance().All().size());
-        const float menuTop = anchor.bottom
-                            - (kDebugButtonHeight + kDebugButtonGap) * static_cast<float>(rows)
-                            + kDebugButtonGap;
-
-        auto addRow = [&](int index, const std::string& label) {
-            const Rect rect = Rect::FromXYWH(menuLeft,
-                                             menuTop + (kDebugButtonHeight + kDebugButtonGap)
-                                                           * static_cast<float>(index),
-                                             kDebugMenuWidth, kDebugButtonHeight);
-            ui::Button row(rect, label, FontSize::Small);
-            row.SetAccent(palette::kExp);
-            debugUniqueMenu_.push_back(row);
-        };
-
-        addRow(0, "全ユニークスキル解放");
-        int index = 1;
+        std::vector<std::string> labels;
         for (const UniqueSkillDef& def : UniqueSkillDatabase::Instance().All()) {
-            addRow(index, def.name);
-            ++index;
+            labels.push_back(def.name);
         }
+        buildMenu(debugUniqueMenu_, debugButtons_.back().GetRect(), labels, true);
     }
 }
 
@@ -190,32 +205,40 @@ void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& co
 
     Inventory& inventory = context.player.GetInventory();
 
+    // --- 「col 追加」のプルダウン -------------------------------------------------
+    if (debugMenuOpen_ == DebugMenu::Col) {
+        for (int i = 0; i < static_cast<int>(debugColMenu_.size()); ++i) {
+            if (!debugColMenu_[static_cast<size_t>(i)].Update(input, dt)) continue;
+            if (i >= kDebugColAmountCount) continue;
+
+            const int amount = kDebugColAmounts[i];
+            inventory.AddCol(amount);
+            debugMessage_ = str::Format("col を %s 追加しました", str::Comma(amount).c_str());
+            debugMessageTimer_ = 2.8f;
+            debugMenuOpen_ = DebugMenu::None;
+            return;
+        }
+        if (input.MouseClicked(MouseButton::Left)) debugMenuOpen_ = DebugMenu::None;
+    }
+
     // --- 「ユニーク解放」のプルダウン -------------------------------------------
-    if (debugUniqueMenuOpen_) {
+    if (debugMenuOpen_ == DebugMenu::Unique) {
+        const std::vector<UniqueSkillDef>& all = UniqueSkillDatabase::Instance().All();
         for (int i = 0; i < static_cast<int>(debugUniqueMenu_.size()); ++i) {
             if (!debugUniqueMenu_[static_cast<size_t>(i)].Update(input, dt)) continue;
 
-            if (i == 0) {
-                context.player.DebugUnlockAllUniqueSkills();
-                debugMessage_ = str::Format("全ユニークスキルを解放しました（習得 : %s）",
-                                            UniqueSkillName(context.player.UniqueSkill()));
-            } else {
-                const std::vector<UniqueSkillDef>& all = UniqueSkillDatabase::Instance().All();
-                const size_t index = static_cast<size_t>(i - 1);
-                if (index < all.size()) {
-                    context.player.DebugAcquireUniqueSkill(all[index].type);
-                    player_.RefreshEquipment(context.player);
-                    debugMessage_ = str::Format("ユニークスキル「%s」を習得しました",
-                                                all[index].name.c_str());
-                }
+            const size_t index = static_cast<size_t>(i);
+            if (index < all.size()) {
+                context.player.DebugAcquireUniqueSkill(all[index].type);
+                player_.RefreshEquipment(context.player);
+                debugMessage_ = str::Format("ユニークスキル「%s」を習得しました",
+                                            all[index].name.c_str());
             }
             debugMessageTimer_ = 2.8f;
-            debugUniqueMenuOpen_ = false;
+            debugMenuOpen_ = DebugMenu::None;
             return;
         }
-
-        // プルダウンの外をクリックしたら閉じる
-        if (input.MouseClicked(MouseButton::Left)) debugUniqueMenuOpen_ = false;
+        if (input.MouseClicked(MouseButton::Left)) debugMenuOpen_ = DebugMenu::None;
     }
 
     for (int i = 0; i < static_cast<int>(debugButtons_.size()); ++i) {
@@ -223,10 +246,9 @@ void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& co
 
         switch (kDebugButtons[i].action) {
         case DebugAction::AddCol:
-            inventory.AddCol(kDebugColAmount);
-            debugMessage_ = str::Format("col を %s 追加しました",
-                                        str::Comma(kDebugColAmount).c_str());
-            break;
+            // プルダウンを開いて追加する量を選ばせる
+            debugMenuOpen_ = (debugMenuOpen_ == DebugMenu::Col) ? DebugMenu::None : DebugMenu::Col;
+            return;
         case DebugAction::AddMaterial:
             inventory.AddMaterial(kDebugMaterialAmount);
             debugMessage_ = str::Format("強化素材を %d 追加しました", kDebugMaterialAmount);
@@ -259,7 +281,8 @@ void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& co
             break;
         case DebugAction::UnlockUnique:
             // プルダウンを開いて解放するユニークスキルを選ばせる
-            debugUniqueMenuOpen_ = !debugUniqueMenuOpen_;
+            debugMenuOpen_ =
+                (debugMenuOpen_ == DebugMenu::Unique) ? DebugMenu::None : DebugMenu::Unique;
             return;
         }
         debugMessageTimer_ = 2.8f;
@@ -281,18 +304,21 @@ void HomeScene::DrawDebugPanel(const GameContext& context) const
 
     for (const ui::Button& button : debugButtons_) button.Draw();
 
-    // --- 「ユニーク解放」のプルダウン -------------------------------------------
-    if (debugUniqueMenuOpen_ && !debugUniqueMenu_.empty()) {
-        const Rect firstRow = debugUniqueMenu_.front().GetRect();
-        const Rect lastRow = debugUniqueMenu_.back().GetRect();
+    // --- プルダウン ---------------------------------------------------------------
+    auto drawMenu = [](const std::vector<ui::Button>& rows, const char* title) {
+        if (rows.empty()) return;
+        const Rect firstRow = rows.front().GetRect();
+        const Rect lastRow = rows.back().GetRect();
         const Rect menu(firstRow.left - 8.0f, firstRow.top - 30.0f, firstRow.right + 8.0f,
                         lastRow.bottom + 8.0f);
         draw::ChamferRect(menu, 10.0f, palette::kPanel, 235);
         draw::StrokeRect(menu, palette::kExp, 2.0f, 220);
-        draw::Text(FontSize::Tiny, menu.left + 12.0f, menu.top + 8.0f, palette::kExp,
-                   "解放するユニークスキル");
-        for (const ui::Button& row : debugUniqueMenu_) row.Draw();
-    }
+        draw::Text(FontSize::Tiny, menu.left + 12.0f, menu.top + 8.0f, palette::kExp, title);
+        for (const ui::Button& row : rows) row.Draw();
+    };
+
+    if (debugMenuOpen_ == DebugMenu::Col) drawMenu(debugColMenu_, "追加する col");
+    if (debugMenuOpen_ == DebugMenu::Unique) drawMenu(debugUniqueMenu_, "解放するユニークスキル");
 
     // 通知はパネルの上に出す（プルダウンと重ならないように）
     if (debugMessageTimer_ > 0.0f) {
@@ -442,8 +468,11 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
         for (const ui::Button& button : debugButtons_) {
             if (button.GetRect().Expanded(12.0f).Contains(mouseX, mouseY)) overDebugPanel = true;
         }
-        if (debugUniqueMenuOpen_) {
-            for (const ui::Button& row : debugUniqueMenu_) {
+        const std::vector<ui::Button>* openMenu = nullptr;
+        if (debugMenuOpen_ == DebugMenu::Col) openMenu = &debugColMenu_;
+        else if (debugMenuOpen_ == DebugMenu::Unique) openMenu = &debugUniqueMenu_;
+        if (openMenu) {
+            for (const ui::Button& row : *openMenu) {
                 if (row.GetRect().Expanded(12.0f).Contains(mouseX, mouseY)) overDebugPanel = true;
             }
         }

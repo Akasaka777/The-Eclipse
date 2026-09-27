@@ -105,12 +105,6 @@ void QuestPanel::Draw(const GameContext& context) const
         draw::Text(FontSize::Medium, rect.left + 20.0f, rect.top + 12.0f, palette::kText, quest.name);
         draw::Text(FontSize::Tiny, rect.left + 22.0f, rect.top + 50.0f, palette::kTextDim, quest.subtitle);
 
-        // 難易度（★）
-        std::string stars;
-        for (int s = 0; s < quest.difficulty; ++s) stars += "★";
-        draw::Text(FontSize::Small, rect.right - 20.0f, rect.top + 14.0f, palette::kAccentWarm, stars,
-                   draw::TextAlign::Right);
-
         draw::Text(FontSize::Small, rect.left + 20.0f, rect.bottom - 34.0f, palette::kTextDim,
                    str::Format("推奨戦力 %s ／ %dフロア",
                                str::Comma(quest.recommendedPower).c_str(), quest.FloorCount()));
@@ -170,17 +164,18 @@ void QuestPanel::Draw(const GameContext& context) const
     }
 
     // --- 主なドロップ --------------------------------------------------------
-    //   hideDrops が立っているクエストは、何が落ちるかを伏せる
-    if (quest->hideDrops) {
-        startButton_.Draw();
-        closeButton_.Draw();
-        return;
-    }
-
     draw::Line(detail.left + 24.0f, y, detail.right - 24.0f, y, palette::kBorder, 1.0f, 120);
     y += 16.0f;
     draw::Text(FontSize::Normal, detail.left + 24.0f, y, palette::kAccent, "主なボスドロップ");
     y += 40.0f;
+
+    // 中身を伏せるクエストは「不明」とだけ出す
+    if (quest->hideDrops) {
+        draw::Text(FontSize::Small, detail.left + 32.0f, y + 5.0f, palette::kTextDisabled, "不明");
+        startButton_.Draw();
+        closeButton_.Draw();
+        return;
+    }
 
     const ItemDatabase& items = ItemDatabase::Instance();
     int shown = 0;

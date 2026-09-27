@@ -186,13 +186,6 @@ void EquipPanel::DrawSlotColumn(const GameContext& context) const
             draw::Text(FontSize::Small, rect.left + 64.0f, rect.top + 28.0f, reasonColor, reason);
         }
     }
-
-    // スキルはスキルツリータブで設定する
-    if (!slotButtons_.empty()) {
-        const Rect last = slotButtons_.back().GetRect();
-        draw::Text(FontSize::Tiny, last.left, last.bottom + 18.0f, palette::kTextDim,
-                   "ソードスキルは「スキル」タブで装備します");
-    }
 }
 
 void EquipPanel::DrawItemList(const GameContext& context) const

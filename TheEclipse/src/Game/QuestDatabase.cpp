@@ -396,7 +396,8 @@ int QuestDatabase::RollIv(const DropEntry& entry, int difficulty) const
 }
 
 std::vector<EquipmentItem> QuestDatabase::RollDrops(const QuestDef& quest, bool bossDefeated,
-                                                    int enemiesDefeated, float dropRate) const
+                                                    int enemiesDefeated, float dropRate,
+                                                    bool firstClear) const
 {
     std::vector<EquipmentItem> drops;
     const ItemDatabase& items = ItemDatabase::Instance();
@@ -425,7 +426,15 @@ std::vector<EquipmentItem> QuestDatabase::RollDrops(const QuestDef& quest, bool 
     //   特別クエスト（ユニークスキル用のセット武器）はセットで渡したいので、
     //   この部位抽選を通さず今までどおり全候補を引く。
     if (bossDefeated && !quest.bossDrops.empty()) {
-        if (quest.special) {
+        if (firstClear && !quest.special) {
+            // 初回クリアだけは、主なボスドロップの中から必ず 1 つ落とす。
+            //   部位抽選は通さない（どの部位が来るかも含めてランダム）。
+            const DropEntry& entry =
+                quest.bossDrops[static_cast<size_t>(
+                    math::RandInt(0, static_cast<int>(quest.bossDrops.size()) - 1))];
+            EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
+            if (item.IsValid()) drops.push_back(item);
+        } else if (quest.special) {
             bool gotAny = false;
             for (const DropEntry& entry : quest.bossDrops) {
                 if (!roll(entry.chance)) continue;

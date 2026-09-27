@@ -32,6 +32,16 @@ enum class HomeTab
     Settings   // 設定
 };
 
+//------------------------------------------------------------------------------
+// 開発者モードのプルダウン（同時に開くのは 1 つだけ）
+//------------------------------------------------------------------------------
+enum class DebugMenu
+{
+    None,
+    Col,     // 追加する col の量を選ぶ
+    Unique   // 解放するユニークスキルを選ぶ
+};
+
 class HomeScene : public Scene
 {
 public:
@@ -63,9 +73,10 @@ private:
 
     std::vector<ui::Button> tabButtons_;
     std::vector<ui::Button> debugButtons_;
-    // 「ユニーク解放」のプルダウン
+    // プルダウン（開いているのは常に 1 つだけ）
+    std::vector<ui::Button> debugColMenu_;
     std::vector<ui::Button> debugUniqueMenu_;
-    bool debugUniqueMenuOpen_ = false;
+    DebugMenu debugMenuOpen_ = DebugMenu::None;
     HomeTab activeTab_ = HomeTab::None;
 
     ui::PlayerPanel   playerPanel_;
