@@ -210,21 +210,26 @@ EquipmentItem ItemDatabase::CreateRandomAny(int iv, int maxTier) const
     return Create(candidates[static_cast<size_t>(index)], iv);
 }
 
-std::vector<EquipmentItem> ItemDatabase::CreateStarterSet() const
+int StarterWeaponId(WeaponType type)
 {
-    // 初期装備の個体値（低めに固定して、ドロップで更新していく想定）
-    constexpr int kStarterIv = 20;
+    switch (type) {
+    case WeaponType::OneHandSword: return 100; // アイアンソード
+    case WeaponType::OneHandMace:  return 110; // アイアンメイス
+    case WeaponType::Dagger:       return 120; // ショートダガー
+    case WeaponType::Rapier:       return 130; // フルーレ
+    case WeaponType::Spear:        return 140; // アイアンランス
+    default:                       return 100;
+    }
+}
 
+std::vector<EquipmentItem> ItemDatabase::CreateStarterSet(WeaponType weapon) const
+{
     std::vector<EquipmentItem> items;
-    items.push_back(Create(100, kStarterIv)); // アイアンソード
+    // 選んだ武器種の武器だけを配る（選ばなかった武器種は手に入らない）
+    items.push_back(Create(StarterWeaponId(weapon), kStarterIv));
     items.push_back(Create(200, kStarterIv)); // レザーキャップ
     items.push_back(Create(210, kStarterIv)); // レザーアーマー
     items.push_back(Create(220, kStarterIv)); // ラウンドシールド
-    // 他の武器種も試せるように 1 本ずつ配布
-    items.push_back(Create(110, kStarterIv));
-    items.push_back(Create(120, kStarterIv));
-    items.push_back(Create(130, kStarterIv));
-    items.push_back(Create(140, kStarterIv));
     return items;
 }
 

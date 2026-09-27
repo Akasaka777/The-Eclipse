@@ -19,7 +19,8 @@ public:
     PlayerData();
 
     // 初期装備とスキルを設定する
-    void SetupNewGame();
+    // 新規プレイの初期化（選んだ武器種の武器だけを配る）
+    void SetupNewGame(WeaponType weapon = WeaponType::OneHandSword);
 
     const std::string& Name() const { return name_; }
     // プレイヤー名を設定する（空文字や長すぎる名前は調整される）

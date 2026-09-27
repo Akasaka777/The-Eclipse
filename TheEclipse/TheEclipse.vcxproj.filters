@@ -148,6 +148,9 @@
     <ClCompile Include="src\UI\UIWidgets.cpp">
       <Filter></Filter>
     </ClCompile>
+    <ClCompile Include="src\UI\WeaponSelectPanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
     <ClCompile Include="src\main.cpp">
       <Filter></Filter>
     </ClCompile>
@@ -304,6 +307,9 @@
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\UI\UIWidgets.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\WeaponSelectPanel.h">
       <Filter></Filter>
     </ClInclude>
   </ItemGroup>

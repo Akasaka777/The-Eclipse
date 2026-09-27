@@ -11,6 +11,7 @@
 #include "Graphics/DrawUtil.h"
 
 #include <cmath>
+#include <string>
 
 namespace ecl {
 
@@ -32,13 +33,14 @@ void TitleScene::OnEnter(GameContext& context)
     time_ = 0.0f;
     exitRequested_ = false;
 
-    // セーブデータがあれば読み込み、無ければ初期装備を配る
+    // セーブデータがあれば読み込む
     if (!loadAttempted_) {
         loadAttempted_ = true;
         if (SaveSystem::Exists() && SaveSystem::Load(context)) {
             hasSaveData_ = true;
         } else if (context.player.GetInventory().Items().empty()) {
-            context.player.SetupNewGame();
+            // 初回は名前と武器種を訊いてから初期装備を配る
+            starterPending_ = true;
         }
 
         // セーブデータが無い初回だけ、プレイヤー名を訊く
@@ -59,7 +61,24 @@ void TitleScene::Update(float dt, GameContext& context, SceneManager& manager)
     // --- 初回の名前入力 --------------------------------------------------------
     if (namePanel_.IsOpen()) {
         namePanel_.Update(dt, input);
-        if (namePanel_.Confirmed()) context.player.SetName(namePanel_.Result());
+        if (namePanel_.Confirmed()) {
+            context.player.SetName(namePanel_.Result());
+            // 名前を決めたら、続けて使う武器種を選んでもらう
+            if (starterPending_) weaponPanel_.Open();
+        }
+        return;
+    }
+
+    // --- 初回の武器種選択 ------------------------------------------------------
+    if (weaponPanel_.IsOpen()) {
+        weaponPanel_.Update(dt, input);
+        if (weaponPanel_.Confirmed()) {
+            chosenWeapon_ = weaponPanel_.Result();
+            // 選んだ武器種の武器だけを配る
+            context.player.SetupNewGame(chosenWeapon_);
+            starterPending_ = false;
+            weaponChosen_ = true;
+        }
         return;
     }
 
@@ -115,8 +134,11 @@ void TitleScene::Draw(GameContext& context)
                                context.player.Name().c_str(), context.player.Level()),
                    draw::TextAlign::Center);
     } else if (nameAsked_ && !namePanel_.IsOpen()) {
-        draw::Text(FontSize::Small, kScreenW * 0.5f, 660.0f, palette::kAccent,
-                   str::Format("ようこそ、%s さん", context.player.Name().c_str()),
+        const std::string welcome = weaponChosen_
+            ? str::Format("ようこそ、%s さん（%s 使い）", context.player.Name().c_str(),
+                          WeaponTypeName(chosenWeapon_))
+            : str::Format("ようこそ、%s さん", context.player.Name().c_str());
+        draw::Text(FontSize::Small, kScreenW * 0.5f, 660.0f, palette::kAccent, welcome,
                    draw::TextAlign::Center);
     }
     draw::Text(FontSize::Tiny, kScreenW * 0.5f, kScreenH - 60.0f, palette::kTextDim,
@@ -125,8 +147,9 @@ void TitleScene::Draw(GameContext& context)
     draw::Text(FontSize::Tiny, kScreenW - 24.0f, kScreenH - 32.0f, palette::kTextDisabled,
                "DxLib / C++17", draw::TextAlign::Right);
 
-    // 名前入力は最前面に重ねる
+    // 名前入力・武器種選択は最前面に重ねる
     namePanel_.Draw();
+    weaponPanel_.Draw();
 }
 
 } // namespace ecl

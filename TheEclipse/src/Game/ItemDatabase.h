@@ -27,6 +27,14 @@ constexpr int kDragonBootsId  = 252;  // 足
 // 竜王のセットか
 bool IsDragonSetItem(int templateId);
 
+//------------------------------------------------------------------------------
+// 初期装備
+//------------------------------------------------------------------------------
+// 初期装備の個体値（低めに固定して、ドロップで更新していく想定）
+constexpr int kStarterIv = 20;
+// 武器種ごとの初期武器のテンプレート ID
+int StarterWeaponId(WeaponType type);
+
 struct ItemTemplate
 {
     int         id = 0;
@@ -57,8 +65,8 @@ public:
     // 完全ランダム
     EquipmentItem CreateRandomAny(int iv, int maxTier = 3) const;
 
-    // 初期装備一式
-    std::vector<EquipmentItem> CreateStarterSet() const;
+    // 初期装備一式（選んだ武器種の武器 1 本と防具。他の武器種は配らない）
+    std::vector<EquipmentItem> CreateStarterSet(WeaponType weapon) const;
 
 private:
     ItemDatabase();

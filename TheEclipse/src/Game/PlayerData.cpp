@@ -19,10 +19,10 @@ int ExpTableFor(int level)
 
 PlayerData::PlayerData() = default;
 
-void PlayerData::SetupNewGame()
+void PlayerData::SetupNewGame(WeaponType weapon)
 {
     const ItemDatabase& database = ItemDatabase::Instance();
-    inventory_.AddItems(database.CreateStarterSet());
+    inventory_.AddItems(database.CreateStarterSet(weapon));
 
     // 先頭の武器・防具を初期装備にする
     for (const EquipmentItem& item : inventory_.Items()) {
