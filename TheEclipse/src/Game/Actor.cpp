@@ -169,7 +169,9 @@ void Actor::DrawBody(const Camera& camera, int alpha) const
     }
     if (bodyAlpha <= 0) return;
 
-    const float phase = alive ? animator.Phase() : DeathPhase();
+    // 攻撃モーション中は状態タイマ由来の進行度を使う（1 振りを必ず振り切る）
+    float phase = alive ? animator.Phase() : DeathPhase();
+    if (alive && motionPhase >= 0.0f) phase = math::Clamp(motionPhase, 0.0f, 1.0f);
 
     // 奥にいるほどわずかに暗くして距離感を出す
     ActorArt shaded = art;
@@ -178,7 +180,8 @@ void Actor::DrawBody(const Camera& camera, int alpha) const
     shaded.main = shaded.main.Scaled(shade);
     shaded.accent = shaded.accent.Scaled(shade);
 
-    DrawActor(screen, facing, pose, phase, shaded, &animator, bodyAlpha, flashTimer / 0.18f);
+    DrawActor(screen, facing, pose, phase, shaded, &animator, bodyAlpha, flashTimer / 0.18f,
+              motionVariant);
 }
 
 } // namespace ecl

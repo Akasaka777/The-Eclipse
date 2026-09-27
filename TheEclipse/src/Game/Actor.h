@@ -39,6 +39,10 @@ public:
     ActorArt art;
     Animator animator;
     PoseKind pose = PoseKind::Idle;
+    // 攻撃モーションの進行度（0〜1）。負値ならアニメータの位相を使う
+    float motionPhase = -1.0f;
+    // モーションの派生（通常攻撃の段数 / スキルの演出種別）
+    int   motionVariant = 0;
 
     // --- 状態タイマ ---------------------------------------------------------
     float hurtTimer = 0.0f;

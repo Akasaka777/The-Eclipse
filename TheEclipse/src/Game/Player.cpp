@@ -2,6 +2,7 @@
 
 #include "Common/MathUtil.h"
 #include "Game/ActorAssets.h"
+#include "Game/WeaponMotion.h"
 #include "Core/GameConfig.h"
 #include "Graphics/DrawUtil.h"
 
@@ -10,24 +11,6 @@
 namespace ecl {
 
 namespace {
-
-// 通常攻撃 1 段分の定義
-struct ComboStep
-{
-    float duration;
-    float hitTime;
-    float damageMultiplier;
-    float reach;
-    float knockback;
-    float forwardImpulse;
-    int   effectStyle;
-};
-
-const ComboStep kCombo[3] = {
-    { 0.34f, 0.11f, 1.00f, 1.30f, 140.0f, 180.0f, 0 },
-    { 0.36f, 0.12f, 1.15f, 1.35f, 160.0f, 200.0f, 1 },
-    { 0.54f, 0.17f, 1.85f, 1.55f, 380.0f, 260.0f, 0 },
-};
 
 // パリィ
 constexpr float kParryWindow = 0.18f;    // 受け流しの受付時間
@@ -380,7 +363,7 @@ void Player::StartAttack(CombatSystem& combat)
     attackBuffered_ = false;
     guarding_ = false;
 
-    const ComboStep& step = kCombo[math::ClampInt(comboIndex_, 0, 2)];
+    const ComboStep& step = WeaponComboStep(weapon_, comboIndex_);
     attackDuration_ = step.duration / attackSpeedFactor_;
     animator.Play(PoseKind::Attack, true);
 }
@@ -390,7 +373,7 @@ void Player::UpdateAttack(float dt, CombatSystem& combat, const Input& input)
     (void)input;
     attackTimer_ += dt;
 
-    const ComboStep& step = kCombo[math::ClampInt(comboIndex_, 0, 2)];
+    const ComboStep& step = WeaponComboStep(weapon_, comboIndex_);
     const float hitTime = step.hitTime / attackSpeedFactor_;
 
     // 前進しながら斬る
@@ -407,7 +390,7 @@ void Player::UpdateAttack(float dt, CombatSystem& combat, const Input& input)
 
     if (attackTimer_ >= attackDuration_) {
         comboResetTimer_ = kComboWindow;
-        comboIndex_ = (comboIndex_ + 1) % 3;
+        comboIndex_ = (comboIndex_ + 1) % math::MaxI(1, WeaponComboLength(weapon_));
         if (attackBuffered_) {
             StartAttack(combat);
         } else {
@@ -418,13 +401,13 @@ void Player::UpdateAttack(float dt, CombatSystem& combat, const Input& input)
 
 void Player::SpawnComboHitBox(CombatSystem& combat)
 {
-    const ComboStep& step = kCombo[math::ClampInt(comboIndex_, 0, 2)];
+    const ComboStep& step = WeaponComboStep(weapon_, comboIndex_);
     const float reach = halfWidth * 2.0f * step.reach * WeaponReachScale(weapon_);
     const float centerX = pos.x + static_cast<float>(facing) * (halfWidth + reach * 0.5f);
-    const float centerY = pos.y - height * 0.55f;
+    const float centerY = pos.y - height * (0.55f + step.offsetY);
 
     HitBox hitBox;
-    hitBox.area = Rect::FromCenter(centerX, centerY, reach, height * 0.9f);
+    hitBox.area = Rect::FromCenter(centerX, centerY, reach, height * step.height);
     hitBox.team = Team::Player;
     hitBox.sourceId = id;
     hitBox.attack = stats.attack;
@@ -433,8 +416,9 @@ void Player::SpawnComboHitBox(CombatSystem& combat)
     hitBox.critDamage = stats.critDamage;
     hitBox.knockback = step.knockback;
     hitBox.z = z;
-    hitBox.zRange = config::kHitDepthRange;
-    hitBox.hitStop = (comboIndex_ == 2) ? 0.07f : 0.035f;
+    // 薙ぎ払いや回転は奥行き方向にも広く、突きは細く当たる
+    hitBox.zRange = config::kHitDepthRange * step.depthScale;
+    hitBox.hitStop = step.hitStop;
     hitBox.life = 0.09f;
     hitBox.color = art.trim;
     combat.AddHitBox(hitBox);
@@ -520,10 +504,26 @@ void Player::UpdateDash(float dt)
 
 void Player::UpdatePose()
 {
+    // 攻撃中はモーションの進行度を自分で持つ（1 振りを必ず振り切る）
+    motionPhase = -1.0f;
+    motionVariant = 0;
+
     switch (state_) {
-    case PlayerState::Dead:   pose = PoseKind::Dead; return;
-    case PlayerState::Attack: pose = PoseKind::Attack; return;
-    case PlayerState::Skill:  pose = PoseKind::Skill; return;
+    case PlayerState::Dead:
+        pose = PoseKind::Dead;
+        return;
+    case PlayerState::Attack:
+        pose = PoseKind::Attack;
+        motionPhase = (attackDuration_ > 0.0f) ? attackTimer_ / attackDuration_ : 0.0f;
+        motionVariant = comboIndex_;
+        return;
+    case PlayerState::Skill:
+        pose = PoseKind::Skill;
+        if (currentSkill_ && currentSkill_->duration > 0.0f) {
+            motionPhase = skillTimer_ / currentSkill_->duration;
+            motionVariant = currentSkill_->effectStyle;
+        }
+        return;
     case PlayerState::Dash:   pose = PoseKind::Dash; return;
     case PlayerState::Hurt:   pose = PoseKind::Hurt; return;
     default: break;

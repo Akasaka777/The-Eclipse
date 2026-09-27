@@ -222,6 +222,7 @@
     <ClCompile Include="src\Game\Stats.cpp" />
     <ClCompile Include="src\Game\SwordSkill.cpp" />
     <ClCompile Include="src\Game\UniqueSkill.cpp" />
+    <ClCompile Include="src\Game\WeaponMotion.cpp" />
     <ClCompile Include="src\Graphics\Animation.cpp" />
     <ClCompile Include="src\Graphics\CharacterArt.cpp" />
     <ClCompile Include="src\Graphics\DrawUtil.cpp" />
@@ -274,6 +275,7 @@
     <ClInclude Include="src\Game\Stats.h" />
     <ClInclude Include="src\Game\SwordSkill.h" />
     <ClInclude Include="src\Game\UniqueSkill.h" />
+    <ClInclude Include="src\Game\WeaponMotion.h" />
     <ClInclude Include="src\Game\WeaponType.h" />
     <ClInclude Include="src\Graphics\Animation.h" />
     <ClInclude Include="src\Graphics\CharacterArt.h" />

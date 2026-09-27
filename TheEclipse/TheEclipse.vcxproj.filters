@@ -91,6 +91,9 @@
     <ClCompile Include="src\Game\UniqueSkill.cpp">
       <Filter></Filter>
     </ClCompile>
+    <ClCompile Include="src\Game\WeaponMotion.cpp">
+      <Filter></Filter>
+    </ClCompile>
     <ClCompile Include="src\Graphics\Animation.cpp">
       <Filter></Filter>
     </ClCompile>
@@ -241,6 +244,9 @@
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\Game\UniqueSkill.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\WeaponMotion.h">
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\Game\WeaponType.h">

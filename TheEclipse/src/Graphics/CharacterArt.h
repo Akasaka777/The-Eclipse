@@ -42,9 +42,10 @@ struct ActorArt
 
 // 画面座標の矩形に収めてキャラクターを描画する
 //   animator が有効なスプライトを持つ場合はそちらを優先
+//   motionVariant : 通常攻撃の段数 / スキルの演出種別（武器モーションの選択に使う）
 void DrawActor(const Rect& screenRect, int facing, PoseKind pose, float phase,
                const ActorArt& art, const Animator* animator = nullptr,
-               int alpha = 255, float flash = 0.0f);
+               int alpha = 255, float flash = 0.0f, int motionVariant = 0);
 
 // 武器単体の描画（手の位置と角度を指定）
 void DrawWeapon(const Vec2& handPos, float angleRad, int facing, float length,

@@ -3,6 +3,7 @@
 #include "Common/MathUtil.h"
 #include "Core/DxInclude.h"
 #include "Core/GameConfig.h"
+#include "Game/WeaponMotion.h"
 #include "Graphics/DrawUtil.h"
 
 #include <cmath>
@@ -25,58 +26,48 @@ Vec2 Rotate(const Vec2& origin, float length, float angle)
     return Vec2(origin.x + std::cos(angle) * length, origin.y + std::sin(angle) * length);
 }
 
-// ポーズから腕（武器）の角度を求める : 0 = 正面水平
-float WeaponAngle(PoseKind pose, float phase, int facing)
+// 待機・移動系のポーズにおける武器の角度 : 0 = 正面水平 / 90 = 真下
+//   攻撃・スキルの振り方は WeaponMotion 側（武器種ごとの定義）に任せる
+float RestingWeaponDeg(PoseKind pose, float phase)
 {
-    float deg = 0.0f;
     switch (pose) {
-    case PoseKind::Idle:   deg = 70.0f + std::sin(phase * kTwoPi) * 4.0f; break;
-    case PoseKind::Walk:   deg = 65.0f + std::sin(phase * kTwoPi) * 12.0f; break;
-    case PoseKind::Run:    deg = 55.0f + std::sin(phase * kTwoPi) * 18.0f; break;
-    case PoseKind::Jump:   deg = 35.0f; break;
-    case PoseKind::Fall:   deg = 50.0f; break;
-    case PoseKind::Dash:   deg = 95.0f; break;
-    case PoseKind::Guard:  deg = 80.0f; break;
-    case PoseKind::Hurt:   deg = 110.0f; break;
-    case PoseKind::Dead:   deg = 95.0f; break;
-    case PoseKind::Attack: {
-        // 振りかぶり → 斬り下ろし
-        const float t = math::Clamp(phase, 0.0f, 1.0f);
-        if (t < 0.3f) {
-            deg = math::Lerp(70.0f, -120.0f, t / 0.3f);
-        } else if (t < 0.55f) {
-            deg = math::Lerp(-120.0f, 25.0f, (t - 0.3f) / 0.25f);
-        } else {
-            deg = math::Lerp(25.0f, 70.0f, (t - 0.55f) / 0.45f);
-        }
-        break;
+    case PoseKind::Idle:  return 70.0f + std::sin(phase * kTwoPi) * 4.0f;
+    case PoseKind::Walk:  return 65.0f + std::sin(phase * kTwoPi) * 12.0f;
+    case PoseKind::Run:   return 55.0f + std::sin(phase * kTwoPi) * 18.0f;
+    case PoseKind::Jump:  return 35.0f;
+    case PoseKind::Fall:  return 50.0f;
+    case PoseKind::Dash:  return 95.0f;
+    case PoseKind::Guard: return 80.0f;
+    case PoseKind::Hurt:  return 110.0f;
+    case PoseKind::Dead:  return 95.0f;
+    default:              return 70.0f;
     }
-    case PoseKind::Skill: {
-        const float t = math::Clamp(phase, 0.0f, 1.0f);
-        if (t < 0.25f) {
-            deg = math::Lerp(70.0f, -140.0f, t / 0.25f);
-        } else if (t < 0.45f) {
-            deg = math::Lerp(-140.0f, 10.0f, (t - 0.25f) / 0.2f);
-        } else if (t < 0.7f) {
-            deg = math::Lerp(10.0f, -60.0f, (t - 0.45f) / 0.25f);
-        } else {
-            deg = math::Lerp(-60.0f, 70.0f, (t - 0.7f) / 0.3f);
-        }
-        break;
-    }
-    default: deg = 70.0f; break;
-    }
+}
 
-    // facing = -1 のときは左右反転
+// 角度をラジアンへ（facing = -1 なら左右反転する）
+float ToWeaponAngle(float deg, int facing)
+{
     const float rad = math::DegToRad(deg);
     return (facing >= 0) ? rad : (math::DegToRad(180.0f) - rad);
+}
+
+// ポーズに対応する武器モーションを取り出す
+WeaponSwing SampleSwing(PoseKind pose, float phase, const ActorArt& art, int variant)
+{
+    if (pose == PoseKind::Attack) return SampleComboSwing(art.weapon, variant, phase);
+    if (pose == PoseKind::Skill) return SampleSkillSwing(art.weapon, variant, phase);
+
+    WeaponSwing swing;
+    swing.angleDeg = RestingWeaponDeg(pose, phase);
+    return swing;
 }
 
 //------------------------------------------------------------------------------
 // 人型（プレイヤー / 騎士 / 小型）の代替描画
 //------------------------------------------------------------------------------
 void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
-                  const ActorArt& art, int alpha, const ColorRGB& main, const ColorRGB& accent)
+                  const ActorArt& art, int alpha, const ColorRGB& main, const ColorRGB& accent,
+                  int variant)
 {
     const float w = rect.Width();
     const float h = rect.Height();
@@ -121,18 +112,20 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
         lean = -dir * h * 0.12f;
         crouch = h * 0.04f;
         break;
-    case PoseKind::Attack:
-        lean = dir * h * (0.04f + math::Clamp(phase - 0.3f, 0.0f, 0.3f) * 0.4f);
-        crouch = h * 0.03f;
-        break;
-    case PoseKind::Skill:
-        lean = dir * h * (0.06f + math::Clamp(phase - 0.25f, 0.0f, 0.35f) * 0.5f);
-        crouch = h * 0.05f;
-        break;
     case PoseKind::Dead:
         break;
     default:
         break;
+    }
+
+    // --- 武器モーション（攻撃・スキルは武器種ごとの定義で上書きする）-----------
+    const bool swinging = (pose == PoseKind::Attack || pose == PoseKind::Skill);
+    const WeaponSwing swing = SampleSwing(pose, phase, art, variant);
+    if (swinging) {
+        lean = dir * h * swing.lean;
+        crouch = h * swing.crouch;
+        // 踏み込みに合わせて足を開く
+        legSwing = dir * h * swing.lean * 0.9f;
     }
 
     // --- 死亡時は横たわった表現 ---------------------------------------------
@@ -199,14 +192,36 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
     // --- 腕と武器 -----------------------------------------------------------
     const Vec2 shoulder(cx + dir * torsoW * 0.35f + lean * 0.7f, shoulderY + h * 0.05f);
     const float armLen = h * 0.20f;
-    const float angle = WeaponAngle(pose, phase, facing);
+    const float angle = ToWeaponAngle(swing.angleDeg, facing);
+    const float armTwist = math::DegToRad(dir > 0.0f ? 20.0f : -20.0f);
+    // 突き技は肩から手までまとめて前へ送り出す
+    const Vec2 handOffset(dir * h * swing.reachOut, -h * swing.liftUp);
+
     // 腕は武器角度に追従（下向きを 90 度とする座標系に合わせる）
-    const float armAngle = angle - math::DegToRad(dir > 0.0f ? 20.0f : -20.0f);
-    const Vec2 hand = Rotate(shoulder, armLen, armAngle);
+    Vec2 hand = Rotate(shoulder, armLen, angle - armTwist);
+    hand.x += handOffset.x;
+    hand.y += handOffset.y;
     Limb(shoulder, hand, h * 0.045f, main.Scaled(1.1f), alpha);
 
     if (art.hasWeapon) {
         const float weaponLen = h * 0.46f * WeaponReachScale(art.weapon);
+
+        // 振っている最中は少し前のコマを薄く重ねて軌跡にする
+        if (swinging) {
+            for (int i = 1; i <= 2; ++i) {
+                const float back = 0.035f * static_cast<float>(i);
+                if (phase - back <= 0.0f) break;
+                const WeaponSwing past = SampleSwing(pose, phase - back, art, variant);
+                const float pastAngle = ToWeaponAngle(past.angleDeg, facing);
+                Vec2 pastHand = Rotate(shoulder, armLen, pastAngle - armTwist);
+                pastHand.x += dir * h * past.reachOut;
+                pastHand.y -= h * past.liftUp;
+                const int trail = math::ClampInt(alpha / (2 + i * 2), 0, 255);
+                DrawWeapon(pastHand, pastAngle, facing, weaponLen, art.weapon,
+                           art.trim, art.trim, trail);
+            }
+        }
+
         DrawWeapon(hand, angle, facing, weaponLen, art.weapon, accent, art.trim, alpha);
 
         // スキル発動中は軌跡を光らせる
@@ -218,10 +233,12 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
         // --- 二刀流：逆手にもう一振り --------------------------------------
         if (art.hasOffHandWeapon) {
             const Vec2 offShoulder(cx - dir * torsoW * 0.35f + lean * 0.5f, shoulderY + h * 0.06f);
-            // 主武器と逆位相で振る
-            const float offAngle = angle + math::DegToRad(dir > 0.0f ? 48.0f : -48.0f);
-            const Vec2 offHand = Rotate(offShoulder, armLen * 0.95f,
-                                        offAngle - math::DegToRad(dir > 0.0f ? 20.0f : -20.0f));
+            // 主武器とずらして振る（ずらし方はモーションごとに決まっている）
+            const float offAngle = angle + math::DegToRad(dir > 0.0f ? swing.offHandDeg
+                                                                    : -swing.offHandDeg);
+            Vec2 offHand = Rotate(offShoulder, armLen * 0.95f, offAngle - armTwist);
+            offHand.x += handOffset.x * 0.8f;
+            offHand.y += handOffset.y * 0.8f;
             Limb(offShoulder, offHand, h * 0.042f, main, alpha);
             DrawWeapon(offHand, offAngle, facing, weaponLen * 0.95f, art.weapon,
                        accent.Scaled(0.9f), art.trim, alpha);
@@ -503,7 +520,8 @@ void DrawActorShadow(float centerX, float groundY, float width, int alpha)
 }
 
 void DrawActor(const Rect& screenRect, int facing, PoseKind pose, float phase,
-               const ActorArt& art, const Animator* animator, int alpha, float flash)
+               const ActorArt& art, const Animator* animator, int alpha, float flash,
+               int motionVariant)
 {
     // --- スプライトがあればそちらを使う ---------------------------------------
     if (animator != nullptr && animator->HasArt()) {
@@ -555,7 +573,7 @@ void DrawActor(const Rect& screenRect, int facing, PoseKind pose, float phase,
     case ArtStyle::Knight:
     case ArtStyle::Imp:
     default:
-        DrawHumanoid(screenRect, facing, pose, phase, art, alpha, main, accent);
+        DrawHumanoid(screenRect, facing, pose, phase, art, alpha, main, accent, motionVariant);
         break;
     }
 }

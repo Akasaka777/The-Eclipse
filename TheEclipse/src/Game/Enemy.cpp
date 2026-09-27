@@ -18,6 +18,8 @@ constexpr float kBodyGap = 30.0f;
 constexpr float kApproachStopRate = 0.92f;
 // プレイヤーの体の半分（Player::Setup の halfWidth と合わせる）
 constexpr float kPlayerHalfWidth = 30.0f;
+// 判定を出してから振り切るまでの時間
+constexpr float kAttackActive = 0.12f;
 } // namespace
 
 void Enemy::Setup(const EnemyDef& def, const Vec2& position, float powerScale)
@@ -203,7 +205,7 @@ void Enemy::Update(float dt, const Stage& stage, CombatSystem& combat,
     }
     case EnemyState::Attack: {
         velocity.x *= 0.9f;
-        if (stateTimer_ >= 0.12f) {
+        if (stateTimer_ >= kAttackActive) {
             state_ = EnemyState::Recover;
             stateTimer_ = 0.0f;
         }
@@ -301,10 +303,22 @@ void Enemy::SpawnAttack(CombatSystem& combat)
 
 void Enemy::UpdatePose()
 {
+    // 攻撃モーションの進行度（予備動作で 0 → kStrikePhase、判定後に振り切る）
+    constexpr float kStrikePhase = 0.36f;
+    motionPhase = -1.0f;
+    motionVariant = 0;
+
     switch (state_) {
     case EnemyState::Windup:
+        pose = PoseKind::Attack;
+        if (def_ && def_->attackWindup > 0.0f) {
+            motionPhase = kStrikePhase * math::Clamp(stateTimer_ / def_->attackWindup, 0.0f, 1.0f);
+        }
+        break;
     case EnemyState::Attack:
         pose = PoseKind::Attack;
+        motionPhase = kStrikePhase
+                    + (1.0f - kStrikePhase) * math::Clamp(stateTimer_ / kAttackActive, 0.0f, 1.0f);
         break;
     case EnemyState::Hurt:
         pose = PoseKind::Hurt;

@@ -2,6 +2,7 @@
 
 #include "Common/MathUtil.h"
 #include "Game/ActorAssets.h"
+#include "Game/WeaponMotion.h"
 #include "Core/GameConfig.h"
 #include "Graphics/DrawUtil.h"
 
@@ -609,10 +610,26 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
 
 void Boss::UpdatePose()
 {
+    // 攻撃モーションの進行度（予備動作で 0 → kStrikePhase、そこから振り切る）
+    constexpr float kStrikePhase = 0.36f;
+    motionPhase = -1.0f;
+    // 技ごとに違う振り方になるようモーションを割り当てる
+    motionVariant = static_cast<int>(currentKind_)
+                  % math::MaxI(1, WeaponComboLength(art.weapon));
+
     switch (state_) {
     case BossState::Windup:
+        pose = PoseKind::Attack;
+        if (windupTime_ > 0.0f) {
+            motionPhase = kStrikePhase * math::Clamp(stateTimer_ / windupTime_, 0.0f, 1.0f);
+        }
+        break;
     case BossState::Attack:
         pose = PoseKind::Attack;
+        if (attackTime_ > 0.0f) {
+            motionPhase = kStrikePhase
+                        + (1.0f - kStrikePhase) * math::Clamp(stateTimer_ / attackTime_, 0.0f, 1.0f);
+        }
         break;
     case BossState::PhaseShift:
         pose = PoseKind::Guard;
