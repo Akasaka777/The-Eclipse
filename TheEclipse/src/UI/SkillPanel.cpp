@@ -153,6 +153,10 @@ bool SkillPanel::CanEquipSelected(const GameContext& context, std::string& outRe
         outReason = "まだ解放していません";
         return false;
     }
+    if (!player.HasWeaponEquipped()) {
+        outReason = "武器を装備すると使えます（素手では振れません）";
+        return false;
+    }
     if (!player.MatchesCurrentSkillSet(*skill)) {
         if (skill->IsUnique()) {
             // ユニークスキルは独立した系統。発動条件を満たす装備が要る

@@ -136,6 +136,9 @@
     <ClCompile Include="src\UI\SettingsPanel.cpp">
       <Filter></Filter>
     </ClCompile>
+    <ClCompile Include="src\UI\ShopPanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
     <ClCompile Include="src\UI\SkillPanel.cpp">
       <Filter></Filter>
     </ClCompile>
@@ -295,6 +298,9 @@
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\UI\SettingsPanel.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\ShopPanel.h">
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\UI\SkillPanel.h">

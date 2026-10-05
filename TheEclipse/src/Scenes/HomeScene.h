@@ -13,6 +13,7 @@
 #include "UI/QuestPanel.h"
 #include "UI/SettingsPanel.h"
 #include "UI/UIWidgets.h"
+#include "UI/ShopPanel.h"
 #include "UI/SmithPanel.h"
 
 #include <string>
@@ -28,6 +29,7 @@ enum class HomeTab
     None,
     Player,    // プレイヤー（ステータス / 装備 / アイテム / スキル）
     Quest,     // クエスト選択
+    Shop,      // ショップ（武器 / 装備 / アイテム / アクセサリー）
     Smith,     // 鍛冶屋（強化・修理）
     Settings   // 設定
 };
@@ -58,6 +60,8 @@ private:
     bool AnyPanelOpen() const;
 
     void DrawField(const GameContext& context);
+    // プレイヤーより手前に描く背景物（案内看板など）
+    void DrawFieldForeground(const GameContext& context);
     void DrawPlayerSummary(const GameContext& context) const;
     void DrawTabBar(const GameContext& context) const;
     void DrawFieldGuide(const GameContext& context) const;
@@ -81,6 +85,7 @@ private:
 
     ui::PlayerPanel   playerPanel_;
     ui::QuestPanel    questPanel_;
+    ui::ShopPanel     shopPanel_;
     ui::SmithPanel    smithPanel_;
     ui::SettingsPanel settingsPanel_;
 

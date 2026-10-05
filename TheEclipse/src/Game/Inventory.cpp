@@ -184,18 +184,36 @@ Stats Inventory::StatsFromSlots(const int equipped[static_cast<int>(EquipSlot::C
     return total;
 }
 
+StatRates Inventory::RatesFromSlots(const int equipped[static_cast<int>(EquipSlot::Count)]) const
+{
+    StatRates total;
+    for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {
+        if (equipped[i] == 0) continue;
+        const EquipmentItem* item = FindByUid(equipped[i]);
+        if (!item) continue;
+        // 倍率バフはアクセサリーだけが持つ（個体値や強化では変わらない）
+        total += item->rates;
+    }
+    return total;
+}
+
 Stats Inventory::EquippedStats() const
 {
     return StatsFromSlots(equippedUid_);
 }
 
-Stats Inventory::PreviewStats(int uid, EquipSlot slot) const
+StatRates Inventory::EquippedRates() const
 {
-    int preview[static_cast<int>(EquipSlot::Count)];
-    for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) preview[i] = equippedUid_[i];
+    return RatesFromSlots(equippedUid_);
+}
+
+void Inventory::BuildPreviewSlots(int uid, EquipSlot slot,
+                                  int out[static_cast<int>(EquipSlot::Count)]) const
+{
+    for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) out[i] = equippedUid_[i];
 
     const EquipmentItem* item = FindByUid(uid);
-    if (!item || !CanEquipTo(uid, slot)) return StatsFromSlots(preview);
+    if (!item || !CanEquipTo(uid, slot)) return;
 
     if (IsWeaponSlot(slot)) {
         const EquipSlot other = OppositeWeaponSlot(slot);
@@ -204,17 +222,30 @@ Stats Inventory::PreviewStats(int uid, EquipSlot slot) const
                             && item->weaponType == WeaponType::OneHandSword
                             && (!otherItem || otherItem->weaponType == WeaponType::OneHandSword);
         if (!canPairUp || (otherItem && otherItem->uid == uid)) {
-            preview[static_cast<int>(other)] = 0;
+            out[static_cast<int>(other)] = 0;
         }
     }
-    preview[static_cast<int>(slot)] = uid;
+    out[static_cast<int>(slot)] = uid;
 
     // 両手持ちになるなら盾は外れる
-    if (preview[static_cast<int>(EquipSlot::WeaponRight)] != 0
-        && preview[static_cast<int>(EquipSlot::WeaponLeft)] != 0) {
-        preview[static_cast<int>(EquipSlot::Shield)] = 0;
+    if (out[static_cast<int>(EquipSlot::WeaponRight)] != 0
+        && out[static_cast<int>(EquipSlot::WeaponLeft)] != 0) {
+        out[static_cast<int>(EquipSlot::Shield)] = 0;
     }
+}
+
+Stats Inventory::PreviewStats(int uid, EquipSlot slot) const
+{
+    int preview[static_cast<int>(EquipSlot::Count)];
+    BuildPreviewSlots(uid, slot, preview);
     return StatsFromSlots(preview);
+}
+
+StatRates Inventory::PreviewRates(int uid, EquipSlot slot) const
+{
+    int preview[static_cast<int>(EquipSlot::Count)];
+    BuildPreviewSlots(uid, slot, preview);
+    return RatesFromSlots(preview);
 }
 
 WeaponType Inventory::CurrentWeaponType() const
@@ -223,6 +254,12 @@ WeaponType Inventory::CurrentWeaponType() const
     if (!weapon) weapon = Equipped(EquipSlot::WeaponLeft);
     if (!weapon) return WeaponType::OneHandSword;
     return weapon->weaponType;
+}
+
+bool Inventory::HasWeaponEquipped() const
+{
+    return Equipped(EquipSlot::WeaponRight) != nullptr
+        || Equipped(EquipSlot::WeaponLeft) != nullptr;
 }
 
 ActorArt Inventory::BuildAppearance() const
@@ -347,6 +384,8 @@ void Inventory::ApplyArmorWear(float amount)
     for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {
         const EquipSlot slot = static_cast<EquipSlot>(i);
         if (IsWeaponSlot(slot)) continue;   // 武器は攻撃時に摩耗する
+        // アクセサリーは摩耗しない（身につけるだけの装飾品）
+        if (slot == EquipSlot::Accessory) continue;
         ApplyWear(slot, amount);
     }
 }

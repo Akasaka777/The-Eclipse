@@ -34,6 +34,7 @@ struct TabDef
 const TabDef kTabs[] = {
     { HomeTab::Player,   "プレイヤー" },
     { HomeTab::Quest,    "クエスト" },
+    { HomeTab::Shop,     "ショップ" },
     { HomeTab::Smith,    "鍛冶屋" },
     { HomeTab::Settings, "設定" },
 };
@@ -112,6 +113,8 @@ int GrantAllArmors(Inventory& inventory)
     int added = 0;
     for (const ItemTemplate& tmpl : ItemDatabase::Instance().Templates()) {
         if (IsWeaponSlot(tmpl.slot)) continue;
+        // アクセサリーは防具ではないので配らない（ショップで買って試す）
+        if (tmpl.slot == EquipSlot::Accessory) continue;
         inventory.AddItem(ItemDatabase::Instance().Create(tmpl.id, kDebugItemIv));
         ++added;
     }
@@ -370,7 +373,7 @@ void HomeScene::OnEnter(GameContext& context)
 
 bool HomeScene::AnyPanelOpen() const
 {
-    return playerPanel_.IsOpen() || questPanel_.IsOpen()
+    return playerPanel_.IsOpen() || questPanel_.IsOpen() || shopPanel_.IsOpen()
         || smithPanel_.IsOpen() || settingsPanel_.IsOpen();
 }
 
@@ -378,6 +381,7 @@ void HomeScene::CloseAllTabs()
 {
     playerPanel_.Close();
     questPanel_.Close();
+    shopPanel_.Close();
     smithPanel_.Close();
     settingsPanel_.Close();
     activeTab_ = HomeTab::None;
@@ -391,6 +395,7 @@ void HomeScene::OpenTab(HomeTab tab, GameContext& context)
     switch (tab) {
     case HomeTab::Player:   playerPanel_.Open(context); break;
     case HomeTab::Quest:    questPanel_.Open(context); break;
+    case HomeTab::Shop:     shopPanel_.Open(); break;
     case HomeTab::Smith:    smithPanel_.Open(); break;
     case HomeTab::Settings: settingsPanel_.Open(context.settings); break;
     default: break;
@@ -423,6 +428,14 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
             activeTab_ = HomeTab::None;
         }
         if (questPanel_.CloseRequested()) activeTab_ = HomeTab::None;
+    } else if (shopPanel_.IsOpen()) {
+        shopPanel_.Update(dt, input, context);
+        if (shopPanel_.Purchased()) {
+            // 買った装備を見た目と能力へ反映できるように作り直す
+            player_.Setup(context.player);
+            player_.FullHeal();
+        }
+        if (shopPanel_.CloseRequested()) activeTab_ = HomeTab::None;
     } else if (smithPanel_.IsOpen()) {
         smithPanel_.Update(dt, input, context);
         player_.Setup(context.player);
@@ -450,6 +463,7 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
         for (int i = 0; i < 4 && i < kTabCount; ++i) {
             if (input.Pressed(keys[i])) OpenTab(kTabs[i].tab, context);
         }
+        // 5 つ目（設定）は ESC で開く。1〜4 はタブの並び順に対応する。
         if (input.Pressed(GameAction::Menu)) OpenTab(HomeTab::Settings, context);
     }
 
@@ -510,6 +524,7 @@ void HomeScene::Draw(GameContext& context)
     combat_.DrawBehindActors(camera_);
     player_.Draw(camera_);
     combat_.DrawFrontOfActors(camera_, context.settings.showDamageNumbers);
+    DrawFieldForeground(context);
 
     DrawFieldGuide(context);
     DrawPlayerSummary(context);
@@ -521,6 +536,7 @@ void HomeScene::Draw(GameContext& context)
         ui::DrawDimOverlay(160);
         playerPanel_.Draw(context);
         questPanel_.Draw(context);
+        shopPanel_.Draw(context);
         smithPanel_.Draw(context);
         settingsPanel_.Draw();
     }
@@ -557,21 +573,28 @@ void HomeScene::DrawField(const GameContext& context)
                    "近づくとクエスト選択", draw::TextAlign::Center);
     }
 
-    // 案内看板
+}
+
+void HomeScene::DrawFieldForeground(const GameContext& context)
+{
+    (void)context;
+
+    // 案内看板はプレイヤーより手前に立っている（player_.Draw の後に描く）
     const Rect board = Rect::FromCenter(700.0f, stage_.GroundY() - 120.0f, 240.0f, 150.0f);
-    if (camera_.IsVisible(board, 200.0f)) {
-        const Rect screen = camera_.WorldToScreen(board);
-        draw::FillRect(screen, ColorRGB(58, 46, 38), 255);
-        draw::StrokeRect(screen, ColorRGB(120, 96, 70), 3.0f, 255);
-        draw::Text(FontSize::Small, screen.CenterX(), screen.top + 16.0f, palette::kText,
-                   "THE ECLIPSE", draw::TextAlign::Center);
-        draw::Text(FontSize::Tiny, screen.CenterX(), screen.top + 54.0f, palette::kTextDim,
-                   "拠点", draw::TextAlign::Center);
-        draw::Text(FontSize::Tiny, screen.CenterX(), screen.top + 84.0f, palette::kTextDim,
-                   "→ 東へ", draw::TextAlign::Center);
-        draw::Line(screen.CenterX() - 8.0f, screen.bottom, screen.CenterX() - 8.0f, screen.bottom + 60.0f,
-                   ColorRGB(90, 72, 54), 8.0f, 255);
-    }
+    if (!camera_.IsVisible(board, 200.0f)) return;
+
+    const Rect screen = camera_.WorldToScreen(board);
+    // 支柱を先に描いて、板で根元を隠す
+    draw::Line(screen.CenterX() - 8.0f, screen.bottom, screen.CenterX() - 8.0f, screen.bottom + 60.0f,
+               ColorRGB(90, 72, 54), 8.0f, 255);
+    draw::FillRect(screen, ColorRGB(58, 46, 38), 255);
+    draw::StrokeRect(screen, ColorRGB(120, 96, 70), 3.0f, 255);
+    draw::Text(FontSize::Small, screen.CenterX(), screen.top + 16.0f, palette::kText,
+               "THE ECLIPSE", draw::TextAlign::Center);
+    draw::Text(FontSize::Tiny, screen.CenterX(), screen.top + 54.0f, palette::kTextDim,
+               "拠点", draw::TextAlign::Center);
+    draw::Text(FontSize::Tiny, screen.CenterX(), screen.top + 84.0f, palette::kTextDim,
+               "→ 東へ", draw::TextAlign::Center);
 }
 
 void HomeScene::DrawFieldGuide(const GameContext& context) const

@@ -56,13 +56,20 @@ public:
     const Inventory& GetInventory() const { return inventory_; }
 
     WeaponType CurrentWeaponType() const { return inventory_.CurrentWeaponType(); }
+    // 武器を持っているか（素手ではソードスキルを使えない）
+    bool HasWeaponEquipped() const { return inventory_.HasWeaponEquipped(); }
 
     // --- スキル構成 ----------------------------------------------------------
     // 武器種に合わせてロードアウトを組み直す（未解放スキルは外れる）
+    //   空いた枠を自動で埋めることはしない。
     void RefreshSkillLoadout();
     // 装備変更後に呼ぶ。使えるスキルの系統（武器種／ユニーク）が変わった場合は
-    // スロットを一度空にしてから、新しい武器用のスキルを入れ直す。
+    // スロットを初期スキルだけの状態に戻す。
     void RefreshSkillLoadoutForEquipment();
+    // 今の系統の初期スキル（通常は武器種の起点スキル。無ければ 0）
+    int  StarterSkillForCurrentSet() const;
+    // スロットを初期スキルだけの状態に戻す
+    void ResetSkillLoadoutToStarter();
     const SwordSkill* SkillAt(int slotIndex) const;
     // スロットへ装備（未解放・武器種違いは失敗）
     bool SetSkillAt(int slotIndex, int skillId);

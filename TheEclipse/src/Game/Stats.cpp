@@ -52,6 +52,11 @@ Stats& Stats::operator+=(const Stats& o)
     mpRegen += o.mpRegen;
     moveSpeed += o.moveSpeed;
     attackSpeed += o.attackSpeed;
+    magicAttack += o.magicAttack;
+    magicDefense += o.magicDefense;
+    accuracy += o.accuracy;
+    fireResist += o.fireResist;
+    waterResist += o.waterResist;
     return *this;
 }
 
@@ -74,6 +79,39 @@ Stats Stats::Scaled(float factor) const
     result.mpRegen = mpRegen * factor;
     result.moveSpeed = moveSpeed * factor;
     result.attackSpeed = attackSpeed * factor;
+    // 魔法・属性・命中はアクセサリー専用の固定値。個体値では揺らがせない
+    result.magicAttack = magicAttack;
+    result.magicDefense = magicDefense;
+    result.accuracy = accuracy;
+    result.fireResist = fireResist;
+    result.waterResist = waterResist;
+    return result;
+}
+
+StatRates& StatRates::operator+=(const StatRates& o)
+{
+    maxHp += o.maxHp;
+    maxMp += o.maxMp;
+    attack += o.attack;
+    defense += o.defense;
+    moveSpeed += o.moveSpeed;
+    return *this;
+}
+
+bool StatRates::Empty() const
+{
+    return maxHp == 0.0f && maxMp == 0.0f && attack == 0.0f
+        && defense == 0.0f && moveSpeed == 0.0f;
+}
+
+Stats ApplyRates(const Stats& base, const StatRates& rates)
+{
+    Stats result = base;
+    result.maxHp *= 1.0f + rates.maxHp;
+    result.maxMp *= 1.0f + rates.maxMp;
+    result.attack *= 1.0f + rates.attack;
+    result.defense *= 1.0f + rates.defense;
+    result.moveSpeed *= 1.0f + rates.moveSpeed;
     return result;
 }
 

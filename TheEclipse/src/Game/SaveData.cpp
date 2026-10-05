@@ -28,7 +28,8 @@ namespace {
 // セーブ形式のバージョン（構造を変えたら上げる）
 // v3: 武器スロットを左右に分割し、ユニークスキルを追加
 // v8: 振り分けステータス（STR / AGI / VIT / INT / LUK）と MP 回復量の見直し
-constexpr int kSaveVersion = 8;
+// v9: アクセサリースロットとショップを追加（アクセサリーは定義から作り直す）
+constexpr int kSaveVersion = 9;
 
 std::string g_lastError;
 
@@ -294,6 +295,17 @@ bool SaveSystem::Load(GameContext& context)
             item.flavor = tmpl->flavor;
             item.slot = tmpl->slot;
             item.weaponType = tmpl->weaponType;
+
+            // アクセサリーは個体値も強化も摩耗も無いので、定義からそのまま作り直す。
+            // uid だけは装備スロットの参照に使うのでセーブした値を引き継ぐ。
+            if (tmpl->slot == EquipSlot::Accessory) {
+                const int savedUid = item.uid;
+                item = ItemDatabase::Instance().Create(templateId, kAccessoryIv);
+                item.uid = savedUid;
+                inventory.AddItem(item);
+                continue;
+            }
+
             // v4 以前はここがレアリティ（0〜4）だったので、個体値へ読み替える
             const int ivField = ToInt(arg(3));
             item.iv = (version > 0 && version < 5) ? ClampIv(ivField * 20 + 10)

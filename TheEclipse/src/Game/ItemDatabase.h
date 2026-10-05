@@ -32,6 +32,8 @@ bool IsDragonSetItem(int templateId);
 //------------------------------------------------------------------------------
 // 初期装備の個体値（低めに固定して、ドロップで更新していく想定）
 constexpr int kStarterIv = 20;
+// アクセサリーの個体値（効果は固定なので表示用の固定値）
+constexpr int kAccessoryIv = 50;
 // 武器種ごとの初期武器のテンプレート ID
 int StarterWeaponId(WeaponType type);
 
@@ -48,6 +50,22 @@ struct ItemTemplate
     bool        special = false;
     // 耐久力が 0 になっても消滅しない（代わりに性能が大きく落ちる）
     bool        indestructible = false;
+
+    // --- ショップ -------------------------------------------------------------
+    // 0 より大きいとショップに並ぶ（購入価格）
+    int         price = 0;
+
+    // --- アクセサリー ---------------------------------------------------------
+    AccessoryKind accessory = AccessoryKind::None;
+    // 倍率で効くバフ（0.05 = +5%）。個体値では変わらない固定値
+    StatRates   rates = StatRates();
+    // 「攻撃力 +5%」のような効果の説明（ショップと装備メニューに出す）
+    const char* effect = "";
+    // 戦闘開始時に攻撃力が上がる（旅人の護符）
+    float       openingAttackRate = 0.0f;
+    float       openingDuration = 0.0f;
+
+    bool        InShop() const { return price > 0; }
 };
 
 class ItemDatabase
@@ -67,6 +85,14 @@ public:
 
     // 初期装備一式（選んだ武器種の武器 1 本と防具。他の武器種は配らない）
     std::vector<EquipmentItem> CreateStarterSet(WeaponType weapon) const;
+
+    // --- ショップ -------------------------------------------------------------
+    // ショップに並ぶ品（price 順ではなく定義順）
+    std::vector<const ItemTemplate*> ShopItems() const;
+    // 指定スロットのショップの品（武器は WeaponRight でまとめて取れる）
+    std::vector<const ItemTemplate*> ShopItemsForSlot(EquipSlot slot) const;
+    // 防具（頭・体・盾・腕・手・足）のショップの品
+    std::vector<const ItemTemplate*> ShopArmors() const;
 
 private:
     ItemDatabase();

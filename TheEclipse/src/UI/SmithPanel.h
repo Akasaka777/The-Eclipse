@@ -45,9 +45,10 @@ private:
     Button repairButton_;
     Button repairAllButton_;
     Button sellButton_;
+    // 「表示 : すべて / 装備中のみ」をクリックで切り替える
     Button filterButton_;
-    // 装備の種類で絞り込むタブ
-    std::vector<Button> categoryButtons_;
+    // 「種類 : すべて → 武器 → 頭装備 → …」をクリックで切り替える
+    Button categoryButton_;
     // 使う強化結晶の個数を選ぶ
     Button crystalMinusButton_;
     Button crystalPlusButton_;

@@ -261,10 +261,12 @@ void EquipPanel::DrawComparison(const GameContext& context) const
     Stats next = current;
     const EquipmentItem* selected = inventory.FindByUid(selectedUid_);
     if (selected && inventory.CanEquipTo(selectedUid_, selectedSlot_)) {
-        // 比較にもステータス振り分けを反映する
-        next = ApplyAbilities(context.player.BaseStats()
-                                  + inventory.PreviewStats(selectedUid_, selectedSlot_),
-                              context.player.Abilities());
+        // 比較にもアクセサリーの倍率バフとステータス振り分けを反映する
+        next = ApplyAbilities(
+            ApplyRates(context.player.BaseStats()
+                           + inventory.PreviewStats(selectedUid_, selectedSlot_),
+                       inventory.PreviewRates(selectedUid_, selectedSlot_)),
+            context.player.Abilities());
     }
 
     float y = preview.bottom + 22.0f;
@@ -288,12 +290,19 @@ void EquipPanel::DrawComparison(const GameContext& context) const
         draw::Text(FontSize::Small, detail.left + 24.0f, y, palette::kAccent,
                    selected->DisplayName());
         y += 26.0f;
-        draw::Text(FontSize::Tiny, detail.left + 24.0f, y, palette::kTextDim,
-                   context.settings.debugMode
-                       ? str::Format("個体値 %d ／ 強化上限 +%d ／ 耐久力 最大 %d", selected->iv,
-                                     selected->MaxUpgrade(), selected->MaxDurabilityDisplay())
-                       : str::Format("強化上限 +%d ／ 耐久力 最大 %d",
-                                     selected->MaxUpgrade(), selected->MaxDurabilityDisplay()));
+        if (selected->IsAccessory()) {
+            // アクセサリーは強化も摩耗もしない。種別と効果を出す
+            draw::Text(FontSize::Tiny, detail.left + 24.0f, y, palette::kAccentWarm,
+                       str::Format("%s ／ %s", AccessoryKindName(selected->accessory),
+                                   selected->effect.c_str()));
+        } else {
+            draw::Text(FontSize::Tiny, detail.left + 24.0f, y, palette::kTextDim,
+                       context.settings.debugMode
+                           ? str::Format("個体値 %d ／ 強化上限 +%d ／ 耐久力 最大 %d", selected->iv,
+                                         selected->MaxUpgrade(), selected->MaxDurabilityDisplay())
+                           : str::Format("強化上限 +%d ／ 耐久力 最大 %d",
+                                         selected->MaxUpgrade(), selected->MaxDurabilityDisplay()));
+        }
         y += 22.0f;
         draw::Text(FontSize::Tiny, detail.left + 24.0f, y, palette::kTextDim, selected->flavor);
     }

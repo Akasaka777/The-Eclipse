@@ -1,6 +1,7 @@
 #include "Game/Player.h"
 
 #include "Common/MathUtil.h"
+#include "Common/StringUtil.h"
 #include "Game/ActorAssets.h"
 #include "Game/WeaponMotion.h"
 #include "Core/GameConfig.h"
@@ -44,6 +45,10 @@ void Player::Setup(const PlayerData& data)
 {
     ApplyEquipment(data);
 
+    // 戦闘開始時バフ（旅人の護符）はここで発動する。
+    // 戦闘中の装備変更（RefreshEquipment）では掛け直さない。
+    openingTimer_ = openingDuration_;
+
     hp = maxHp;
     mp_ = maxMp_;
 
@@ -81,6 +86,18 @@ void Player::ApplyEquipment(const PlayerData& data)
     maxMp_ = math::MaxF(1.0f, stats.maxMp);
 
     weapon_ = data.CurrentWeaponType();
+    // 素手ではソードスキルを使えない
+    hasWeapon_ = data.HasWeaponEquipped();
+
+    // アクセサリーの戦闘開始時バフ（旅人の護符）
+    openingAttackRate_ = 0.0f;
+    openingDuration_ = 0.0f;
+    if (const EquipmentItem* charm = data.GetInventory().Equipped(EquipSlot::Accessory)) {
+        openingAttackRate_ = charm->openingAttackRate;
+        openingDuration_ = charm->openingDuration;
+    }
+    // 装備を外したらバフも切れる
+    if (openingDuration_ <= 0.0f) openingTimer_ = 0.0f;
     // ユニークスキル「神聖剣」は盾を持っている間だけガードが完全無効化になる
     perfectGuard_ = data.HasPerfectGuard();
 
@@ -130,6 +147,12 @@ float Player::MpRatio() const
     return math::Clamp(mp_ / maxMp_, 0.0f, 1.0f);
 }
 
+float Player::AttackPower() const
+{
+    const float bonus = (openingTimer_ > 0.0f) ? openingAttackRate_ : 0.0f;
+    return stats.attack * (1.0f + bonus);
+}
+
 const SwordSkill* Player::Skill(int index) const
 {
     if (index < 0 || index >= 4) return nullptr;
@@ -151,6 +174,8 @@ float Player::SkillCooldownRatio(int index) const
 
 bool Player::CanUseSkill(int index) const
 {
+    // 素手ではソードスキルを振れない（武器を装備していることが前提）
+    if (!hasWeapon_) return false;
     // 装備されていないスロット（ユニークスキルで減った枠を含む）は使用できない
     const SwordSkill* skill = Skill(index);
     if (!skill || !alive) return false;
@@ -233,6 +258,7 @@ void Player::Update(float dt, const Stage& stage, CombatSystem& combat,
     if (comboResetTimer_ <= 0.0f && state_ != PlayerState::Attack) comboIndex_ = 0;
 
     dashCooldown_ = math::MaxF(0.0f, dashCooldown_ - dt);
+    openingTimer_ = math::MaxF(0.0f, openingTimer_ - dt);
     parryWindow_ = math::MaxF(0.0f, parryWindow_ - dt);
     parryCooldown_ = math::MaxF(0.0f, parryCooldown_ - dt);
     parryFlash_ = math::MaxF(0.0f, parryFlash_ - dt);
@@ -410,7 +436,7 @@ void Player::SpawnComboHitBox(CombatSystem& combat)
     hitBox.area = Rect::FromCenter(centerX, centerY, reach, height * step.height);
     hitBox.team = Team::Player;
     hitBox.sourceId = id;
-    hitBox.attack = stats.attack;
+    hitBox.attack = AttackPower();
     hitBox.damageMultiplier = step.damageMultiplier;
     hitBox.critRate = stats.critRate;
     hitBox.critDamage = stats.critDamage;
@@ -464,7 +490,7 @@ void Player::SpawnSkillStrike(const SkillStrike& strike, CombatSystem& combat)
     hitBox.area = Rect::FromCenter(centerX, centerY, reach, height * strike.height);
     hitBox.team = Team::Player;
     hitBox.sourceId = id;
-    hitBox.attack = stats.attack;
+    hitBox.attack = AttackPower();
     hitBox.damageMultiplier = strike.damageMultiplier;
     hitBox.critRate = stats.critRate;
     hitBox.critDamage = stats.critDamage;
@@ -634,6 +660,14 @@ void Player::Draw(const Camera& camera) const
 {
     DrawBody(camera);
     if (!alive) return;
+
+    // 戦闘開始時バフ（旅人の護符）が効いている間は頭上に出す
+    if (openingTimer_ > 0.0f) {
+        const Vec2 above = camera.WorldToScreen(Vec2(pos.x, pos.y - height - 28.0f));
+        draw::Text(FontSize::Tiny, above.x, above.y, palette::kAccentWarm,
+                   str::Format("ATK +%.0f%%  %.0fs", openingAttackRate_ * 100.0f, openingTimer_),
+                   draw::TextAlign::Center);
+    }
 
     const Vec2 guardPos = camera.WorldToScreen(Vec2(pos.x + static_cast<float>(facing) * 40.0f,
                                                     pos.y - height * 0.55f));

@@ -218,6 +218,11 @@ void BattleHud::DrawSkillBar(const Player& player, const PlayerData& data) const
             draw::FillRect(cover, palette::kBlack, 165);
             draw::Text(FontSize::Medium, rect.CenterX(), rect.CenterY() - 18.0f, palette::kText,
                        str::Format("%.1f", player.SkillCooldown(i)), draw::TextAlign::Center);
+        } else if (!player.HasWeapon()) {
+            // 素手ではソードスキルを振れない
+            draw::FillRect(rect.Expanded(-4.0f), palette::kBlack, 130);
+            draw::Text(FontSize::Small, rect.CenterX(), rect.CenterY() - 10.0f, palette::kDanger,
+                       "素手", draw::TextAlign::Center);
         } else if (player.Mp() < skill->mpCost) {
             // MP 不足
             draw::FillRect(rect.Expanded(-4.0f), palette::kBlack, 120);

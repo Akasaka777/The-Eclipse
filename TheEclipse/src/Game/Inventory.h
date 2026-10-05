@@ -78,9 +78,15 @@ public:
     bool IsEquipped(int uid) const;
     // 装備中の合計ステータス（左手の武器は控えめに加算する）
     Stats EquippedStats() const;
+    // 装備中のアクセサリーの倍率バフ（攻撃力 +5% など）
+    StatRates EquippedRates() const;
     // 指定アイテムを指定スロットに装備した場合のステータス（比較表示用）
     Stats PreviewStats(int uid, EquipSlot slot) const;
+    // 指定アイテムを指定スロットに装備した場合の倍率バフ（比較表示用）
+    StatRates PreviewRates(int uid, EquipSlot slot) const;
     WeaponType CurrentWeaponType() const;
+    // どちらかの手に武器を持っているか（素手ならソードスキルを使えない）
+    bool HasWeaponEquipped() const;
     // 装備中のスキンからキャラクターの見た目を組み立てる
     ActorArt BuildAppearance() const;
 
@@ -129,6 +135,11 @@ private:
 
     // 装備 uid の配列からステータスを合計する内部処理
     Stats StatsFromSlots(const int equipped[static_cast<int>(EquipSlot::Count)]) const;
+    // 同じく倍率バフを合計する
+    StatRates RatesFromSlots(const int equipped[static_cast<int>(EquipSlot::Count)]) const;
+    // 「この装備をこのスロットに着けたら」の装備 uid 配列を組む
+    void BuildPreviewSlots(int uid, EquipSlot slot,
+                           int out[static_cast<int>(EquipSlot::Count)]) const;
 };
 
 } // namespace ecl

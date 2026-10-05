@@ -50,10 +50,31 @@ enum class EquipSlot
     Arm,         // 腕
     Hand,        // 手
     Foot,        // 足
+    Accessory,   // アクセサリー（1 つだけ装備できる）
     Count
 };
 
 const char* EquipSlotName(EquipSlot slot);
+
+//------------------------------------------------------------------------------
+// アクセサリーの種別
+//   ショップで並べるときの見出しに使う。性能そのものには影響しない。
+//------------------------------------------------------------------------------
+enum class AccessoryKind
+{
+    None,
+    Bracelet,  // 腕輪
+    Ring,      // 指輪
+    Anklet,    // 足飾り
+    Pendant,   // ペンダント
+    Charm,     // お守り
+    Earring,   // イヤリング
+    Glasses,   // 眼鏡
+    Talisman,  // 護符
+    Count
+};
+
+const char* AccessoryKindName(AccessoryKind kind);
 // 武器を装備するスロットか
 bool IsWeaponSlot(EquipSlot slot);
 // 反対の手のスロット（武器スロット以外を渡した場合はそのまま返す）
@@ -83,15 +104,27 @@ struct EquipmentItem
     float       growthCritRate = 0.0f;
     float       growthCritDamage = 0.0f;
 
+    // --- アクセサリー専用 -------------------------------------------------------
+    AccessoryKind accessory = AccessoryKind::None;
+    // 倍率で効くバフ（個体値や強化では変わらない固定値）
+    StatRates   rates;
+    // 「攻撃力 +5%」のような効果の説明
+    std::string effect;
+    // 戦闘開始時に攻撃力が上がる（0 なら無し）。旅人の護符用。
+    float       openingAttackRate = 0.0f;
+    float       openingDuration = 0.0f;
+
     bool  IsValid() const { return uid != 0; }
     // 武器カテゴリのアイテムは slot に WeaponRight を持つ（左右どちらにも装備できる）
     bool  IsWeapon() const { return slot == EquipSlot::WeaponRight; }
+    bool  IsAccessory() const { return slot == EquipSlot::Accessory; }
     // 強化値を反映した最終ステータス
     Stats TotalStats() const;
     // "ロングソード +5"
     std::string DisplayName() const;
     int   Power() const { return TotalStats().Power(); }
-    int   MaxUpgrade() const { return IvMaxUpgrade(iv); }
+    // アクセサリーは強化できない（効果は表どおりの固定値）
+    int   MaxUpgrade() const { return IsAccessory() ? 0 : IvMaxUpgrade(iv); }
 
     // --- 耐久力 ---------------------------------------------------------------
     // 個体値が高く、強化するほど長持ちする

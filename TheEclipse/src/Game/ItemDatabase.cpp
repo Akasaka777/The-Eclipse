@@ -42,6 +42,90 @@ Stats ArmorStats(float defense, float hp, float mp, float critRate = 0.0f,
     return s;
 }
 
+//------------------------------------------------------------------------------
+// アクセサリーの定義を組む
+//   rates : 倍率で効くバフ（攻撃力 +5% など）
+//   flat  : そのまま加算される値（クリティカル率 / 魔法 / 属性 / 命中）
+//------------------------------------------------------------------------------
+ItemTemplate MakeAccessory(int id, const char* name, const char* flavor, AccessoryKind kind,
+                           const char* effect, int price, const StatRates& rates,
+                           const Stats& flat = Stats())
+{
+    ItemTemplate t;
+    t.id = id;
+    t.name = name;
+    t.flavor = flavor;
+    t.slot = EquipSlot::Accessory;
+    t.tier = 1;
+    t.base = flat;
+    t.price = price;
+    t.accessory = kind;
+    t.rates = rates;
+    t.effect = effect;
+    return t;
+}
+
+StatRates Rate(float attack, float defense, float maxHp, float maxMp, float moveSpeed)
+{
+    StatRates r;
+    r.attack = attack;
+    r.defense = defense;
+    r.maxHp = maxHp;
+    r.maxMp = maxMp;
+    r.moveSpeed = moveSpeed;
+    return r;
+}
+
+// 加算で効く値だけを持つステータス
+Stats FlatBonus(float critRate = 0.0f, float magicAttack = 0.0f, float magicDefense = 0.0f,
+                float accuracy = 0.0f, float fireResist = 0.0f, float waterResist = 0.0f)
+{
+    Stats s;
+    s.critRate = critRate;
+    s.magicAttack = magicAttack;
+    s.magicDefense = magicDefense;
+    s.accuracy = accuracy;
+    s.fireResist = fireResist;
+    s.waterResist = waterResist;
+    return s;
+}
+
+//------------------------------------------------------------------------------
+// ショップに並べる品と価格
+//   ID が kShopOnlyIdBase 以上のものはショップ専用（ドロップには出ない）。
+//   それ未満のものはドロップでも手に入る装備で、ショップでも買えるようにする。
+//------------------------------------------------------------------------------
+constexpr int kShopOnlyIdBase = 300;
+
+struct ShopPrice
+{
+    int id;
+    int price;
+};
+
+const ShopPrice kShopPrices[] = {
+    // --- ドロップにも出る装備（ショップでも買える）---------------------------
+    { 110, 800 },  // アイアンメイス
+    { 201, 1500 }, // アイアンヘルム
+    { 211, 1900 }, // チェインメイル
+    { 221, 1800 }, // カイトシールド
+
+    // --- ショップ専用の武器 ---------------------------------------------------
+    { 300, 700 },  { 301, 1100 }, { 302, 2600 },           // 片手剣
+    { 310, 2400 }, { 311, 2800 },                          // 片手棍
+    { 320, 650 },  { 321, 1000 }, { 322, 2700 },           // 細剣
+    { 330, 750 },  { 331, 2300 }, { 332, 3000 },           // 槍
+    { 340, 600 },  { 341, 950 },  { 342, 2500 },           // 短剣
+
+    // --- ショップ専用の防具 ---------------------------------------------------
+    { 350, 400 },  { 351, 2600 },                          // 頭
+    { 360, 300 },  { 361, 800 },  { 362, 3400 },           // 体
+    { 370, 450 },  { 371, 1100 },                          // 盾
+    { 380, 350 },  { 381, 900 },  { 382, 2000 },           // 腕
+    { 390, 300 },  { 391, 750 },  { 392, 1700 },           // 手
+    { 395, 380 },  { 396, 950 },  { 397, 2100 },           // 足
+};
+
 } // namespace
 
 ItemDatabase::ItemDatabase()
@@ -121,7 +205,111 @@ ItemDatabase::ItemDatabase()
         { 250, "レザーブーツ",         "長時間の探索に向く。",                     EquipSlot::Foot, SWD, 1, ArmorStats(5.0f, 28.0f, 4.0f, 0.0f, 18.0f) },
         { 251, "韋駄天のブーツ",       "駆け抜ける者のための靴。",                 EquipSlot::Foot, SWD, 2, ArmorStats(9.0f, 46.0f, 8.0f, 0.0f, 34.0f) },
         { 252, "エンシェントドラゴンブーツ", "溶岩の上でも足を取られない具足。", EquipSlot::Foot, SWD, 3, ArmorStats(24.0f, 150.0f, 26.0f, 0.0f, 52.0f) },
+
+        //======================================================================
+        // ショップ専用の武器（ドロップには出ない）
+        //======================================================================
+        //--- 片手剣 -------------------------------------------------------------
+        { 300, "鉄製ロングソード",   "扱いやすい標準的な剣。",         EquipSlot::WeaponRight, SWD, 1, WeaponStats(30.0f, 0.05f, 0.10f,  0.00f) },
+        { 301, "傭兵の剣",           "頑丈で実戦向き。",               EquipSlot::WeaponRight, SWD, 1, WeaponStats(34.0f, 0.05f, 0.12f, -0.01f) },
+        { 302, "騎士見習いの剣",     "切れ味と見栄えを両立。",         EquipSlot::WeaponRight, SWD, 2, WeaponStats(42.0f, 0.07f, 0.14f,  0.01f) },
+
+        //--- 片手棍 -------------------------------------------------------------
+        { 310, "戦鎚",               "重い一撃を叩き込む。",           EquipSlot::WeaponRight, MCE, 2, WeaponStats(50.0f, 0.03f, 0.20f, -0.11f) },
+        { 311, "聖職者のメイス",     "儀礼用にも使われる。",           EquipSlot::WeaponRight, MCE, 2, WeaponStats(43.0f, 0.05f, 0.16f, -0.07f) },
+
+        //--- 細剣 ---------------------------------------------------------------
+        { 320, "スティレット",       "細身で急所を狙いやすい。",       EquipSlot::WeaponRight, RPR, 1, WeaponStats(22.0f, 0.14f, 0.12f, 0.13f,  8.0f) },
+        { 321, "フェンシングソード", "軽快な刺突武器。",               EquipSlot::WeaponRight, RPR, 1, WeaponStats(26.0f, 0.11f, 0.13f, 0.14f, 10.0f) },
+        { 322, "貴族仕立ての細剣",   "装飾性の高い上品な剣。",         EquipSlot::WeaponRight, RPR, 2, WeaponStats(35.0f, 0.13f, 0.16f, 0.15f, 12.0f) },
+
+        //--- 槍 -----------------------------------------------------------------
+        { 330, "木柄の鉄槍",         "安価で扱いやすい。",             EquipSlot::WeaponRight, SPR, 1, WeaponStats(29.0f, 0.05f, 0.11f, -0.05f) },
+        { 331, "パイク",             "長い間合いを活かす。",           EquipSlot::WeaponRight, SPR, 2, WeaponStats(44.0f, 0.06f, 0.15f, -0.03f) },
+        { 332, "ハルバード",         "刺突と斬撃を兼ね備える。",       EquipSlot::WeaponRight, SPR, 2, WeaponStats(48.0f, 0.07f, 0.17f, -0.05f) },
+
+        //--- 短剣 ---------------------------------------------------------------
+        { 340, "ハンターナイフ",     "狩猟にも使える実用品。",         EquipSlot::WeaponRight, DGR, 1, WeaponStats(19.0f, 0.14f, 0.13f, 0.17f, 12.0f) },
+        { 341, "鋼のダガー",         "冒険者向けの標準品。",           EquipSlot::WeaponRight, DGR, 1, WeaponStats(22.0f, 0.16f, 0.14f, 0.18f, 12.0f) },
+        { 342, "暗殺者の短剣",       "細身で隠し持ちやすい。",         EquipSlot::WeaponRight, DGR, 2, WeaponStats(29.0f, 0.21f, 0.18f, 0.21f, 16.0f) },
+
+        //======================================================================
+        // ショップ専用の防具（ドロップには出ない）
+        //======================================================================
+        { 350, "革の帽子",           "軽量で最低限の防護。",           EquipSlot::Head, SWD, 1, ArmorStats( 5.0f, 32.0f,  8.0f) },
+        { 351, "騎士の兜",           "防御力の高い重装備。",           EquipSlot::Head, SWD, 2, ArmorStats(15.0f, 92.0f,  4.0f) },
+
+        { 360, "布の服",             "防御力は低いが安価。",           EquipSlot::Body, SWD, 1, ArmorStats( 6.0f,  50.0f, 18.0f) },
+        { 361, "革鎧",               "軽装冒険者の定番。",             EquipSlot::Body, SWD, 1, ArmorStats(12.0f,  84.0f,  8.0f, 0.0f,   6.0f) },
+        { 362, "プレートアーマー",   "重厚で高い防御力。",             EquipSlot::Body, SWD, 2, ArmorStats(26.0f, 165.0f,  0.0f, 0.0f, -10.0f) },
+
+        { 370, "木製ラウンドシールド", "軽くて扱いやすい。",           EquipSlot::Shield, SWD, 1, ArmorStats( 7.0f, 44.0f, 0.0f) },
+        { 371, "アイアンシールド",   "頑丈な金属製の盾。",             EquipSlot::Shield, SWD, 1, ArmorStats(13.0f, 78.0f, 0.0f, 0.0f, -3.0f) },
+
+        { 380, "革の腕当て",         "軽装向けの基本装備。",           EquipSlot::Arm, SWD, 1, ArmorStats( 4.0f, 26.0f, 5.0f, 0.02f) },
+        { 381, "アイアンアームガード", "腕を金属で保護。",             EquipSlot::Arm, SWD, 1, ArmorStats( 8.0f, 44.0f, 0.0f, 0.03f) },
+        { 382, "騎士の小手甲",       "重装備用の腕防具。",             EquipSlot::Arm, SWD, 2, ArmorStats(13.0f, 68.0f, 0.0f, 0.04f) },
+
+        { 390, "革手袋",             "安価で使いやすい。",             EquipSlot::Hand, SWD, 1, ArmorStats( 3.0f, 20.0f, 4.0f, 0.02f) },
+        { 391, "ハードレザーグローブ", "戦闘向けの丈夫な手袋。",       EquipSlot::Hand, SWD, 1, ArmorStats( 5.0f, 30.0f, 6.0f, 0.03f) },
+        { 392, "アイアングローブ",   "手を金属で覆う重装備。",         EquipSlot::Hand, SWD, 2, ArmorStats( 9.0f, 46.0f, 0.0f, 0.03f) },
+
+        { 395, "革のブーツ",         "冒険者の基本装備。",             EquipSlot::Foot, SWD, 1, ArmorStats( 4.0f, 24.0f, 4.0f, 0.0f, 16.0f) },
+        { 396, "グリーブ",           "脛を金属で防護。",               EquipSlot::Foot, SWD, 1, ArmorStats( 8.0f, 42.0f, 0.0f, 0.0f, 10.0f) },
+        { 397, "騎士の鉄靴",         "重装兵向けの防具。",             EquipSlot::Foot, SWD, 2, ArmorStats(13.0f, 62.0f, 0.0f, 0.0f,  4.0f) },
     };
+
+    //==========================================================================
+    // アクセサリー（ショップ専用）
+    //   倍率バフは個体値でも強化でも変わらない固定値にしている。
+    //==========================================================================
+    const std::vector<ItemTemplate> accessories = {
+        MakeAccessory(400, "力の腕輪",           "腕に力が満ちる金属の輪。",
+                      AccessoryKind::Bracelet, "攻撃力 +5%",   2500, Rate(0.05f, 0.0f, 0.0f, 0.0f, 0.0f)),
+        MakeAccessory(401, "守りの腕輪",         "打撃を逃がす厚い腕輪。",
+                      AccessoryKind::Bracelet, "防御力 +5%",   2500, Rate(0.0f, 0.05f, 0.0f, 0.0f, 0.0f)),
+        MakeAccessory(402, "魔力の指輪",         "魔力を増幅させる銀の指輪。",
+                      AccessoryKind::Ring,     "魔法攻撃力 +5%", 1800, StatRates(),
+                      FlatBonus(0.0f, 0.05f)),
+        MakeAccessory(403, "精神の指輪",         "心を鎮め、魔を退ける指輪。",
+                      AccessoryKind::Ring,     "魔法防御力 +5%", 1800, StatRates(),
+                      FlatBonus(0.0f, 0.0f, 0.05f)),
+        MakeAccessory(404, "俊足のアンクレット", "足取りが軽くなる足飾り。",
+                      AccessoryKind::Anklet,   "素早さ +5%",   2500, Rate(0.0f, 0.0f, 0.0f, 0.0f, 0.05f)),
+        MakeAccessory(405, "生命のペンダント",   "持ち主の生命力を支える石。",
+                      AccessoryKind::Pendant,  "最大HP +5%",   2800, Rate(0.0f, 0.0f, 0.05f, 0.0f, 0.0f)),
+        MakeAccessory(406, "魔力のペンダント",   "魔力の器を広げる石。",
+                      AccessoryKind::Pendant,  "最大MP +5%",   2200, Rate(0.0f, 0.0f, 0.0f, 0.05f, 0.0f)),
+        MakeAccessory(407, "会心のお守り",       "急所を見抜く勘が冴える。",
+                      AccessoryKind::Charm,    "クリティカル率 +3%", 4000, StatRates(),
+                      FlatBonus(0.03f)),
+        MakeAccessory(408, "火除けの耳飾り",     "炎の熱を和らげる耳飾り。",
+                      AccessoryKind::Earring,  "火属性ダメージ -5%", 1800, StatRates(),
+                      FlatBonus(0.0f, 0.0f, 0.0f, 0.0f, 0.05f)),
+        MakeAccessory(409, "水除けの耳飾り",     "水気を払う耳飾り。",
+                      AccessoryKind::Earring,  "水属性ダメージ -5%", 1800, StatRates(),
+                      FlatBonus(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.05f)),
+        MakeAccessory(410, "集中の眼鏡",         "狙いが定まる薄い眼鏡。",
+                      AccessoryKind::Glasses,  "命中率 +5%",   1800, StatRates(),
+                      FlatBonus(0.0f, 0.0f, 0.0f, 0.05f)),
+        MakeAccessory(411, "旅人の護符",         "旅立ちを後押しする古い護符。",
+                      AccessoryKind::Talisman, "戦闘開始時、攻撃力 +5%（20 秒）", 3200, StatRates()),
+    };
+    templates_.insert(templates_.end(), accessories.begin(), accessories.end());
+
+    // 旅人の護符だけは戦闘開始時の時限バフを持つ
+    for (ItemTemplate& t : templates_) {
+        if (t.id != 411) continue;
+        t.openingAttackRate = 0.05f;
+        t.openingDuration = 20.0f;
+    }
+
+    // ショップの価格を割り当てる
+    for (const ShopPrice& entry : kShopPrices) {
+        for (ItemTemplate& t : templates_) {
+            if (t.id == entry.id) t.price = entry.price;
+        }
+    }
 
     // 手装備の攻撃速度補正は個別に付与
     for (ItemTemplate& t : templates_) {
@@ -138,6 +326,8 @@ ItemDatabase::ItemDatabase()
         }
         // 竜王のセットもボスドロップ専用（ランダム抽選には出さない）
         if (IsDragonSetItem(t.id)) t.special = true;
+        // ショップ専用の装備とアクセサリーはドロップ抽選に出さない
+        if (t.id >= kShopOnlyIdBase) t.special = true;
     }
 
 }
@@ -171,6 +361,20 @@ EquipmentItem ItemDatabase::Create(int templateId, int iv) const
     item.iv = ClampIv(iv);
     item.upgradeLevel = 0;
     item.indestructible = tmpl->indestructible;
+    item.accessory = tmpl->accessory;
+    item.rates = tmpl->rates;
+    item.effect = tmpl->effect;
+    item.openingAttackRate = tmpl->openingAttackRate;
+    item.openingDuration = tmpl->openingDuration;
+
+    if (tmpl->slot == EquipSlot::Accessory) {
+        // アクセサリーは個体値で揺らがない（効果は表どおりの固定値）。
+        // 摩耗も強化もしないので、耐久力は常に満タンのまま。
+        item.iv = kAccessoryIv;
+        item.baseStats = tmpl->base;
+        item.RestoreDurability();
+        return item;
+    }
 
     // 能力値は個体値だけで決まる（同じ個体値なら必ず同じ性能になる）
     const float scale = IvStatScale(item.iv);
@@ -182,6 +386,37 @@ EquipmentItem ItemDatabase::Create(int templateId, int iv) const
 
     item.RestoreDurability();
     return item;
+}
+
+std::vector<const ItemTemplate*> ItemDatabase::ShopItems() const
+{
+    std::vector<const ItemTemplate*> result;
+    for (const ItemTemplate& t : templates_) {
+        if (t.InShop()) result.push_back(&t);
+    }
+    return result;
+}
+
+std::vector<const ItemTemplate*> ItemDatabase::ShopItemsForSlot(EquipSlot slot) const
+{
+    std::vector<const ItemTemplate*> result;
+    for (const ItemTemplate& t : templates_) {
+        if (!t.InShop() || t.slot != slot) continue;
+        result.push_back(&t);
+    }
+    return result;
+}
+
+std::vector<const ItemTemplate*> ItemDatabase::ShopArmors() const
+{
+    std::vector<const ItemTemplate*> result;
+    for (const ItemTemplate& t : templates_) {
+        if (!t.InShop()) continue;
+        if (t.slot == EquipSlot::WeaponRight || t.slot == EquipSlot::WeaponLeft) continue;
+        if (t.slot == EquipSlot::Accessory) continue;
+        result.push_back(&t);
+    }
+    return result;
 }
 
 EquipmentItem ItemDatabase::CreateRandom(EquipSlot slot, int iv, int maxTier) const

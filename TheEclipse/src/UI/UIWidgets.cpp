@@ -243,6 +243,12 @@ void DrawSlotIcon(const Rect& rect, EquipSlot slot, const ColorRGB& color)
         draw::FillRect(Rect(cx - size, cy - size * 0.2f, cx + size * 0.4f, cy + size), color.Scaled(0.7f), 255);
         draw::FillRect(Rect(cx - size, cy + size * 0.5f, cx + size, cy + size), color, 255);
         break;
+    case EquipSlot::Accessory:
+        // 石の付いた指輪
+        draw::Circle(cx, cy + size * 0.3f, size * 0.75f, color, false, 3.0f, 255);
+        draw::Triangle(Vec2(cx - size * 0.4f, cy - size * 0.4f), Vec2(cx + size * 0.4f, cy - size * 0.4f),
+                       Vec2(cx, cy - size * 1.1f), color, true, 255);
+        break;
     default:
         break;
     }
@@ -269,21 +275,32 @@ void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, boo
 
     draw::Text(FontSize::Normal, rect.left + 74.0f, rect.top + 8.0f, palette::kText, item.DisplayName());
 
-    const std::string sub = item.IsWeapon()
-        ? str::Format("%s  ATK %d", WeaponTypeName(item.weaponType),
-                      static_cast<int>(item.TotalStats().attack))
-        : str::Format("%s  DEF %d  HP %d", EquipSlotName(item.slot),
-                      static_cast<int>(item.TotalStats().defense),
-                      static_cast<int>(item.TotalStats().maxHp));
+    std::string sub;
+    if (item.IsAccessory()) {
+        // アクセサリーは種別と効果を出す（戦力や耐久力の概念が無い）
+        sub = str::Format("%s  %s", AccessoryKindName(item.accessory), item.effect.c_str());
+    } else if (item.IsWeapon()) {
+        sub = str::Format("%s  ATK %d", WeaponTypeName(item.weaponType),
+                          static_cast<int>(item.TotalStats().attack));
+    } else {
+        sub = str::Format("%s  DEF %d  HP %d", EquipSlotName(item.slot),
+                          static_cast<int>(item.TotalStats().defense),
+                          static_cast<int>(item.TotalStats().maxHp));
+    }
     draw::Text(FontSize::Small, rect.left + 74.0f, rect.top + 36.0f, palette::kTextDim, sub);
 
-    draw::Text(FontSize::Small, rect.right - 12.0f, rect.top + 10.0f, palette::kText,
-               str::Format("戦力 %d", item.Power()), draw::TextAlign::Right);
+    if (!item.IsAccessory()) {
+        draw::Text(FontSize::Small, rect.right - 12.0f, rect.top + 10.0f, palette::kText,
+                   str::Format("戦力 %d", item.Power()), draw::TextAlign::Right);
+    }
 
-    if (showIv) {
+    if (showIv && !item.IsAccessory()) {
         draw::Text(FontSize::Tiny, rect.right - 119.0f, rect.top + 12.0f, palette::kExp,
                    str::Format("IV %d", item.iv), draw::TextAlign::Right);
     }
+
+    // アクセサリーは摩耗も強化もしないので耐久力は出さない
+    if (item.IsAccessory()) return;
 
     // --- 耐久力 ---------------------------------------------------------------
     const Rect durabilityBar(rect.right - 200.0f, rect.bottom - 16.0f, rect.right - 12.0f,

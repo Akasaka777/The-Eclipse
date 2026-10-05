@@ -29,9 +29,18 @@ const CategoryDef kCategories[] = {
     { "腕装備", EquipSlot::Arm },
     { "手装備", EquipSlot::Hand },
     { "足装備", EquipSlot::Foot },
+    // アクセサリーは強化も修理もできないが、売却はできる
+    { "アクセサリー", EquipSlot::Accessory },
 };
 
 constexpr int kCategoryCount = static_cast<int>(sizeof(kCategories) / sizeof(kCategories[0]));
+
+// 「種類 : 武器」のようなボタンの見出し
+std::string CategoryLabel(int index)
+{
+    const int clamped = math::ClampInt(index, 0, kCategoryCount - 1);
+    return std::string("種類 : ") + kCategories[clamped].label;
+}
 
 } // namespace
 
@@ -66,16 +75,10 @@ void SmithPanel::Layout()
     filterButton_ = Button(Rect::FromXYWH(window_.left + 40.0f, window_.top + 74.0f, 220.0f, 44.0f),
                            "表示 : すべて", FontSize::Small);
 
-    // --- 装備の種類で絞り込むタブ（「表示 : ...」の右隣に並べる）-----------------
-    categoryButtons_.clear();
-    const float tabWidth = 90.0f;
-    const float tabGap = 6.0f;
-    const float tabLeft = filterButton_.GetRect().right + 12.0f;
-    for (int i = 0; i < kCategoryCount; ++i) {
-        const Rect rect = Rect::FromXYWH(tabLeft + (tabWidth + tabGap) * static_cast<float>(i),
-                                         window_.top + 74.0f, tabWidth, 44.0f);
-        categoryButtons_.push_back(Button(rect, kCategories[i].label, FontSize::Tiny));
-    }
+    // --- 装備の種類は 1 つのボタンで順送りする（タブを並べない）-------------------
+    categoryButton_ = Button(Rect::FromXYWH(filterButton_.GetRect().right + 12.0f,
+                                            window_.top + 74.0f, 220.0f, 44.0f),
+                             CategoryLabel(categoryIndex_), FontSize::Small);
 
     // --- 使う強化結晶の個数 -----------------------------------------------------
     const float detailLeft = window_.left + 790.0f;
@@ -97,6 +100,12 @@ void SmithPanel::Open()
     confirmSellUid_ = 0;
     lastResultUid_ = 0;
     message_.clear();
+
+    // 絞り込みは開くたびに「すべて」へ戻す
+    categoryIndex_ = 0;
+    equippedOnly_ = false;
+    categoryButton_.SetLabel(CategoryLabel(categoryIndex_));
+    filterButton_.SetLabel("表示 : すべて");
 }
 
 std::vector<const EquipmentItem*> SmithPanel::SortedItems(const GameContext& context) const
@@ -160,13 +169,12 @@ void SmithPanel::Update(float dt, const Input& input, GameContext& context)
         scroll_ = 0;
     }
 
-    // --- 装備の種類タブ -------------------------------------------------------
-    for (int i = 0; i < static_cast<int>(categoryButtons_.size()); ++i) {
-        categoryButtons_[static_cast<size_t>(i)].SetSelected(i == categoryIndex_);
-        if (categoryButtons_[static_cast<size_t>(i)].Update(input, dt)) {
-            categoryIndex_ = i;
-            scroll_ = 0;
-        }
+    // --- 装備の種類（クリックごとに次の種類へ）---------------------------------
+    categoryButton_.SetSelected(categoryIndex_ != 0);
+    if (categoryButton_.Update(input, dt)) {
+        categoryIndex_ = (categoryIndex_ + 1) % kCategoryCount;
+        categoryButton_.SetLabel(CategoryLabel(categoryIndex_));
+        scroll_ = 0;
     }
 
     // --- 使う強化結晶の個数 ---------------------------------------------------
@@ -269,7 +277,7 @@ void SmithPanel::Draw(const GameContext& context) const
                str::Format("強化結晶 %d", inventory.Material()), draw::TextAlign::Right);
 
     filterButton_.Draw();
-    for (const Button& button : categoryButtons_) button.Draw();
+    categoryButton_.Draw();
 
     // --- 一覧 ---------------------------------------------------------------
     const std::vector<const EquipmentItem*> items = SortedItems(context);

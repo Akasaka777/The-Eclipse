@@ -44,7 +44,23 @@ const char* EquipSlotName(EquipSlot slot)
     case EquipSlot::Arm:    return "腕装備";
     case EquipSlot::Hand:   return "手装備";
     case EquipSlot::Foot:   return "足装備";
+    case EquipSlot::Accessory: return "アクセサリー";
     default: return "装備";
+    }
+}
+
+const char* AccessoryKindName(AccessoryKind kind)
+{
+    switch (kind) {
+    case AccessoryKind::Bracelet: return "腕輪";
+    case AccessoryKind::Ring:     return "指輪";
+    case AccessoryKind::Anklet:   return "足飾り";
+    case AccessoryKind::Pendant:  return "ペンダント";
+    case AccessoryKind::Charm:    return "お守り";
+    case AccessoryKind::Earring:  return "イヤリング";
+    case AccessoryKind::Glasses:  return "眼鏡";
+    case AccessoryKind::Talisman: return "護符";
+    default: return "アクセサリー";
     }
 }
 

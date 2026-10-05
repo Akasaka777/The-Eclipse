@@ -10,11 +10,29 @@
 namespace ecl {
 
 namespace {
+
+//------------------------------------------------------------------------------
 // レベルごとの必要経験値
+//   両端を固定した冪乗カーブ。
+//     レベル  1 →  2 : kExpFirst      EXP
+//     レベル 98 → 99 : kExpLast       EXP
+//   この 2 点を通るように指数を求めているので、数値を変えたいときは
+//   kExpFirst / kExpLast だけを触れば中間も自動で付いてくる。
+//------------------------------------------------------------------------------
+constexpr double kExpFirst = 150.0;        // レベル 1 → 2
+constexpr double kExpLast = 2000000.0;     // レベル 98 → 99
+constexpr int    kExpLastLevel = 98;       // 最後のレベルアップ
+
 int ExpTableFor(int level)
 {
-    return static_cast<int>(90.0f + 52.0f * std::pow(static_cast<float>(level), 1.42f));
+    const int clamped = math::ClampInt(level, 1, kExpLastLevel);
+    // kExpFirst * level^exponent が kExpLastLevel で kExpLast になる指数
+    static const double exponent =
+        std::log(kExpLast / kExpFirst) / std::log(static_cast<double>(kExpLastLevel));
+    const double need = kExpFirst * std::pow(static_cast<double>(clamped), exponent);
+    return static_cast<int>(need + 0.5);
 }
+
 } // namespace
 
 PlayerData::PlayerData() = default;
@@ -34,7 +52,8 @@ void PlayerData::SetupNewGame(WeaponType weapon)
     for (int id : SkillDatabase::Instance().StarterSkillIds()) {
         if (!IsSkillUnlocked(id)) unlockedSkills_.push_back(id);
     }
-    RefreshSkillLoadout();
+    // 最初は選んだ武器の初期スキルだけを装備した状態にする
+    ResetSkillLoadoutToStarter();
 }
 
 int PlayerData::ExpToNext() const
@@ -82,7 +101,8 @@ Stats PlayerData::BaseStats() const
 
 Stats PlayerData::EquippedStats() const
 {
-    return BaseStats() + inventory_.EquippedStats();
+    // アクセサリーの倍率バフ（攻撃力 +5% など）は、素の値と装備値の合計に掛ける
+    return ApplyRates(BaseStats() + inventory_.EquippedStats(), inventory_.EquippedRates());
 }
 
 Stats PlayerData::TotalStats() const
@@ -148,18 +168,50 @@ void PlayerData::SetName(const std::string& name)
     name_ = str::Truncate(trimmed, kMaxNameLength);
 }
 
+int PlayerData::StarterSkillForCurrentSet() const
+{
+    const SkillDatabase& database = SkillDatabase::Instance();
+    // 武器を外している間はどの系統のスキルも使えない
+    if (!UsesUniqueSkillSet() && !HasWeaponEquipped()) return 0;
+
+    const std::vector<const SwordSkill*> pool =
+        UsesUniqueSkillSet() ? database.ForUnique(uniqueSkill_)
+                             : database.ForWeapon(CurrentWeaponType());
+
+    // 通常の系統は「起点スキル（解放コスト 0）」が初期スキル。
+    // ユニークスキルの系統には起点が無いので、解放済みの最上段を初期スキルとする。
+    for (const SwordSkill* skill : pool) {
+        if (skill->IsStarter() && IsSkillUnlocked(skill->id)) return skill->id;
+    }
+    for (const SwordSkill* skill : pool) {
+        if (IsSkillUnlocked(skill->id)) return skill->id;
+    }
+    return 0;
+}
+
+void PlayerData::ResetSkillLoadoutToStarter()
+{
+    for (int i = 0; i < kSkillSlotCount; ++i) skillLoadout_[i] = 0;
+    const int starter = StarterSkillForCurrentSet();
+    if (starter != 0 && SkillSlotLimit() > 0) skillLoadout_[0] = starter;
+
+    lastLoadoutUnique_ = UsesUniqueSkillSet();
+    lastLoadoutWeapon_ = CurrentWeaponType();
+}
+
 void PlayerData::RefreshSkillLoadoutForEquipment()
 {
-    // 系統が変わったらスロットを作り直す（前の武器のスキルを残さない）
+    // 系統（武器種 / ユニーク）が変わったら、スロットは初期スキルだけに戻す。
+    // 前の武器のスキルを引き継がず、勝手に埋め直しもしない。
     if (UsesUniqueSkillSet() != lastLoadoutUnique_ || CurrentWeaponType() != lastLoadoutWeapon_) {
-        for (int i = 0; i < kSkillSlotCount; ++i) skillLoadout_[i] = 0;
+        ResetSkillLoadoutToStarter();
+        return;
     }
     RefreshSkillLoadout();
 }
 
 void PlayerData::RefreshSkillLoadout()
 {
-    const SkillDatabase& database = SkillDatabase::Instance();
     const bool uniqueSet = UsesUniqueSkillSet();
     const int  limit = SkillSlotLimit();
 
@@ -189,18 +241,8 @@ void PlayerData::RefreshSkillLoadout()
         }
     }
 
-    // --- 3. 空きスロットを解放済みスキルで埋める ---------------------------------
-    const std::vector<const SwordSkill*> pool =
-        uniqueSet ? database.ForUnique(uniqueSkill_) : database.ForWeapon(CurrentWeaponType());
-    for (int i = 0; i < limit; ++i) {
-        if (skillLoadout_[i] != 0) continue;
-        for (const SwordSkill* candidate : pool) {
-            if (!IsSkillUnlocked(candidate->id)) continue;
-            if (IsSkillEquipped(candidate->id)) continue;
-            skillLoadout_[i] = candidate->id;
-            break;
-        }
-    }
+    // 空いた枠を勝手に埋めることはしない（どれを装備するかはプレイヤーが決める）。
+    // 武器を変えたときだけ ResetSkillLoadoutToStarter() が初期スキルを入れる。
 }
 
 void PlayerData::AddSkillPoints(int amount)
@@ -251,15 +293,7 @@ bool PlayerData::UnlockSkill(int skillId)
     skillPoints_ -= skill->unlockCost;
     unlockedSkills_.push_back(skillId);
 
-    // 今の系統のスキルなら、空きスロットへ自動で装備する
-    if (MatchesCurrentSkillSet(*skill)) {
-        for (int i = 0; i < SkillSlotLimit(); ++i) {
-            if (skillLoadout_[i] == 0) {
-                skillLoadout_[i] = skillId;
-                break;
-            }
-        }
-    }
+    // 解放しただけではスロットに入れない（どれを装備するかはプレイヤーが決める）
     return true;
 }
 

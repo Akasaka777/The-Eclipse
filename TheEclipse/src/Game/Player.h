@@ -77,6 +77,15 @@ public:
     // 直前フレームで攻撃判定を出したか（コンボ表示のトリガ）
     bool JustAttacked() const { return justAttacked_; }
     WeaponType Weapon() const { return weapon_; }
+    // 武器を装備しているか（素手ではソードスキルを使えない）
+    bool HasWeapon() const { return hasWeapon_; }
+
+    // --- 戦闘開始時バフ（旅人の護符）-----------------------------------------
+    bool  HasOpeningBuff() const { return openingTimer_ > 0.0f; }
+    float OpeningBuffRemain() const { return openingTimer_; }
+    float OpeningBuffRate() const { return openingAttackRate_; }
+    // バフを乗せた攻撃力（判定を出すときに使う）
+    float AttackPower() const;
 
 private:
     // 装備由来の値を反映する（Setup / RefreshEquipment の共通処理）
@@ -98,7 +107,14 @@ private:
     float maxMp_ = 100.0f;
 
     WeaponType weapon_ = WeaponType::OneHandSword;
+    // 武器を持っているか（素手ではソードスキルを封じる）
+    bool  hasWeapon_ = true;
     float attackSpeedFactor_ = 1.0f;
+
+    // 戦闘開始時に一定時間だけ攻撃力が上がる（旅人の護符）
+    float openingAttackRate_ = 0.0f;
+    float openingDuration_ = 0.0f;
+    float openingTimer_ = 0.0f;
 
     // 通常攻撃
     int   comboIndex_ = 0;
