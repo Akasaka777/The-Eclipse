@@ -214,10 +214,6 @@ void ResultScene::DrawRewards(const GameContext& context) const
                                      result.abilityPointsGained)
                        : str::Format("スキルポイント  +%d", result.skillPointsGained));
     }
-    if (result.firstClear) {
-        draw::Text(FontSize::Small, panel.right - 32.0f, y, palette::kAccentWarm,
-                   "初回クリアボーナス獲得！", draw::TextAlign::Right);
-    }
     y += 44.0f;
 
     // --- 素材（多いときは先頭 3 種だけ名前を出す）-------------------------------
@@ -289,13 +285,13 @@ void ResultScene::DrawRewards(const GameContext& context) const
 
         ui::DrawItemRow(rect, item, false, false, false);
 
-        // 初回クリアの確定ドロップ（ボスドロップは先頭に並ぶ）
+        // 初回クリア報酬の確定ドロップ（ボスドロップは先頭に並ぶ）
         if (index == 0 && guaranteedFirst) {
             const Rect badge = Rect::FromXYWH(rect.right - 412.0f, rect.top + 10.0f, 112.0f, 24.0f);
             draw::FillRect(badge, palette::kAccentWarm.Scaled(0.35f), 230);
             draw::StrokeRect(badge, palette::kAccentWarm, 1.0f, 230);
             draw::Text(FontSize::Tiny, badge.CenterX(), badge.top + 4.0f, palette::kAccentWarm,
-                       "初回クリア確定", draw::TextAlign::Center);
+                       "初回クリア報酬", draw::TextAlign::Center);
         }
 
         // 特に戦力の高い装備は光らせる（個体値そのものは表示しない）

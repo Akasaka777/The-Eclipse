@@ -7,6 +7,8 @@
 #include "Graphics/DrawUtil.h"
 
 #include <cmath>
+#include <utility>
+#include <vector>
 
 namespace ecl {
 
@@ -426,85 +428,364 @@ void DrawWisp(const Rect& rect, int facing, PoseKind pose, float phase,
 } // namespace
 
 //------------------------------------------------------------------------------
+// 武器
+//   刀身は「光の当たる側 / 影側」の 2 色に塗り分け、暗い縁取りを付けて立体感を出す。
+//   残像（alpha が低い）は細部を省いたシルエットだけを描く。
+//------------------------------------------------------------------------------
+namespace {
+
+// 武器の軸に沿った座標系（along : 手元から先端へ / side : 軸に直交）
+struct WeaponFrame
+{
+    Vec2 hand;
+    Vec2 dir;
+    Vec2 perp;
+    int  alpha = 255;
+
+    Vec2 P(float along, float side) const
+    {
+        return Vec2(hand.x + dir.x * along + perp.x * side, hand.y + dir.y * along + perp.y * side);
+    }
+    void Seg(float a1, float s1, float a2, float s2, const ColorRGB& color, float thickness,
+             int a = -1) const
+    {
+        const Vec2 p1 = P(a1, s1);
+        const Vec2 p2 = P(a2, s2);
+        draw::Line(p1.x, p1.y, p2.x, p2.y, color, thickness, a < 0 ? alpha : a);
+    }
+    void Tri(const Vec2& p1, const Vec2& p2, const Vec2& p3, const ColorRGB& color, int a = -1) const
+    {
+        draw::Triangle(p1, p2, p3, color, true, a < 0 ? alpha : a);
+    }
+    void Quad(const Vec2& p1, const Vec2& p2, const Vec2& p3, const Vec2& p4, const ColorRGB& color) const
+    {
+        Tri(p1, p2, p3, color);
+        Tri(p1, p3, p4, color);
+    }
+    void Dot(float along, float side, float radius, const ColorRGB& color, bool fill = true,
+             float thickness = 1.0f, int a = -1) const
+    {
+        const Vec2 c = P(along, side);
+        draw::Circle(c.x, c.y, radius, color, fill, thickness, a < 0 ? alpha : a);
+    }
+
+    // 左右対称の刀身（stations は手元から先端へ (along, 半幅) の並び。最後は先端）
+    //   上半分を明るく、下半分を暗く塗り、外側に縁取りを付ける
+    void Blade(const std::vector<std::pair<float, float>>& stations, const ColorRGB& light,
+               const ColorRGB& dark, const ColorRGB& outline, float outlineWidth) const
+    {
+        const size_t n = stations.size();
+        if (n < 2) return;
+        // 縁取り：少し太らせた形を暗い色で先に塗る
+        for (size_t i = 0; i + 1 < n; ++i) {
+            const float a1 = stations[i].first - (i == 0 ? outlineWidth : 0.0f);
+            const float a2 = stations[i + 1].first + (i + 2 == n ? outlineWidth * 1.6f : 0.0f);
+            const float w1 = stations[i].second + outlineWidth;
+            const float w2 = stations[i + 1].second + (i + 2 == n ? 0.0f : outlineWidth);
+            Quad(P(a1, -w1), P(a2, -w2), P(a2, w2), P(a1, w1), outline);
+        }
+        // 下地：2 色の境目や三角形の継ぎ目に縁取りの色が透けないよう、中間色で一度塗る
+        const ColorRGB mid = ColorRGB::Lerp(light, dark, 0.5f);
+        for (size_t i = 0; i + 1 < n; ++i) {
+            Quad(P(stations[i].first, -stations[i].second), P(stations[i + 1].first, -stations[i + 1].second),
+                 P(stations[i + 1].first, stations[i + 1].second), P(stations[i].first, stations[i].second), mid);
+        }
+        // 本体：光の当たる側（side < 0）と影側
+        for (size_t i = 0; i + 1 < n; ++i) {
+            const float a1 = stations[i].first;
+            const float a2 = stations[i + 1].first;
+            const float w1 = stations[i].second;
+            const float w2 = stations[i + 1].second;
+            Quad(P(a1, -w1), P(a2, -w2), P(a2, 0.0f), P(a1, 0.0f), light);
+            Quad(P(a1, 0.0f), P(a2, 0.0f), P(a2, w2), P(a1, w1), dark);
+        }
+    }
+
+    // 革を巻いた柄（from → to）。巻き目を斜めの線で入れる
+    void Grip(float from, float to, float width, const ColorRGB& leather, const ColorRGB& outline,
+              int wraps) const
+    {
+        Seg(from, 0.0f, to, 0.0f, outline, width + 3.0f);
+        Seg(from, 0.0f, to, 0.0f, leather, width);
+        Seg(from, -width * 0.18f, to, -width * 0.18f, leather.Scaled(1.35f), width * 0.22f);
+        for (int i = 0; i < wraps; ++i) {
+            const float t = (static_cast<float>(i) + 0.5f) / static_cast<float>(wraps);
+            const float a = from + (to - from) * t;
+            const float step = (to - from) / static_cast<float>(wraps) * 0.35f;
+            Seg(a - step, -width * 0.48f, a + step, width * 0.48f, outline, math::MaxF(1.0f, width * 0.14f));
+        }
+    }
+
+    // 柄頭（丸い金具＋小さな宝石）
+    void Pommel(float along, float radius, const ColorRGB& fitting, const ColorRGB& gem,
+                const ColorRGB& outline) const
+    {
+        Dot(along, 0.0f, radius + 1.5f, outline);
+        Dot(along, 0.0f, radius, fitting);
+        Dot(along, -radius * 0.35f, radius * 0.45f, fitting.Scaled(1.3f));
+        Dot(along, 0.0f, radius * 0.38f, gem);
+    }
+};
+
+ColorRGB Leather() { return ColorRGB(96, 64, 44); }
+
+// 残像用：細部を省いたシルエット
+void DrawWeaponSilhouette(const WeaponFrame& f, float length, WeaponType type, const ColorRGB& color)
+{
+    switch (type) {
+    case WeaponType::OneHandSword:
+        f.Tri(f.P(length * 0.05f, -length * 0.075f), f.P(length * 0.05f, length * 0.075f),
+              f.P(length, 0.0f), color);
+        break;
+    case WeaponType::OneHandMace:
+        f.Seg(0.0f, 0.0f, length * 0.7f, 0.0f, color, length * 0.06f);
+        f.Dot(length * 0.8f, 0.0f, length * 0.16f, color);
+        break;
+    case WeaponType::Dagger: {
+        const float len = length * 0.55f;
+        f.Tri(f.P(0.0f, -len * 0.13f), f.P(0.0f, len * 0.13f), f.P(len, 0.0f), color);
+        break;
+    }
+    case WeaponType::Rapier: {
+        const float len = length * 1.12f;
+        f.Seg(0.0f, 0.0f, len, 0.0f, color, len * 0.035f);
+        break;
+    }
+    case WeaponType::Spear: {
+        const float len = length * 1.30f;
+        f.Seg(len * 0.4f, 0.0f, len * 0.8f, 0.0f, color, len * 0.03f);
+        f.Tri(f.P(len * 0.78f, -len * 0.06f), f.P(len * 0.78f, len * 0.06f), f.P(len, 0.0f), color);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+} // namespace
+
 void DrawWeapon(const Vec2& handPos, float angleRad, int facing, float length,
                 WeaponType type, const ColorRGB& metal, const ColorRGB& accent, int alpha)
 {
     // 向きは angleRad に含まれているため facing は形状調整用にのみ使う
     (void)facing;
-    const Vec2 dirVec(std::cos(angleRad), std::sin(angleRad));
-    const Vec2 perp(-dirVec.y, dirVec.x);
+    WeaponFrame f;
+    f.hand = handPos;
+    f.dir = Vec2(std::cos(angleRad), std::sin(angleRad));
+    f.perp = Vec2(-f.dir.y, f.dir.x);
+    f.alpha = alpha;
 
-    auto point = [&](float along, float side) {
-        return Vec2(handPos.x + dirVec.x * along + perp.x * side,
-                    handPos.y + dirVec.y * along + perp.y * side);
-    };
+    // 残像は形だけ
+    if (alpha < 200) {
+        DrawWeaponSilhouette(f, length, type, metal);
+        return;
+    }
+
+    const ColorRGB light = ColorRGB::Lerp(metal, palette::kWhite, 0.25f);   // 光の当たる面
+    const ColorRGB dark = ColorRGB::Lerp(metal.Scaled(0.58f), accent, 0.12f); // 影の面
+    const ColorRGB outline(16, 20, 30);
+    // 鍔や柄頭などの金具（刀身より少し暗く、アクセント色を差す）
+    const ColorRGB fitting = ColorRGB::Lerp(metal.Scaled(0.72f), accent, 0.30f);
+    const ColorRGB edge = palette::kWhite;
+    const float ol = math::MaxF(1.5f, length * 0.014f);
 
     switch (type) {
+    //--------------------------------------------------------------------------
+    // 片手剣：両刃の直剣。樋（フラー）・十字鍔・宝石つきの柄頭
+    //--------------------------------------------------------------------------
     case WeaponType::OneHandSword: {
-        const float bladeW = length * 0.085f;
-        // 柄
-        draw::Line(point(-length * 0.14f, 0.0f).x, point(-length * 0.14f, 0.0f).y,
-                   point(0.0f, 0.0f).x, point(0.0f, 0.0f).y, metal.Scaled(0.5f), length * 0.07f, alpha);
-        // 鍔
-        draw::Line(point(0.02f * length, -bladeW * 1.8f).x, point(0.02f * length, -bladeW * 1.8f).y,
-                   point(0.02f * length, bladeW * 1.8f).x, point(0.02f * length, bladeW * 1.8f).y,
-                   accent.Scaled(0.85f), length * 0.05f, alpha);
-        // 刀身
-        const Vec2 tip = point(length, 0.0f);
-        draw::Triangle(point(length * 0.08f, -bladeW), point(length * 0.08f, bladeW), tip, metal, true, alpha);
-        draw::Line(point(length * 0.1f, 0.0f).x, point(length * 0.1f, 0.0f).y, tip.x, tip.y,
-                   palette::kWhite, length * 0.02f, math::ClampInt(alpha - 60, 0, 255));
-        break;
-    }
-    case WeaponType::OneHandMace: {
-        // 柄
-        draw::Line(point(-length * 0.12f, 0.0f).x, point(-length * 0.12f, 0.0f).y,
-                   point(length * 0.72f, 0.0f).x, point(length * 0.72f, 0.0f).y,
-                   metal.Scaled(0.55f), length * 0.07f, alpha);
-        // 頭部
-        const Vec2 head = point(length * 0.82f, 0.0f);
-        draw::Circle(head.x, head.y, length * 0.17f, metal, true, 1.0f, alpha);
-        draw::Circle(head.x, head.y, length * 0.17f, accent.Scaled(0.7f), false, 2.0f, alpha);
-        // 突起
-        for (int i = 0; i < 4; ++i) {
-            const float a = angleRad + static_cast<float>(i) * (kTwoPi / 4.0f) + 0.4f;
-            draw::Line(head.x, head.y, head.x + std::cos(a) * length * 0.25f,
-                       head.y + std::sin(a) * length * 0.25f, metal.Scaled(1.1f), length * 0.05f, alpha);
+        const float L = length;
+        const float bw = L * 0.072f;
+        f.Grip(-L * 0.17f, -L * 0.01f, L * 0.06f, Leather(), outline, 4);
+        f.Pommel(-L * 0.19f, L * 0.04f, fitting, accent, outline);
+
+        f.Blade({ { L * 0.03f, bw * 0.95f }, { L * 0.10f, bw }, { L * 0.80f, bw * 0.92f },
+                  { L * 1.00f, 0.0f } },
+                light, dark, outline, ol);
+        // 樋（中央の溝）と刃先の光
+        f.Seg(L * 0.09f, 0.0f, L * 0.68f, 0.0f, dark.Scaled(0.7f), L * 0.022f);
+        f.Seg(L * 0.09f, -L * 0.011f, L * 0.68f, -L * 0.011f, light, math::MaxF(1.0f, L * 0.006f));
+        f.Seg(L * 0.05f, -bw * 0.80f, L * 0.86f, -bw * 0.62f, edge, math::MaxF(1.0f, L * 0.008f),
+              math::ClampInt(alpha - 90, 0, 255));
+
+        // 十字鍔（中央が太く両端が丸い）
+        f.Seg(L * 0.015f, -L * 0.20f, L * 0.015f, L * 0.20f, outline, L * 0.058f);
+        f.Seg(L * 0.015f, -L * 0.19f, L * 0.015f, L * 0.19f, fitting, L * 0.040f);
+        f.Seg(L * 0.010f, -L * 0.18f, L * 0.010f, L * 0.18f, fitting.Scaled(1.3f), L * 0.010f);
+        for (float side : { -L * 0.20f, L * 0.20f }) {
+            f.Dot(L * 0.015f, side, L * 0.030f, outline);
+            f.Dot(L * 0.015f, side, L * 0.022f, fitting);
         }
+        f.Dot(L * 0.015f, 0.0f, L * 0.034f, outline);
+        f.Dot(L * 0.015f, 0.0f, L * 0.026f, accent);
+        f.Dot(L * 0.010f, -L * 0.008f, L * 0.009f, edge);
         break;
     }
+    //--------------------------------------------------------------------------
+    // 片手棍：金属の柄と、6 枚の出縁（フランジ）を持つ頭部
+    //--------------------------------------------------------------------------
+    case WeaponType::OneHandMace: {
+        const float L = length;
+        f.Grip(-L * 0.12f, L * 0.14f, L * 0.064f, Leather(), outline, 4);
+        f.Pommel(-L * 0.15f, L * 0.038f, fitting, accent, outline);
+        // 柄（金属）
+        f.Seg(L * 0.14f, 0.0f, L * 0.70f, 0.0f, outline, L * 0.062f);
+        f.Seg(L * 0.14f, 0.0f, L * 0.70f, 0.0f, dark, L * 0.044f);
+        f.Seg(L * 0.14f, -L * 0.010f, L * 0.70f, -L * 0.010f, light, L * 0.012f);
+        // 口金
+        for (float a : { L * 0.15f, L * 0.64f }) {
+            f.Seg(a, -L * 0.045f, a, L * 0.045f, outline, L * 0.042f);
+            f.Seg(a, -L * 0.040f, a, L * 0.040f, fitting, L * 0.028f);
+        }
+
+        // 頭部：出縁を放射状に並べる（上側は明るく、下側は暗く）
+        const Vec2 head = f.P(L * 0.82f, 0.0f);
+        const float baseAngle = std::atan2(f.dir.y, f.dir.x);
+        for (int pass = 0; pass < 2; ++pass) {
+            for (int k = 0; k < 6; ++k) {
+                const float a = baseAngle + kTwoPi * static_cast<float>(k) / 6.0f + 0.26f;
+                const Vec2 out(std::cos(a), std::sin(a));
+                const Vec2 side(-out.y, out.x);
+                const float grow = (pass == 0) ? ol : 0.0f;
+                const float r0 = L * 0.07f;
+                const float r1 = L * 0.20f + grow * 1.4f;
+                const float w = L * 0.055f + grow;
+                const Vec2 b1(head.x + out.x * r0 + side.x * w, head.y + out.y * r0 + side.y * w);
+                const Vec2 b2(head.x + out.x * r0 - side.x * w, head.y + out.y * r0 - side.y * w);
+                const Vec2 tip(head.x + out.x * r1, head.y + out.y * r1);
+                // 光の向き（武器の軸に対して side < 0 側）を向いた出縁ほど明るい
+                const float facingLight = -(out.x * f.perp.x + out.y * f.perp.y);
+                const ColorRGB color = (pass == 0) ? outline
+                                     : ColorRGB::Lerp(dark, light, 0.5f + 0.5f * facingLight);
+                f.Tri(b1, b2, tip, color);
+            }
+        }
+        f.Dot(L * 0.82f, 0.0f, L * 0.095f + ol, outline);
+        f.Dot(L * 0.82f, 0.0f, L * 0.095f, dark);
+        f.Dot(L * 0.80f, -L * 0.030f, L * 0.050f, light);
+        f.Dot(L * 0.82f, 0.0f, L * 0.030f, accent);
+        // 先端の短い突起
+        f.Tri(f.P(L * 0.90f, -L * 0.034f - ol), f.P(L * 0.90f, L * 0.034f + ol), f.P(L * 1.05f + ol, 0.0f),
+              outline);
+        f.Tri(f.P(L * 0.90f, -L * 0.030f), f.P(L * 0.90f, 0.0f), f.P(L * 1.04f, 0.0f), light);
+        f.Tri(f.P(L * 0.90f, 0.0f), f.P(L * 0.90f, L * 0.030f), f.P(L * 1.04f, 0.0f), dark);
+        break;
+    }
+    //--------------------------------------------------------------------------
+    // 短剣：木の葉形の刀身と、先が反った小さな鍔
+    //--------------------------------------------------------------------------
     case WeaponType::Dagger: {
         const float len = length * 0.55f;
-        const float bladeW = len * 0.12f;
-        draw::Line(point(-len * 0.16f, 0.0f).x, point(-len * 0.16f, 0.0f).y,
-                   point(0.0f, 0.0f).x, point(0.0f, 0.0f).y, metal.Scaled(0.5f), len * 0.10f, alpha);
-        draw::Triangle(point(0.0f, -bladeW), point(0.0f, bladeW), point(len, 0.0f), metal, true, alpha);
-        draw::Circle(point(0.0f, 0.0f).x, point(0.0f, 0.0f).y, len * 0.07f, accent, true, 1.0f, alpha);
+        f.Grip(-len * 0.24f, -len * 0.01f, len * 0.10f, Leather(), outline, 3);
+        f.Pommel(-len * 0.27f, len * 0.065f, fitting, accent, outline);
+
+        f.Blade({ { len * 0.03f, len * 0.085f }, { len * 0.12f, len * 0.11f }, { len * 0.42f, len * 0.125f },
+                  { len * 0.80f, len * 0.07f }, { len * 1.00f, 0.0f } },
+                light, dark, outline, ol);
+        // 鎬（中央の稜線）
+        f.Seg(len * 0.06f, 0.0f, len * 0.94f, 0.0f, dark.Scaled(0.75f), math::MaxF(1.0f, len * 0.016f));
+        f.Seg(len * 0.06f, -len * 0.09f, len * 0.80f, -len * 0.06f, edge, math::MaxF(1.0f, len * 0.012f),
+              math::ClampInt(alpha - 90, 0, 255));
+
+        // 鍔：両端を刀身側へ反らせる
+        f.Seg(len * 0.01f, -len * 0.20f, len * 0.01f, len * 0.20f, outline, len * 0.085f);
+        f.Seg(len * 0.01f, -len * 0.19f, len * 0.01f, len * 0.19f, fitting, len * 0.060f);
+        for (float s : { -1.0f, 1.0f }) {
+            f.Seg(len * 0.01f, s * len * 0.19f, len * 0.09f, s * len * 0.26f, outline, len * 0.060f);
+            f.Seg(len * 0.01f, s * len * 0.19f, len * 0.09f, s * len * 0.26f, fitting, len * 0.038f);
+        }
+        f.Dot(len * 0.01f, 0.0f, len * 0.045f, accent);
         break;
     }
+    //--------------------------------------------------------------------------
+    // 細剣：細く長い刀身。碗状の護拳・十字の鍔・護拳から柄頭へ回る弓
+    //--------------------------------------------------------------------------
     case WeaponType::Rapier: {
         const float len = length * 1.12f;
-        // 護拳
-        const Vec2 guard = point(0.04f * len, 0.0f);
-        draw::Circle(guard.x, guard.y, len * 0.07f, accent.Scaled(0.9f), false, 3.0f, alpha);
-        // 細身の刀身
-        draw::Line(guard.x, guard.y, point(len, 0.0f).x, point(len, 0.0f).y, metal, len * 0.035f, alpha);
-        draw::Line(point(-len * 0.12f, 0.0f).x, point(-len * 0.12f, 0.0f).y, guard.x, guard.y,
-                   metal.Scaled(0.5f), len * 0.055f, alpha);
+        f.Grip(-len * 0.15f, -len * 0.005f, len * 0.040f, Leather(), outline, 5);
+        f.Pommel(-len * 0.175f, len * 0.034f, fitting, accent, outline);
+
+        f.Blade({ { len * 0.05f, len * 0.020f }, { len * 0.12f, len * 0.017f }, { len * 0.92f, len * 0.008f },
+                  { len * 1.00f, 0.0f } },
+                light, dark, outline, math::MaxF(1.2f, ol * 0.8f));
+        f.Seg(len * 0.07f, -len * 0.010f, len * 0.92f, -len * 0.005f, edge, math::MaxF(1.0f, len * 0.004f),
+              math::ClampInt(alpha - 80, 0, 255));
+
+        // 護拳の弓（鍔から柄頭へ、手の甲側を回る曲線）
+        Vec2 prev = f.P(len * 0.02f, len * 0.11f);
+        for (int i = 1; i <= 8; ++i) {
+            const float t = static_cast<float>(i) / 8.0f;
+            const float u = 1.0f - t;
+            // 2 次ベジェ：(0.02, 0.11) → (-0.07, 0.17) → (-0.17, 0.035)
+            const float a = u * u * 0.02f + 2.0f * u * t * (-0.07f) + t * t * (-0.17f);
+            const float sd = u * u * 0.11f + 2.0f * u * t * 0.17f + t * t * 0.035f;
+            const Vec2 cur = f.P(len * a, len * sd);
+            draw::Line(prev.x, prev.y, cur.x, cur.y, outline, len * 0.024f, alpha);
+            draw::Circle(cur.x, cur.y, len * 0.012f, outline, true, 1.0f, alpha);
+            prev = cur;
+        }
+        // 縁取りを全部引いてから中身を重ねる（継ぎ目に隙間が出ないよう関節に丸を置く）
+        prev = f.P(len * 0.02f, len * 0.11f);
+        for (int i = 1; i <= 8; ++i) {
+            const float t = static_cast<float>(i) / 8.0f;
+            const float u = 1.0f - t;
+            const float a = u * u * 0.02f + 2.0f * u * t * (-0.07f) + t * t * (-0.17f);
+            const float sd = u * u * 0.11f + 2.0f * u * t * 0.17f + t * t * 0.035f;
+            const Vec2 cur = f.P(len * a, len * sd);
+            draw::Line(prev.x, prev.y, cur.x, cur.y, fitting, len * 0.013f, alpha);
+            draw::Circle(cur.x, cur.y, len * 0.0065f, fitting, true, 1.0f, alpha);
+            prev = cur;
+        }
+        // 十字の鍔
+        f.Seg(len * 0.03f, -len * 0.13f, len * 0.03f, len * 0.12f, outline, len * 0.026f);
+        f.Seg(len * 0.03f, -len * 0.125f, len * 0.03f, len * 0.115f, fitting, len * 0.015f);
+        f.Dot(len * 0.03f, -len * 0.13f, len * 0.018f, fitting);
+        // 碗状の護拳
+        f.Dot(len * 0.035f, 0.0f, len * 0.070f + ol, outline);
+        f.Dot(len * 0.035f, 0.0f, len * 0.070f, dark);
+        f.Dot(len * 0.025f, -len * 0.020f, len * 0.042f, light);
+        f.Dot(len * 0.035f, 0.0f, len * 0.070f, accent, false, math::MaxF(1.5f, len * 0.010f));
         break;
     }
+    //--------------------------------------------------------------------------
+    // 槍：木目の柄・布を巻いた握り・房飾り・稜線のある木の葉形の穂先
+    //--------------------------------------------------------------------------
     case WeaponType::Spear: {
         const float len = length * 1.30f;
-        // 石突〜柄
-        draw::Line(point(-len * 0.30f, 0.0f).x, point(-len * 0.30f, 0.0f).y,
-                   point(len * 0.80f, 0.0f).x, point(len * 0.80f, 0.0f).y,
-                   ColorRGB(120, 88, 58), len * 0.035f, alpha);
+        const ColorRGB wood(126, 90, 58);
+        // 柄
+        f.Seg(-len * 0.30f, 0.0f, len * 0.78f, 0.0f, outline, len * 0.042f);
+        f.Seg(-len * 0.30f, 0.0f, len * 0.78f, 0.0f, wood, len * 0.030f);
+        f.Seg(-len * 0.30f, -len * 0.007f, len * 0.78f, -len * 0.007f, wood.Scaled(1.35f), len * 0.007f);
+        f.Seg(-len * 0.20f, len * 0.006f, len * 0.60f, len * 0.006f, wood.Scaled(0.7f), len * 0.004f);
+        // 石突
+        f.Seg(-len * 0.33f, 0.0f, -len * 0.27f, 0.0f, outline, len * 0.050f);
+        f.Seg(-len * 0.33f, 0.0f, -len * 0.27f, 0.0f, fitting, len * 0.036f);
+        // 握りの布巻き
+        for (int i = 0; i < 4; ++i) {
+            const float a = -len * 0.07f + len * 0.045f * static_cast<float>(i);
+            f.Seg(a - len * 0.012f, -len * 0.020f, a + len * 0.012f, len * 0.020f, outline, len * 0.020f);
+            f.Seg(a - len * 0.012f, -len * 0.018f, a + len * 0.012f, len * 0.018f, accent.Scaled(0.75f),
+                  len * 0.012f);
+        }
+        // 房飾り（口金から垂れる）
+        for (float s : { 0.0f, 0.03f }) {
+            f.Seg(len * 0.76f, len * 0.015f, len * (0.67f + s), len * (0.085f + s * 0.6f), accent,
+                  math::MaxF(1.5f, len * 0.010f));
+        }
+        // 口金
+        f.Quad(f.P(len * 0.73f, -len * 0.028f), f.P(len * 0.81f, -len * 0.022f),
+               f.P(len * 0.81f, len * 0.022f), f.P(len * 0.73f, len * 0.028f), outline);
+        f.Quad(f.P(len * 0.735f, -len * 0.022f), f.P(len * 0.805f, -len * 0.017f),
+               f.P(len * 0.805f, len * 0.017f), f.P(len * 0.735f, len * 0.022f), fitting);
+        f.Seg(len * 0.745f, -len * 0.030f, len * 0.745f, len * 0.030f, accent, len * 0.012f);
         // 穂先
-        draw::Triangle(point(len * 0.78f, -len * 0.06f), point(len * 0.78f, len * 0.06f),
-                       point(len, 0.0f), metal, true, alpha);
-        draw::Line(point(len * 0.74f, -len * 0.05f).x, point(len * 0.74f, -len * 0.05f).y,
-                   point(len * 0.74f, len * 0.05f).x, point(len * 0.74f, len * 0.05f).y,
-                   accent.Scaled(0.8f), len * 0.03f, alpha);
+        f.Blade({ { len * 0.80f, len * 0.030f }, { len * 0.86f, len * 0.058f }, { len * 0.93f, len * 0.040f },
+                  { len * 1.00f, 0.0f } },
+                light, dark, outline, ol);
+        f.Seg(len * 0.81f, 0.0f, len * 0.985f, 0.0f, dark.Scaled(0.7f), math::MaxF(1.0f, len * 0.006f));
+        f.Seg(len * 0.82f, -len * 0.035f, len * 0.95f, -len * 0.025f, edge, math::MaxF(1.0f, len * 0.004f),
+              math::ClampInt(alpha - 90, 0, 255));
         break;
     }
     default:
