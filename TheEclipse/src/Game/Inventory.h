@@ -3,9 +3,11 @@
 //==============================================================================
 #pragma once
 
+#include "Game/Consumable.h"
 #include "Game/Equipment.h"
 #include "Graphics/CharacterArt.h"
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -126,11 +128,27 @@ public:
     int  Material() const { return material_; }
     void AddMaterial(int amount);
 
+    // --- 消費アイテム・素材（ID ごとの個数で持つ）-------------------------------
+    int  ItemCount(int itemId) const;
+    // 上限（回復・バフ 99 / 素材 999）を超えたぶんは捨てる。実際に増えた数を返す
+    int  AddItemCount(int itemId, int count);
+    // 1 つ使う（無ければ false）
+    bool ConsumeItem(int itemId);
+    // 1 個以上持っているアイテムの ID 一覧（定義順）
+    std::vector<int> OwnedItemIds(ConsumableKind kind) const;
+
+    // 戦闘で使うアイテムの装備枠（0 なら空）。個数が 0 になっても枠は残す
+    int  QuickItem(QuickSlot slot) const;
+    // 種類が枠に合わないアイテムは装備できない（0 を渡すと外す）
+    bool SetQuickItem(QuickSlot slot, int itemId);
+
 private:
     std::vector<EquipmentItem> items_;
     int equippedUid_[static_cast<int>(EquipSlot::Count)] = {};
     int col_ = 3000;
     int material_ = 20;
+    std::map<int, int> itemCounts_;
+    int quickItems_[kQuickSlotCount] = {};
     bool dualWieldEnabled_ = false;
 
     // 装備 uid の配列からステータスを合計する内部処理

@@ -188,6 +188,12 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
         player_.UseSkill(clickedSkill, combat_);
     }
 
+    // アイテムスライダー（E かクリックで使う。フロア移動の暗転中は使えない）
+    if (hud_.ItemUseRequested() && !transitioning_
+        && (phase_ == Phase::Battle || phase_ == Phase::FloorClear || phase_ == Phase::FloorIntro)) {
+        UseQuickItem(context);
+    }
+
     // --- フロア遷移中 --------------------------------------------------------
     if (transitioning_) {
         UpdateFloorTransition(dt, context);
@@ -421,7 +427,9 @@ void QuestScene::UpdateActors(float dt, GameContext& context)
     const bool controlEnabled = (phase_ == Phase::Battle || phase_ == Phase::FloorClear
                                  || phase_ == Phase::FloorIntro);
 
-    player_.Update(dt, stage_, combat_, input, controlEnabled && !menu_.IsOpen());
+    // アイテムスライダーをクリックしたフレームは、同じクリックで攻撃を出さない
+    player_.Update(dt, stage_, combat_, input,
+                   controlEnabled && !menu_.IsOpen() && !hud_.ItemClickConsumed());
 
     for (std::unique_ptr<Enemy>& enemy : enemies_) {
         enemy->Update(dt, stage_, combat_, player_.pos, player_.alive, player_.z);
@@ -439,6 +447,36 @@ Actor* QuestScene::FindActorById(int actorId)
     }
     if (boss_ && boss_->id == actorId) return boss_.get();
     return nullptr;
+}
+
+void QuestScene::UseQuickItem(GameContext& context)
+{
+    Inventory& inventory = context.player.GetInventory();
+    const QuickSlot slot = hud_.ItemSlot();
+    const ConsumableDef* item = ConsumableDatabase::Instance().Find(inventory.QuickItem(slot));
+    if (!item) {
+        hud_.ShowItemMessage(str::Format("%sアイテムが装備されていません", QuickSlotName(slot)));
+        return;
+    }
+    if (inventory.ItemCount(item->id) <= 0) {
+        hud_.ShowItemMessage(str::Format("%s がありません", item->name.c_str()));
+        return;
+    }
+
+    switch (player_.UseItem(*item, combat_)) {
+    case ItemUseResult::Used:
+        inventory.ConsumeItem(item->id);
+        break;
+    case ItemUseResult::NoEffect:
+        hud_.ShowItemMessage(item->mpRate > 0.0f && item->hpRate > 0.0f ? "HP と MP は満タンです"
+                             : item->mpRate > 0.0f                      ? "MP は満タンです"
+                                                                        : "HP は満タンです");
+        break;
+    case ItemUseResult::Cooldown:
+    case ItemUseResult::Unusable:
+    default:
+        break;   // 連打や戦闘不能中は黙って無視する
+    }
 }
 
 void QuestScene::HandleParrySuccess(GameContext& context)
@@ -565,9 +603,9 @@ void QuestScene::ResolveProjectiles(GameContext& context)
                                            -projectile.velocity.y * 0.5f);
                 projectile.team = Team::Player;
                 projectile.sourceId = player_.id;
-                projectile.attack = player_.stats.attack;
+                projectile.attack = player_.AttackPower();
                 projectile.damageMultiplier = 1.8f;
-                projectile.critRate = player_.stats.critRate;
+                projectile.critRate = player_.CritRate();
                 projectile.critDamage = player_.stats.critDamage;
                 projectile.color = palette::kCritical;
                 projectile.life = math::MaxF(projectile.life, 2.0f);
@@ -743,6 +781,9 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
         result.drops = QuestDatabase::Instance().RollDrops(
             *quest_, cleared, enemiesDefeated_, context.player.DropRateMultiplier(),
             result.firstClear);
+        // 素材（道中は倒した数だけ、ボスは撃破時）
+        result.materials = QuestDatabase::Instance().RollMaterials(
+            *quest_, cleared, enemiesDefeated_, context.player.DropRateMultiplier());
     }
 
     result.expGained = exp;
@@ -755,6 +796,9 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
     // --- プレイヤーへ反映 -----------------------------------------------------
     Inventory& inventory = context.player.GetInventory();
     inventory.AddItems(result.drops);
+    for (const ItemStack& stack : result.materials) {
+        inventory.AddItemCount(stack.itemId, stack.count);
+    }
     inventory.AddCol(col);
     inventory.AddMaterial(result.materialGained);
     const int spBefore = context.player.SkillPoints();

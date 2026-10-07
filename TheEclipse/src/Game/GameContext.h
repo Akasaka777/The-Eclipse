@@ -4,6 +4,7 @@
 #pragma once
 
 #include "Core/GameConfig.h"
+#include "Game/Consumable.h"
 #include "Game/Equipment.h"
 #include "Game/PlayerData.h"
 
@@ -37,6 +38,8 @@ struct QuestResult
     int         abilityPointsGained = 0;   // 振り分けステータス用
     bool        firstClear = false;
     std::vector<EquipmentItem> drops;
+    // 持ち帰った素材（武器・防具の作成用）
+    std::vector<ItemStack> materials;
     // 耐久力が尽きて消滅した装備
     std::vector<std::string> brokenItems;
     // このクエストでユニークスキルの解放条件を満たしたか

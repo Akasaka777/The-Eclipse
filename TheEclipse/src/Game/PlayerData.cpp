@@ -54,6 +54,10 @@ void PlayerData::SetupNewGame(WeaponType weapon)
     }
     // 最初は選んだ武器の初期スキルだけを装備した状態にする
     ResetSkillLoadoutToStarter();
+
+    // 回復アイテムを少しだけ持たせ、戦闘で使えるよう装備しておく
+    inventory_.AddItemCount(kStarterPotionId, kStarterPotionCount);
+    inventory_.SetQuickItem(QuickSlot::Recovery, kStarterPotionId);
 }
 
 int PlayerData::ExpToNext() const

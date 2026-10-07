@@ -41,6 +41,7 @@ enum class DebugMenu
 {
     None,
     Col,     // 追加する col の量を選ぶ
+    Level,   // 上げるレベルの量を選ぶ
     Unique   // 解放するユニークスキルを選ぶ
 };
 
@@ -79,6 +80,7 @@ private:
     std::vector<ui::Button> debugButtons_;
     // プルダウン（開いているのは常に 1 つだけ）
     std::vector<ui::Button> debugColMenu_;
+    std::vector<ui::Button> debugLevelMenu_;
     std::vector<ui::Button> debugUniqueMenu_;
     DebugMenu debugMenuOpen_ = DebugMenu::None;
     HomeTab activeTab_ = HomeTab::None;

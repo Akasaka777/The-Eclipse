@@ -44,6 +44,8 @@ void Input::Initialize()
     bind(GameAction::Skill2,    { KEY_INPUT_2, KEY_INPUT_NUMPAD2 }, -1, "2");
     bind(GameAction::Skill3,    { KEY_INPUT_3, KEY_INPUT_NUMPAD3 }, -1, "3");
     bind(GameAction::Skill4,    { KEY_INPUT_4, KEY_INPUT_NUMPAD4 }, -1, "4");
+    bind(GameAction::ItemSwitch, { KEY_INPUT_Q }, -1, "Q");
+    bind(GameAction::ItemUse,    { KEY_INPUT_E }, -1, "E");
     bind(GameAction::Menu,      { KEY_INPUT_ESCAPE }, -1, "ESC");
     bind(GameAction::Confirm,   { KEY_INPUT_RETURN }, -1, "ENTER");
     bind(GameAction::Cancel,    { KEY_INPUT_ESCAPE, KEY_INPUT_BACK }, -1, "ESC");

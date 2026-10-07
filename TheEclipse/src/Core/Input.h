@@ -24,6 +24,8 @@ enum class GameAction
     Skill2,
     Skill3,
     Skill4,
+    ItemSwitch,   // 戦闘中のアイテム枠を 回復 ⇔ バフ で切り替える
+    ItemUse,      // 選んでいる枠のアイテムを使う
     Menu,
     Confirm,
     Cancel,

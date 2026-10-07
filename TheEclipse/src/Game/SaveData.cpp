@@ -2,6 +2,7 @@
 
 #include "Common/StringUtil.h"
 #include "Game/Ability.h"
+#include "Game/Consumable.h"
 #include "Game/GameContext.h"
 #include "Common/MathUtil.h"
 #include "Game/ItemDatabase.h"
@@ -29,7 +30,8 @@ namespace {
 // v3: 武器スロットを左右に分割し、ユニークスキルを追加
 // v8: 振り分けステータス（STR / AGI / VIT / INT / LUK）と MP 回復量の見直し
 // v9: アクセサリースロットとショップを追加（アクセサリーは定義から作り直す）
-constexpr int kSaveVersion = 9;
+// v10: 消費アイテム（回復・バフ）と素材、戦闘用アイテム枠を追加
+constexpr int kSaveVersion = 10;
 
 std::string g_lastError;
 
@@ -159,6 +161,17 @@ bool SaveSystem::Save(const GameContext& context)
         file << "equip " << i << ' ' << inventory.EquippedUid(static_cast<EquipSlot>(i)) << "\n";
     }
 
+    // --- 消費アイテム・素材 -------------------------------------------------
+    //   consumable <アイテムID> <個数>
+    //   quickitem  <枠（0: 回復 / 1: バフ）> <アイテムID>
+    for (const ConsumableDef& def : ConsumableDatabase::Instance().All()) {
+        const int count = inventory.ItemCount(def.id);
+        if (count > 0) file << "consumable " << def.id << ' ' << count << "\n";
+    }
+    for (int i = 0; i < kQuickSlotCount; ++i) {
+        file << "quickitem " << i << ' ' << inventory.QuickItem(static_cast<QuickSlot>(i)) << "\n";
+    }
+
     // --- スキル -------------------------------------------------------------
     for (int i = 0; i < kSkillSlotCount; ++i) {
         file << "skillslot " << i << ' ' << player.SkillLoadout()[i] << "\n";
@@ -207,6 +220,7 @@ bool SaveSystem::Load(GameContext& context)
     inventory.Clear();
 
     int equippedUid[static_cast<int>(EquipSlot::Count)] = {};
+    int quickItems[kQuickSlotCount] = {};
     int skillSlots[kSkillSlotCount] = {};
     std::vector<int> unlocked;
     std::vector<int> cleared;
@@ -263,6 +277,12 @@ bool SaveSystem::Load(GameContext& context)
             if (slot >= 0 && slot < static_cast<int>(EquipSlot::Count)) {
                 equippedUid[slot] = ToInt(arg(2));
             }
+        } else if (key == "consumable") {
+            // 定義が無くなったアイテムは AddItemCount 側で捨てる
+            inventory.AddItemCount(ToInt(arg(1)), ToInt(arg(2)));
+        } else if (key == "quickitem") {
+            const int slot = ToInt(arg(1), -1);
+            if (slot >= 0 && slot < kQuickSlotCount) quickItems[slot] = ToInt(arg(2));
         } else if (key == "skillslot") {
             const int slot = ToInt(arg(1), -1);
             if (slot >= 0 && slot < kSkillSlotCount) skillSlots[slot] = ToInt(arg(2));
@@ -377,6 +397,15 @@ bool SaveSystem::Load(GameContext& context)
     for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {
         if (equippedUid[i] == 0) continue;
         inventory.EquipTo(equippedUid[i], static_cast<EquipSlot>(i));
+    }
+    // 戦闘用アイテム枠（種類が合わないものは SetQuickItem が弾く）
+    for (int i = 0; i < kQuickSlotCount; ++i) {
+        inventory.SetQuickItem(static_cast<QuickSlot>(i), quickItems[i]);
+    }
+    // v9 以前のセーブにはアイテムが無いので、新規ゲームと同じ回復アイテムを配る
+    if (version > 0 && version < 10) {
+        inventory.AddItemCount(kStarterPotionId, kStarterPotionCount);
+        inventory.SetQuickItem(QuickSlot::Recovery, kStarterPotionId);
     }
     // 装備を戻してからスキル構成を整える
     //   （使えるスキルの系統は装備で決まるため、装備より先に整えると外れてしまう）

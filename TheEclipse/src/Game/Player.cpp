@@ -48,6 +48,10 @@ void Player::Setup(const PlayerData& data)
     // 戦闘開始時バフ（旅人の護符）はここで発動する。
     // 戦闘中の装備変更（RefreshEquipment）では掛け直さない。
     openingTimer_ = openingDuration_;
+    // バフアイテムは戦闘ごとに切れる
+    itemBuff_ = nullptr;
+    itemBuffTimer_ = 0.0f;
+    itemCooldown_ = 0.0f;
 
     hp = maxHp;
     mp_ = maxMp_;
@@ -149,8 +153,66 @@ float Player::MpRatio() const
 
 float Player::AttackPower() const
 {
-    const float bonus = (openingTimer_ > 0.0f) ? openingAttackRate_ : 0.0f;
+    float bonus = (openingTimer_ > 0.0f) ? openingAttackRate_ : 0.0f;
+    if (const ConsumableDef* buff = ItemBuff()) bonus += buff->rates.attack;
     return stats.attack * (1.0f + bonus);
+}
+
+float Player::DefensePower() const
+{
+    const ConsumableDef* buff = ItemBuff();
+    return stats.defense * (1.0f + (buff ? buff->rates.defense : 0.0f));
+}
+
+float Player::MoveSpeed() const
+{
+    const ConsumableDef* buff = ItemBuff();
+    return stats.moveSpeed * (1.0f + (buff ? buff->rates.moveSpeed : 0.0f));
+}
+
+float Player::CritRate() const
+{
+    const ConsumableDef* buff = ItemBuff();
+    return stats.critRate + (buff ? buff->critRate : 0.0f);
+}
+
+float Player::ItemBuffRatio() const
+{
+    const ConsumableDef* buff = ItemBuff();
+    if (!buff || buff->duration <= 0.0f) return 0.0f;
+    return math::Clamp(itemBuffTimer_ / buff->duration, 0.0f, 1.0f);
+}
+
+ItemUseResult Player::UseItem(const ConsumableDef& item, CombatSystem& combat)
+{
+    if (!alive || item.kind == ConsumableKind::Material) return ItemUseResult::Unusable;
+    if (itemCooldown_ > 0.0f) return ItemUseResult::Cooldown;
+
+    const Vec2 above(pos.x, pos.y - height - 30.0f);
+
+    if (item.kind == ConsumableKind::Recovery) {
+        const float healHp = math::MinF(maxHp - hp, maxHp * item.hpRate);
+        const float healMp = math::MinF(maxMp_ - mp_, maxMp_ * item.mpRate);
+        // 回復する余地が無いときは使わない（アイテムを無駄にしない）
+        if (healHp < 1.0f && healMp < 1.0f) return ItemUseResult::NoEffect;
+
+        hp += math::MaxF(0.0f, healHp);
+        mp_ += math::MaxF(0.0f, healMp);
+        if (healHp >= 1.0f) {
+            combat.AddHealNumber(Vec2(pos.x, pos.y - height * 1.1f), static_cast<int>(healHp));
+        }
+        combat.AddPopup(above, item.name, item.color, false);
+        combat.AddRing(Vec2(pos.x, pos.y - height * 0.5f), 150.0f, item.color, 0.35f);
+    } else {
+        // バフは 1 つだけ。使い直すと効果時間が最初からになる
+        itemBuff_ = &item;
+        itemBuffTimer_ = item.duration;
+        combat.AddPopup(above, item.name, item.color, true);
+        combat.AddRing(Vec2(pos.x, pos.y - height * 0.5f), 210.0f, item.color, 0.45f);
+    }
+
+    itemCooldown_ = kItemUseCooldown;
+    return ItemUseResult::Used;
 }
 
 const SwordSkill* Player::Skill(int index) const
@@ -259,6 +321,8 @@ void Player::Update(float dt, const Stage& stage, CombatSystem& combat,
 
     dashCooldown_ = math::MaxF(0.0f, dashCooldown_ - dt);
     openingTimer_ = math::MaxF(0.0f, openingTimer_ - dt);
+    itemBuffTimer_ = math::MaxF(0.0f, itemBuffTimer_ - dt);
+    itemCooldown_ = math::MaxF(0.0f, itemCooldown_ - dt);
     parryWindow_ = math::MaxF(0.0f, parryWindow_ - dt);
     parryCooldown_ = math::MaxF(0.0f, parryCooldown_ - dt);
     parryFlash_ = math::MaxF(0.0f, parryFlash_ - dt);
@@ -336,7 +400,7 @@ void Player::UpdateNormal(float dt, CombatSystem& combat, const Input& input, bo
     guarding_ = input.Down(GameAction::Guard) && onGround;
 
     const float axis = input.MoveAxisX();
-    const float speed = stats.moveSpeed * (guarding_ ? 0.0f : 1.0f);
+    const float speed = MoveSpeed() * (guarding_ ? 0.0f : 1.0f);
 
     if (math::Abs(axis) > 0.1f && !guarding_) {
         velocity.x = axis * speed;
@@ -352,7 +416,7 @@ void Player::UpdateNormal(float dt, CombatSystem& combat, const Input& input, bo
         if (input.Down(GameAction::MoveUp)) depthAxis += 1.0f;   // 奥へ
         if (input.Down(GameAction::MoveDown)) depthAxis -= 1.0f; // 手前へ
         if (depthAxis != 0.0f) {
-            MoveDepth(depthAxis * stats.moveSpeed * config::kDepthMoveRate * dt, stage);
+            MoveDepth(depthAxis * MoveSpeed() * config::kDepthMoveRate * dt, stage);
             depthMoving_ = true;
         }
     }
@@ -438,7 +502,7 @@ void Player::SpawnComboHitBox(CombatSystem& combat)
     hitBox.sourceId = id;
     hitBox.attack = AttackPower();
     hitBox.damageMultiplier = step.damageMultiplier;
-    hitBox.critRate = stats.critRate;
+    hitBox.critRate = CritRate();
     hitBox.critDamage = stats.critDamage;
     hitBox.knockback = step.knockback;
     hitBox.z = z;
@@ -492,7 +556,7 @@ void Player::SpawnSkillStrike(const SkillStrike& strike, CombatSystem& combat)
     hitBox.sourceId = id;
     hitBox.attack = AttackPower();
     hitBox.damageMultiplier = strike.damageMultiplier;
-    hitBox.critRate = stats.critRate;
+    hitBox.critRate = CritRate();
     hitBox.critDamage = stats.critDamage;
     hitBox.knockback = strike.knockback;
     hitBox.z = z;
@@ -592,7 +656,7 @@ int Player::ApplyHit(const HitBox& hitBox, CombatSystem& combat)
         return 0;
     }
 
-    DamageResult result = CalculateDamage(hitBox.attack, stats.defense, hitBox.damageMultiplier,
+    DamageResult result = CalculateDamage(hitBox.attack, DefensePower(), hitBox.damageMultiplier,
                                           hitBox.critRate, hitBox.critDamage);
 
     // ガード中は大幅に軽減し、のけぞりも短い
@@ -661,11 +725,19 @@ void Player::Draw(const Camera& camera) const
     DrawBody(camera);
     if (!alive) return;
 
-    // 戦闘開始時バフ（旅人の護符）が効いている間は頭上に出す
+    // 戦闘開始時バフ（旅人の護符）とバフアイテムが効いている間は頭上に出す
+    float buffTextY = pos.y - height - 28.0f;
     if (openingTimer_ > 0.0f) {
-        const Vec2 above = camera.WorldToScreen(Vec2(pos.x, pos.y - height - 28.0f));
+        const Vec2 above = camera.WorldToScreen(Vec2(pos.x, buffTextY));
         draw::Text(FontSize::Tiny, above.x, above.y, palette::kAccentWarm,
                    str::Format("ATK +%.0f%%  %.0fs", openingAttackRate_ * 100.0f, openingTimer_),
+                   draw::TextAlign::Center);
+        buffTextY -= 24.0f;
+    }
+    if (const ConsumableDef* buff = ItemBuff()) {
+        const Vec2 above = camera.WorldToScreen(Vec2(pos.x, buffTextY));
+        draw::Text(FontSize::Tiny, above.x, above.y, buff->color,
+                   str::Format("%s  %.0fs", buff->name.c_str(), itemBuffTimer_),
                    draw::TextAlign::Center);
     }
 

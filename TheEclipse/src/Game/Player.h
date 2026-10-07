@@ -5,6 +5,7 @@
 #pragma once
 
 #include "Core/Input.h"
+#include "Game/Consumable.h"
 #include "Game/Actor.h"
 #include "Game/PlayerData.h"
 #include "Game/SwordSkill.h"
@@ -22,6 +23,17 @@ enum class PlayerState
     Dash,
     Hurt,
     Dead
+};
+
+//------------------------------------------------------------------------------
+// 戦闘中にアイテムを使った結果
+//------------------------------------------------------------------------------
+enum class ItemUseResult
+{
+    Used,       // 使った（呼び出し側で所持数を 1 減らす）
+    Cooldown,   // 直前に使ったばかり
+    NoEffect,   // HP / MP が満タンで回復の意味が無い
+    Unusable    // 戦闘不能・素材など、使えない状態や種類
 };
 
 class Player : public Actor
@@ -86,6 +98,19 @@ public:
     float OpeningBuffRate() const { return openingAttackRate_; }
     // バフを乗せた攻撃力（判定を出すときに使う）
     float AttackPower() const;
+    // アイテムのバフを乗せた防御力・移動速度・クリティカル率
+    float DefensePower() const;
+    float MoveSpeed() const;
+    float CritRate() const;
+
+    // --- アイテム -----------------------------------------------------------
+    // 回復・バフアイテムを使う。Used のときだけ効果が出る（所持数は呼び出し側で減らす）
+    ItemUseResult UseItem(const ConsumableDef& item, CombatSystem& combat);
+    float ItemCooldown() const { return itemCooldown_; }
+    // 効いているバフアイテム（無ければ nullptr）
+    const ConsumableDef* ItemBuff() const { return (itemBuffTimer_ > 0.0f) ? itemBuff_ : nullptr; }
+    float ItemBuffRemain() const { return itemBuffTimer_; }
+    float ItemBuffRatio() const;
 
 private:
     // 装備由来の値を反映する（Setup / RefreshEquipment の共通処理）
@@ -115,6 +140,11 @@ private:
     float openingAttackRate_ = 0.0f;
     float openingDuration_ = 0.0f;
     float openingTimer_ = 0.0f;
+
+    // バフアイテム（1 つだけ。別のバフを使うと上書き）
+    const ConsumableDef* itemBuff_ = nullptr;
+    float itemBuffTimer_ = 0.0f;
+    float itemCooldown_ = 0.0f;
 
     // 通常攻撃
     int   comboIndex_ = 0;

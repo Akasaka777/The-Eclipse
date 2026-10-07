@@ -15,6 +15,8 @@ constexpr float kRowHeight = 66.0f;
 
 // ショップで買った装備の個体値（低めに固定。良い個体値はドロップで狙う）
 constexpr int kShopIv = 35;
+// アイテムのまとめ買いの個数
+constexpr int kBulkBuyCount = 10;
 
 } // namespace
 
@@ -56,6 +58,10 @@ void ShopPanel::Layout()
     buyButton_ = Button(Rect::FromXYWH(detailArea_.left, window_.bottom - 82.0f, 220.0f, 54.0f),
                         "購入する");
     buyButton_.SetAccent(palette::kAccentWarm);
+    buyTenButton_ = Button(Rect::FromXYWH(detailArea_.left + 236.0f, window_.bottom - 82.0f,
+                                          220.0f, 54.0f),
+                           str::Format("%d 個購入", kBulkBuyCount));
+    buyTenButton_.SetAccent(palette::kAccentWarm);
     closeButton_ = Button(Rect::FromXYWH(window_.right - 200.0f, window_.bottom - 82.0f,
                                          160.0f, 54.0f), "閉じる");
 }
@@ -95,6 +101,62 @@ std::vector<const ItemTemplate*> ShopPanel::Goods() const
     }
 }
 
+std::vector<const ConsumableDef*> ShopPanel::ItemGoods() const
+{
+    if (tab_ != ShopTab::Item) return std::vector<const ConsumableDef*>();
+    return ConsumableDatabase::Instance().ShopItems();
+}
+
+const ConsumableDef* ShopPanel::SelectedItem() const
+{
+    if (selectedId_ == 0) return nullptr;
+    for (const ConsumableDef* def : ItemGoods()) {
+        if (def->id == selectedId_) return def;
+    }
+    return nullptr;
+}
+
+int ShopPanel::GoodsCount() const
+{
+    return (tab_ == ShopTab::Item) ? static_cast<int>(ItemGoods().size())
+                                   : static_cast<int>(Goods().size());
+}
+
+int ShopPanel::ItemBuyCount(const GameContext& context, int wanted) const
+{
+    const ConsumableDef* item = SelectedItem();
+    if (!item) return 0;
+    const int room = item->MaxStack() - context.player.GetInventory().ItemCount(item->id);
+    return math::ClampInt(wanted, 0, math::MaxI(0, room));
+}
+
+void ShopPanel::BuyItem(GameContext& context, int wanted)
+{
+    const ConsumableDef* item = SelectedItem();
+    if (!item) return;
+    Inventory& inventory = context.player.GetInventory();
+
+    const int count = ItemBuyCount(context, wanted);
+    if (count <= 0) {
+        message_ = str::Format("%s はこれ以上持てません（上限 %d 個）", item->name.c_str(),
+                               item->MaxStack());
+        messageTimer_ = 2.4f;
+        return;
+    }
+    const int cost = item->price * count;
+    if (inventory.Col() < cost) {
+        message_ = "col が足りません";
+        messageTimer_ = 2.0f;
+        return;
+    }
+
+    inventory.AddCol(-cost);
+    inventory.AddItemCount(item->id, count);
+    purchased_ = true;
+    message_ = str::Format("%s を %d 個購入しました", item->name.c_str(), count);
+    messageTimer_ = 2.4f;
+}
+
 const ItemTemplate* ShopPanel::Selected() const
 {
     if (selectedId_ == 0) return nullptr;
@@ -127,7 +189,9 @@ void ShopPanel::Update(float dt, const Input& input, GameContext& context)
 
     Inventory& inventory = context.player.GetInventory();
     const std::vector<const ItemTemplate*> goods = Goods();
-    const int maxScroll = math::MaxI(0, static_cast<int>(goods.size()) - kVisibleRows);
+    const std::vector<const ConsumableDef*> itemGoods = ItemGoods();
+    const int goodsCount = GoodsCount();
+    const int maxScroll = math::MaxI(0, goodsCount - kVisibleRows);
 
     // --- 一覧の選択 / スクロール ----------------------------------------------
     const float mouseX = static_cast<float>(input.MouseX());
@@ -138,16 +202,45 @@ void ShopPanel::Update(float dt, const Input& input, GameContext& context)
     if (input.MouseClicked(MouseButton::Left)) {
         for (int row = 0; row < kVisibleRows; ++row) {
             const int index = scroll_ + row;
-            if (index >= static_cast<int>(goods.size())) break;
+            if (index >= goodsCount) break;
             if (!RowRect(row).Contains(mouseX, mouseY)) continue;
-            selectedId_ = goods[static_cast<size_t>(index)]->id;
+            selectedId_ = (tab_ == ShopTab::Item) ? itemGoods[static_cast<size_t>(index)]->id
+                                                  : goods[static_cast<size_t>(index)]->id;
             message_.clear();
             break;
         }
     }
     scroll_ = math::ClampInt(scroll_, 0, maxScroll);
 
-    // --- 購入 -----------------------------------------------------------------
+    // --- 購入（アイテム）----------------------------------------------------------
+    if (tab_ == ShopTab::Item) {
+        const ConsumableDef* item = SelectedItem();
+        const int col = inventory.Col();
+        const int one = ItemBuyCount(context, 1);
+        const int bulk = ItemBuyCount(context, kBulkBuyCount);
+        buyButton_.SetEnabled(item && one > 0 && col >= item->price * one);
+        buyTenButton_.SetEnabled(item && bulk > 0 && col >= item->price * bulk);
+        // 上限が近いときは買える数だけ表示する
+        buyTenButton_.SetLabel(str::Format("%d 個購入", (item && bulk > 0) ? bulk : kBulkBuyCount));
+
+        const bool clicked = input.MouseClicked(MouseButton::Left);
+        if (buyButton_.Update(input, dt) || (clicked && item && !buyButton_.Enabled()
+                                             && buyButton_.GetRect().Contains(mouseX, mouseY))) {
+            BuyItem(context, 1);   // 買えない理由もここで知らせる
+        }
+        if (buyTenButton_.Update(input, dt) || (clicked && item && !buyTenButton_.Enabled()
+                                                && buyTenButton_.GetRect().Contains(mouseX, mouseY))) {
+            BuyItem(context, kBulkBuyCount);
+        }
+
+        if (closeButton_.Update(input, dt)) {
+            closeRequested_ = true;
+            open_ = false;
+        }
+        return;
+    }
+
+    // --- 購入（装備）-------------------------------------------------------------
     const ItemTemplate* selected = Selected();
     buyButton_.SetEnabled(selected != nullptr && inventory.Col() >= selected->price);
     if (buyButton_.Update(input, dt) && buyButton_.Enabled() && selected) {
@@ -186,6 +279,7 @@ void ShopPanel::Draw(const GameContext& context) const
     DrawDetail(context);
 
     buyButton_.Draw();
+    if (tab_ == ShopTab::Item) buyTenButton_.Draw();
     closeButton_.Draw();
 
     if (messageTimer_ > 0.0f) {
@@ -200,8 +294,7 @@ void ShopPanel::DrawList(const GameContext& context) const
     draw::StrokeRect(listArea_.Expanded(6.0f), palette::kBorder.Scaled(0.6f), 1.0f, 160);
 
     if (tab_ == ShopTab::Item) {
-        draw::Text(FontSize::Normal, listArea_.CenterX(), listArea_.CenterY(),
-                   palette::kTextDisabled, "アイテムは今後追加予定です", draw::TextAlign::Center);
+        DrawItemList(context);
         return;
     }
 
@@ -277,12 +370,15 @@ void ShopPanel::DrawDetail(const GameContext& context) const
     draw::FillRect(detailArea_, palette::kPanelDark, 205);
     draw::StrokeRect(detailArea_, palette::kBorder.Scaled(0.6f), 1.0f, 170);
 
+    if (tab_ == ShopTab::Item) {
+        DrawItemDetail(context);
+        return;
+    }
+
     const ItemTemplate* selected = Selected();
     if (!selected) {
         draw::Text(FontSize::Small, detailArea_.CenterX(), detailArea_.top + 24.0f,
-                   palette::kTextDisabled,
-                   tab_ == ShopTab::Item ? "準備中です" : "品物を選んでください",
-                   draw::TextAlign::Center);
+                   palette::kTextDisabled, "品物を選んでください", draw::TextAlign::Center);
         return;
     }
 
@@ -351,6 +447,109 @@ void ShopPanel::DrawDetail(const GameContext& context) const
         draw::Text(FontSize::Tiny, x, y, palette::kDanger,
                    str::Format("あと %s col 必要です",
                                str::Comma(selected->price - col).c_str()));
+    }
+}
+
+void ShopPanel::DrawItemList(const GameContext& context) const
+{
+    const Inventory& inventory = context.player.GetInventory();
+    const std::vector<const ConsumableDef*> goods = ItemGoods();
+    const float mouseX = static_cast<float>(Input::Instance().MouseX());
+    const float mouseY = static_cast<float>(Input::Instance().MouseY());
+
+    for (int row = 0; row < kVisibleRows; ++row) {
+        const int index = scroll_ + row;
+        if (index >= static_cast<int>(goods.size())) break;
+
+        const ConsumableDef& def = *goods[static_cast<size_t>(index)];
+        const Rect rect = RowRect(row);
+        const bool selected = (def.id == selectedId_);
+        const bool hovered = rect.Contains(mouseX, mouseY);
+        const bool affordable = (inventory.Col() >= def.price);
+
+        ColorRGB fill = palette::kPanelDark;
+        if (selected) fill = ColorRGB::Lerp(palette::kPanelLight, def.color.Scaled(0.5f), 0.55f);
+        else if (hovered) fill = palette::kPanelLight;
+
+        draw::GradientRectH(rect, fill, fill.Scaled(0.75f), 235, 12);
+        draw::StrokeRect(rect, selected ? def.color : palette::kBorder.Scaled(0.7f),
+                         selected ? 2.0f : 1.0f, 255);
+        draw::FillRect(Rect(rect.left, rect.top, rect.left + 6.0f, rect.bottom), def.color, 255);
+
+        DrawConsumableIcon(Rect(rect.left + 12.0f, rect.top + 6.0f, rect.left + 62.0f, rect.bottom - 6.0f),
+                           def);
+        draw::Text(FontSize::Normal, rect.left + 74.0f, rect.top + 8.0f, palette::kText, def.name);
+        draw::Text(FontSize::Small, rect.left + 74.0f, rect.top + 36.0f, palette::kTextDim,
+                   str::Format("%s  %s", ConsumableKindName(def.kind), def.effect.c_str()));
+
+        draw::Text(FontSize::Small, rect.right - 14.0f, rect.top + 8.0f,
+                   affordable ? palette::kAccentWarm : palette::kTextDisabled,
+                   str::Format("%s col", str::Comma(def.price).c_str()), draw::TextAlign::Right);
+        draw::Text(FontSize::Tiny, rect.right - 14.0f, rect.top + 36.0f, palette::kTextDim,
+                   str::Format("所持 %d", inventory.ItemCount(def.id)), draw::TextAlign::Right);
+    }
+
+    draw::Text(FontSize::Tiny, listArea_.left, listArea_.bottom + 14.0f, palette::kTextDim,
+               str::Format("アイテム : %d 件（素材はクエストで手に入ります）",
+                           static_cast<int>(goods.size())));
+}
+
+void ShopPanel::DrawItemDetail(const GameContext& context) const
+{
+    const ConsumableDef* item = SelectedItem();
+    if (!item) {
+        draw::Text(FontSize::Small, detailArea_.CenterX(), detailArea_.top + 24.0f,
+                   palette::kTextDisabled, "品物を選んでください", draw::TextAlign::Center);
+        return;
+    }
+
+    const Inventory& inventory = context.player.GetInventory();
+    const float x = detailArea_.left + 24.0f;
+    const float right = detailArea_.right - 24.0f;
+    float y = detailArea_.top + 20.0f;
+
+    DrawConsumableIcon(Rect::FromXYWH(x, y, 64.0f, 64.0f), *item);
+    draw::Text(FontSize::Medium, x + 80.0f, y + 2.0f, palette::kText, item->name);
+    draw::Text(FontSize::Small, x + 80.0f, y + 38.0f, item->color, ConsumableKindName(item->kind));
+    y += 82.0f;
+    draw::Text(FontSize::Tiny, x, y, palette::kTextDim, item->description); y += 32.0f;
+    draw::Line(x, y, right, y, palette::kBorder, 1.0f, 120); y += 16.0f;
+
+    draw::Text(FontSize::Small, x, y, palette::kTextDim, "効果");
+    draw::Text(FontSize::Small, right, y, palette::kAccentWarm, item->effect, draw::TextAlign::Right);
+    y += 34.0f;
+    draw::Text(FontSize::Small, x, y, palette::kTextDim, "所持数");
+    draw::Text(FontSize::Small, right, y, palette::kText,
+               str::Format("%d / %d", inventory.ItemCount(item->id), item->MaxStack()),
+               draw::TextAlign::Right);
+    y += 40.0f;
+
+    draw::Text(FontSize::Tiny, x, y, palette::kTextDim,
+               "買ったアイテムは「プレイヤー」→「アイテム」で戦闘用に装備できます。");
+    y += 24.0f;
+    draw::Text(FontSize::Tiny, x, y, palette::kTextDim,
+               (item->kind == ConsumableKind::Buff)
+                   ? "バフは使うと無くなり、効果時間のあいだだけ能力が上がります。"
+                   : "戦闘中に右下のスライダーから使えます。");
+    y += 34.0f;
+
+    draw::Line(x, y, right, y, palette::kBorder, 1.0f, 120); y += 16.0f;
+
+    const int col = inventory.Col();
+    const bool affordable = (col >= item->price);
+    draw::Text(FontSize::Normal, x, y, palette::kTextDim, "価格（1 個）");
+    draw::Text(FontSize::Normal, right, y, affordable ? palette::kAccentWarm : palette::kDanger,
+               str::Format("%s col", str::Comma(item->price).c_str()), draw::TextAlign::Right);
+    y += 34.0f;
+    const int bulk = ItemBuyCount(context, kBulkBuyCount);
+    if (bulk > 0) {
+        draw::Text(FontSize::Small, x, y, palette::kTextDim, str::Format("%d 個まとめて", bulk));
+        draw::Text(FontSize::Small, right, y,
+                   (col >= item->price * bulk) ? palette::kAccentWarm : palette::kDanger,
+                   str::Format("%s col", str::Comma(item->price * bulk).c_str()),
+                   draw::TextAlign::Right);
+    } else {
+        draw::Text(FontSize::Small, x, y, palette::kDanger, "所持数が上限に達しています");
     }
 }
 

@@ -6,6 +6,7 @@
 #include "Common/Types.h"
 #include "Core/FontManager.h"
 #include "Core/Input.h"
+#include "Game/Consumable.h"
 #include "Game/Equipment.h"
 
 #include <string>
@@ -116,6 +117,9 @@ void DrawItemRow(const Rect& rect, const EquipmentItem& item, bool selected, boo
 void DrawWeaponIcon(const Rect& rect, WeaponType type, const ColorRGB& color);
 // スロットのアイコン
 void DrawSlotIcon(const Rect& rect, EquipSlot slot, const ColorRGB& color);
+// 消費アイテム・素材のアイコン（回復は丸い瓶 / バフは細い瓶 / 素材は鉱石）
+//   dim を立てると色を落とす（所持数 0 など）
+void DrawConsumableIcon(const Rect& rect, const ConsumableDef& item, bool dim = false);
 // ステータス比較行（差分を色付きで表示）
 void DrawStatDiffLine(float x, float y, const std::string& label, float current, float next, bool percent);
 // 画面全体を覆う暗幕

@@ -11,6 +11,9 @@ namespace {
 // 地面の高さは全フロア共通
 constexpr float kGroundY = 880.0f;
 
+// 道中の素材抽選は、倒した数がこれを超えても増やさない
+constexpr int kMaterialRollLimit = 20;
+
 FloorDef MakeFloor(const std::string& name, float width, StageTheme theme)
 {
     FloorDef floor;
@@ -84,6 +87,15 @@ QuestDatabase::QuestDatabase()
             { 201, 0.09f,  20,  60 },
             { 211, 0.09f,  20,  60 },
             { 221, 0.07f,  20,  60 },
+        };
+        quest.floorMaterials = {
+            { kMatBeastHide,    0.30f, 1, 1 },
+            { kMatIronOre,      0.25f, 1, 1 },
+            { kMatSpiritBranch, 0.15f, 1, 1 },
+        };
+        quest.bossMaterials = {
+            { kMatWolfFang,  1.00f, 1, 2 },
+            { kMatBeastHide, 0.60f, 2, 3 },
         };
         quests_.push_back(quest);
     }
@@ -161,6 +173,15 @@ QuestDatabase::QuestDatabase()
             { 241, 0.08f,  20,  60  },
             { 251, 0.08f,  20,  60  },
         };
+        quest.floorMaterials = {
+            { kMatIronOre,   0.30f, 1, 1 },
+            { kMatHardBone,  0.25f, 1, 1 },
+            { kMatSilverOre, 0.10f, 1, 1 },
+        };
+        quest.bossMaterials = {
+            { kMatGolemCore, 1.00f, 1, 1 },
+            { kMatIronOre,   0.60f, 2, 4 },
+        };
         quests_.push_back(quest);
     }
 
@@ -237,6 +258,15 @@ QuestDatabase::QuestDatabase()
             { 213, 0.1f,  40, 100 },
             { 222, 0.09f,  40,  80 },
         };
+        quest.floorMaterials = {
+            { kMatEclipseShard, 0.25f, 1, 1 },
+            { kMatSilverOre,    0.20f, 1, 1 },
+            { kMatMagicStone,   0.12f, 1, 1 },
+        };
+        quest.bossMaterials = {
+            { kMatDarkSteel,  1.00f, 1, 2 },
+            { kMatMagicStone, 0.50f, 1, 2 },
+        };
         quests_.push_back(quest);
     }
 
@@ -270,6 +300,9 @@ QuestDatabase::QuestDatabase()
         quest.bossDrops = {
             { kHolySwordSwordId,  1.00f, 80, 100 },
             { kHolySwordShieldId, 1.00f, 80, 100 },
+        };
+        quest.bossMaterials = {
+            { kMatHolySilver, 1.00f, 2, 3 },
         };
         quests_.push_back(quest);
     }
@@ -360,6 +393,14 @@ QuestDatabase::QuestDatabase()
             { kDragonArmId,    0.55f, 70, 100 },
             { kDragonGloveId,  0.55f, 70, 100 },
             { kDragonBootsId,  0.55f, 70, 100 },
+        };
+        quest.floorMaterials = {
+            { kMatObsidian,  0.30f, 1, 1 },
+            { kMatFireScale, 0.20f, 1, 1 },
+        };
+        quest.bossMaterials = {
+            { kMatDragonScale, 1.00f, 1, 1 },
+            { kMatFireScale,   0.70f, 2, 4 },
         };
         quests_.push_back(quest);
     }
@@ -488,6 +529,104 @@ std::vector<EquipmentItem> QuestDatabase::RollDrops(const QuestDef& quest, bool 
     // 一度に持ち帰れる数は制限する
     if (drops.size() > 12) drops.resize(12);
     return drops;
+}
+
+std::vector<ItemStack> QuestDatabase::RollMaterials(const QuestDef& quest, bool bossDefeated,
+                                                    int enemiesDefeated, float dropRate) const
+{
+    std::vector<ItemStack> result;
+    auto add = [&result](int itemId, int count) {
+        if (count <= 0) return;
+        for (ItemStack& stack : result) {
+            if (stack.itemId == itemId) {
+                stack.count += count;
+                return;
+            }
+        }
+        result.push_back(ItemStack{ itemId, count });
+    };
+
+    const float rate = math::MaxF(0.0f, dropRate);
+    auto rollEntry = [&](const MaterialDrop& entry) {
+        if (!math::RandChance(math::MinF(1.0f, entry.chance * rate))) return;
+        const int low = math::MaxI(1, entry.minCount);
+        const int high = math::MaxI(low, entry.maxCount);
+        add(entry.itemId, math::RandInt(low, high));
+    };
+
+    // 道中：倒した数だけ、候補ごとに抽選する
+    const int rolls = math::ClampInt(enemiesDefeated, 0, kMaterialRollLimit);
+    for (int i = 0; i < rolls; ++i) {
+        for (const MaterialDrop& entry : quest.floorMaterials) rollEntry(entry);
+    }
+    // ボス：撃破時に候補ごとに抽選する
+    if (bossDefeated) {
+        for (const MaterialDrop& entry : quest.bossMaterials) rollEntry(entry);
+    }
+    return result;
+}
+
+std::vector<BossDropOdds> QuestDatabase::CalcBossDropOdds(const QuestDef& quest,
+                                                          float dropRate) const
+{
+    const ItemDatabase& items = ItemDatabase::Instance();
+    const float rate = math::MaxF(0.0f, dropRate);
+    auto effective = [rate](float chance) { return math::MinF(1.0f, chance * rate); };
+
+    std::vector<BossDropOdds> odds;
+    const size_t count = quest.bossDrops.size();
+    if (count == 0) return odds;
+
+    // RollDrops と同じく、武器は左右をまとめて 1 部位として数える
+    auto slotOf = [&items](const DropEntry& entry, bool* valid) {
+        const ItemTemplate* tmpl = items.Find(entry.templateId);
+        *valid = (tmpl != nullptr);
+        if (!tmpl) return EquipSlot::Count;
+        return IsWeaponSlot(tmpl->slot) ? EquipSlot::WeaponRight : tmpl->slot;
+    };
+
+    std::vector<EquipSlot> slots;
+    for (const DropEntry& entry : quest.bossDrops) {
+        bool valid = false;
+        const EquipSlot slot = slotOf(entry, &valid);
+        if (!valid) continue;
+        bool known = false;
+        for (EquipSlot s : slots) known = known || (s == slot);
+        if (!known) slots.push_back(slot);
+    }
+
+    // 特別クエスト：全候補を個別に抽選し、何も出なければ先頭を確定で落とす
+    float noneProbability = 1.0f;
+    for (const DropEntry& entry : quest.bossDrops) noneProbability *= 1.0f - effective(entry.chance);
+
+    for (size_t i = 0; i < count; ++i) {
+        const DropEntry& entry = quest.bossDrops[i];
+        BossDropOdds o;
+        o.templateId = entry.templateId;
+        o.chance = effective(entry.chance);
+
+        if (quest.special) {
+            o.normal = o.chance + ((i == 0) ? noneProbability : 0.0f);
+            o.firstClear = o.normal;   // 特別クエストは初回でも同じ抽選
+        } else {
+            bool valid = false;
+            const EquipSlot slot = slotOf(entry, &valid);
+            if (valid && !slots.empty()) {
+                // 部位が選ばれる確率 × 同じ部位の先客が全部外れる確率 × 自分の確率
+                float before = 1.0f;
+                for (size_t j = 0; j < i; ++j) {
+                    bool otherValid = false;
+                    if (slotOf(quest.bossDrops[j], &otherValid) != slot || !otherValid) continue;
+                    before *= 1.0f - effective(quest.bossDrops[j].chance);
+                }
+                o.normal = o.chance * before / static_cast<float>(slots.size());
+            }
+            // 初回クリアは候補から 1 つを等確率で確定ドロップ
+            o.firstClear = 1.0f / static_cast<float>(count);
+        }
+        odds.push_back(o);
+    }
+    return odds;
 }
 
 } // namespace ecl

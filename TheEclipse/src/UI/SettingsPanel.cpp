@@ -27,6 +27,8 @@ const KeyGuide kGuides[] = {
     { "パリィ",         "ガード中に左クリック" },
     { "回避ダッシュ",   "SHIFT" },
     { "ソードスキル",   "1 / 2 / 3 / 4" },
+    { "アイテム切替",   "Q（回復 ⇔ バフ）" },
+    { "アイテム使用",   "E / スライダーをクリック" },
     { "メニュー",       "ESC" },
 };
 
@@ -248,7 +250,7 @@ void SettingsPanel::Draw() const
         draw::Text(FontSize::Tiny, columnLeft_ + 12.0f, window_.top + 700.0f, palette::kAccentWarm,
                    "戦闘中 : F1 無敵 / F2 殲滅 / F3 全回復 / F4 判定表示");
         draw::Text(FontSize::Tiny, columnLeft_ + 12.0f, window_.top + 722.0f, palette::kAccentWarm,
-                   "ホーム : 画面左下のボタンで col・素材・SP・武器・スキルを追加");
+                   "ホーム : 画面左下のボタンで col・結晶・SP・LV・装備・アイテム等を追加");
     } else {
         draw::Text(FontSize::Tiny, columnLeft_ + 288.0f, window_.top + 654.0f,
                    palette::kTextDisabled, "※ デバッグモード中のみ変更できます");

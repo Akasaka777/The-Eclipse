@@ -8,6 +8,7 @@
 #include "Core/Input.h"
 #include "Game/GameContext.h"
 #include "UI/EquipPanel.h"
+#include "UI/ItemPanel.h"
 #include "UI/SkillPanel.h"
 #include "UI/StatusPanel.h"
 #include "UI/UIWidgets.h"
@@ -21,7 +22,7 @@ enum class PlayerTab
 {
     Status,     // ステータス
     Equipment,  // 装備
-    Item,       // アイテム（未実装）
+    Item,       // アイテム（回復 / バフ / 素材）
     Skill,      // スキル
     Count
 };
@@ -50,14 +51,12 @@ private:
     void Layout();
     void SelectTab(PlayerTab tab, const GameContext& context);
     void DrawTabs() const;
-    void DrawItemTab() const;
 
-    Rect   itemWindow_;
-    Button itemCloseButton_;
     std::vector<Button> tabButtons_;
 
     StatusPanel status_;
     EquipPanel  equip_;
+    ItemPanel   item_;
     SkillPanel  skill_;
 
     PlayerTab tab_ = PlayerTab::Status;

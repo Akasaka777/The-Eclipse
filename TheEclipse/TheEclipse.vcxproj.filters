@@ -49,6 +49,9 @@
     <ClCompile Include="src\Game\Combat.cpp">
       <Filter></Filter>
     </ClCompile>
+    <ClCompile Include="src\Game\Consumable.cpp">
+      <Filter></Filter>
+    </ClCompile>
     <ClCompile Include="src\Game\Enemy.cpp">
       <Filter></Filter>
     </ClCompile>
@@ -122,6 +125,9 @@
       <Filter></Filter>
     </ClCompile>
     <ClCompile Include="src\UI\EquipPanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\ItemPanel.cpp">
       <Filter></Filter>
     </ClCompile>
     <ClCompile Include="src\UI\NamePanel.cpp">
@@ -210,6 +216,9 @@
     <ClInclude Include="src\Game\Combat.h">
       <Filter></Filter>
     </ClInclude>
+    <ClInclude Include="src\Game\Consumable.h">
+      <Filter></Filter>
+    </ClInclude>
     <ClInclude Include="src\Game\Enemy.h">
       <Filter></Filter>
     </ClInclude>
@@ -286,6 +295,9 @@
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\UI\EquipPanel.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\ItemPanel.h">
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\UI\NamePanel.h">

@@ -21,6 +21,8 @@ void Inventory::Clear()
 {
     items_.clear();
     for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) equippedUid_[i] = 0;
+    itemCounts_.clear();
+    for (int i = 0; i < kQuickSlotCount; ++i) quickItems_[i] = 0;
 }
 
 void Inventory::SetCurrency(int col, int material)
@@ -505,6 +507,65 @@ void Inventory::AddCol(int amount)
 void Inventory::AddMaterial(int amount)
 {
     material_ = math::MaxI(0, material_ + amount);
+}
+
+//==============================================================================
+// 消費アイテム・素材
+//==============================================================================
+int Inventory::ItemCount(int itemId) const
+{
+    const auto it = itemCounts_.find(itemId);
+    return (it != itemCounts_.end()) ? it->second : 0;
+}
+
+int Inventory::AddItemCount(int itemId, int count)
+{
+    const ConsumableDef* def = ConsumableDatabase::Instance().Find(itemId);
+    if (!def || count <= 0) return 0;
+
+    const int before = ItemCount(itemId);
+    const int after = math::MinI(def->MaxStack(), before + count);
+    if (after <= before) return 0;
+    itemCounts_[itemId] = after;
+    return after - before;
+}
+
+bool Inventory::ConsumeItem(int itemId)
+{
+    auto it = itemCounts_.find(itemId);
+    if (it == itemCounts_.end() || it->second <= 0) return false;
+    if (--it->second <= 0) itemCounts_.erase(it);
+    return true;
+}
+
+std::vector<int> Inventory::OwnedItemIds(ConsumableKind kind) const
+{
+    std::vector<int> ids;
+    for (const ConsumableDef* def : ConsumableDatabase::Instance().OfKind(kind)) {
+        if (ItemCount(def->id) > 0) ids.push_back(def->id);
+    }
+    return ids;
+}
+
+int Inventory::QuickItem(QuickSlot slot) const
+{
+    const int index = static_cast<int>(slot);
+    if (index < 0 || index >= kQuickSlotCount) return 0;
+    return quickItems_[index];
+}
+
+bool Inventory::SetQuickItem(QuickSlot slot, int itemId)
+{
+    const int index = static_cast<int>(slot);
+    if (index < 0 || index >= kQuickSlotCount) return false;
+    if (itemId == 0) {
+        quickItems_[index] = 0;
+        return true;
+    }
+    const ConsumableDef* def = ConsumableDatabase::Instance().Find(itemId);
+    if (!def || def->kind != QuickSlotKind(slot)) return false;
+    quickItems_[index] = itemId;
+    return true;
 }
 
 } // namespace ecl

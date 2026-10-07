@@ -60,6 +60,8 @@ private:
     void UpdateFloorTransition(float dt, GameContext& context);
     // パリィ成功時の共通処理（攻撃者をよろけさせる）
     void HandleParrySuccess(GameContext& context);
+    // アイテムスライダーで選んでいる枠のアイテムを使う
+    void UseQuickItem(GameContext& context);
     // ID からアクターを探す
     Actor* FindActorById(int actorId);
     void FinishQuest(bool cleared, bool retired, GameContext& context);

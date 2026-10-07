@@ -6,6 +6,7 @@
 #include "Core/GameConfig.h"
 #include "Core/Input.h"
 #include "Core/SceneManager.h"
+#include "Game/Consumable.h"
 #include "Game/GameContext.h"
 #include "Game/ItemDatabase.h"
 #include "Game/QuestDatabase.h"
@@ -47,9 +48,10 @@ constexpr int kTabCount = static_cast<int>(sizeof(kTabs) / sizeof(kTabs[0]));
 enum class DebugAction
 {
     AddCol,        // col を増やす
-    AddMaterial,   // 強化素材を増やす
+    AddMaterial,   // 強化結晶を増やす
     AddSkillPoint, // スキルポイントを増やす
-    AddLevel,      // レベルを上げる
+    AddLevel,      // レベルを上げる（プルダウンで量を選ぶ）
+    AddItems,      // 回復・バフアイテムと素材を増やす
     AllWeapons,    // 全武器種の武器を入手する
     AllArmors,     // 全防具を入手する
     UnlockSkills,  // スキルを全解放
@@ -64,9 +66,10 @@ struct DebugButtonDef
 
 const DebugButtonDef kDebugButtons[] = {
     { DebugAction::AddCol,        "col 追加 ▼" },
-    { DebugAction::AddMaterial,   "素材 +50" },
+    { DebugAction::AddMaterial,   "強化結晶 +50" },
     { DebugAction::AddSkillPoint, "SP +10" },
-    { DebugAction::AddLevel,      "Lv +5" },
+    { DebugAction::AddLevel,      "LV ▼" },
+    { DebugAction::AddItems,      "アイテム +10" },
     { DebugAction::AllWeapons,    "全武器取得" },
     { DebugAction::AllArmors,     "全防具取得" },
     { DebugAction::UnlockSkills,  "スキル全習得" },
@@ -79,7 +82,7 @@ constexpr float kDebugButtonHeight = 44.0f;
 constexpr float kDebugButtonGap = 8.0f;
 constexpr int   kDebugMaterialAmount = 50;
 constexpr int   kDebugSkillPointAmount = 10;
-constexpr int   kDebugLevelAmount = 5;
+constexpr int   kDebugItemAmount = 10;
 // 装備を配るときの個体値
 constexpr int kDebugItemIv = 70;
 
@@ -91,6 +94,31 @@ constexpr float kDebugMenuWidth = 240.0f;
 constexpr int kDebugColAmounts[] = { 10000, 100000, 1000000 };
 constexpr int kDebugColAmountCount =
     static_cast<int>(sizeof(kDebugColAmounts) / sizeof(kDebugColAmounts[0]));
+
+// 「LV」のプルダウンで選べる量
+constexpr int kDebugLevelAmounts[] = { 1, 5, 10 };
+constexpr int kDebugLevelAmountCount =
+    static_cast<int>(sizeof(kDebugLevelAmounts) / sizeof(kDebugLevelAmounts[0]));
+
+// 回復・バフアイテムと素材を全種類ずつ増やす
+int GrantAllConsumables(Inventory& inventory, int amount)
+{
+    int kinds = 0;
+    for (const ConsumableDef& def : ConsumableDatabase::Instance().All()) {
+        inventory.AddItemCount(def.id, amount);
+        ++kinds;
+    }
+    return kinds;
+}
+
+// 指定したアクションのボタン（プルダウンの位置合わせに使う）
+int DebugButtonIndex(DebugAction action)
+{
+    for (int i = 0; i < kDebugButtonCount; ++i) {
+        if (kDebugButtons[i].action == action) return i;
+    }
+    return 0;
+}
 
 // 全武器種の武器を所持品に追加する（片手剣は二刀流を試せるよう 2 本ずつ）
 int GrantAllWeapons(Inventory& inventory)
@@ -190,6 +218,17 @@ void HomeScene::BuildDebugButtons()
         buildMenu(debugColMenu_, debugButtons_.front().GetRect(), labels, false);
     }
 
+    // 「LV」: LV +1 / LV +5 / LV +10
+    debugLevelMenu_.clear();
+    if (!debugButtons_.empty()) {
+        std::vector<std::string> labels;
+        for (int i = 0; i < kDebugLevelAmountCount; ++i) {
+            labels.push_back(str::Format("LV +%d", kDebugLevelAmounts[i]));
+        }
+        const size_t index = static_cast<size_t>(DebugButtonIndex(DebugAction::AddLevel));
+        buildMenu(debugLevelMenu_, debugButtons_[index].GetRect(), labels, false);
+    }
+
     // 「ユニーク解放」: 個別のユニークスキル（追加すると自動で並ぶ）
     debugUniqueMenu_.clear();
     if (!debugButtons_.empty()) {
@@ -217,6 +256,28 @@ void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& co
             const int amount = kDebugColAmounts[i];
             inventory.AddCol(amount);
             debugMessage_ = str::Format("col を %s 追加しました", str::Comma(amount).c_str());
+            debugMessageTimer_ = 2.8f;
+            debugMenuOpen_ = DebugMenu::None;
+            return;
+        }
+        if (input.MouseClicked(MouseButton::Left)) debugMenuOpen_ = DebugMenu::None;
+    }
+
+    // --- 「LV」のプルダウン ------------------------------------------------------
+    if (debugMenuOpen_ == DebugMenu::Level) {
+        for (int i = 0; i < static_cast<int>(debugLevelMenu_.size()); ++i) {
+            if (!debugLevelMenu_[static_cast<size_t>(i)].Update(input, dt)) continue;
+            if (i >= kDebugLevelAmountCount) continue;
+
+            const int amount = kDebugLevelAmounts[i];
+            const int before = context.player.Level();
+            context.player.DebugAddLevel(amount);
+            player_.Setup(context.player);
+            player_.FullHeal();
+            debugMessage_ = (context.player.Level() == before)
+                ? str::Format("これ以上レベルを上げられません（Lv %d）", before)
+                : str::Format("レベルを %d 上げました（Lv %d）", context.player.Level() - before,
+                              context.player.Level());
             debugMessageTimer_ = 2.8f;
             debugMenuOpen_ = DebugMenu::None;
             return;
@@ -254,7 +315,7 @@ void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& co
             return;
         case DebugAction::AddMaterial:
             inventory.AddMaterial(kDebugMaterialAmount);
-            debugMessage_ = str::Format("強化素材を %d 追加しました", kDebugMaterialAmount);
+            debugMessage_ = str::Format("強化結晶を %d 追加しました", kDebugMaterialAmount);
             break;
         case DebugAction::AddSkillPoint:
             context.player.AddSkillPoints(kDebugSkillPointAmount);
@@ -262,12 +323,15 @@ void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& co
                                         kDebugSkillPointAmount);
             break;
         case DebugAction::AddLevel:
-            context.player.DebugAddLevel(kDebugLevelAmount);
-            player_.Setup(context.player);
-            player_.FullHeal();
-            debugMessage_ = str::Format("レベルを %d 上げました（Lv %d）",
-                                        kDebugLevelAmount, context.player.Level());
+            // プルダウンを開いて上げるレベルを選ばせる
+            debugMenuOpen_ = (debugMenuOpen_ == DebugMenu::Level) ? DebugMenu::None : DebugMenu::Level;
+            return;
+        case DebugAction::AddItems: {
+            const int kinds = GrantAllConsumables(inventory, kDebugItemAmount);
+            debugMessage_ = str::Format("回復・バフ・素材 %d 種類を %d 個ずつ追加しました", kinds,
+                                        kDebugItemAmount);
             break;
+        }
         case DebugAction::AllWeapons: {
             const int added = GrantAllWeapons(inventory);
             debugMessage_ = str::Format("全武器種の武器を %d 個入手しました", added);
@@ -321,6 +385,7 @@ void HomeScene::DrawDebugPanel(const GameContext& context) const
     };
 
     if (debugMenuOpen_ == DebugMenu::Col) drawMenu(debugColMenu_, "追加する col");
+    if (debugMenuOpen_ == DebugMenu::Level) drawMenu(debugLevelMenu_, "上げるレベル");
     if (debugMenuOpen_ == DebugMenu::Unique) drawMenu(debugUniqueMenu_, "解放するユニークスキル");
 
     // 通知はパネルの上に出す（プルダウンと重ならないように）
@@ -484,6 +549,7 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
         }
         const std::vector<ui::Button>* openMenu = nullptr;
         if (debugMenuOpen_ == DebugMenu::Col) openMenu = &debugColMenu_;
+        else if (debugMenuOpen_ == DebugMenu::Level) openMenu = &debugLevelMenu_;
         else if (debugMenuOpen_ == DebugMenu::Unique) openMenu = &debugUniqueMenu_;
         if (openMenu) {
             for (const ui::Button& row : *openMenu) {

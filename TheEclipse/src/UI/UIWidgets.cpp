@@ -207,6 +207,66 @@ void DrawWeaponIcon(const Rect& rect, WeaponType type, const ColorRGB& color)
     }
 }
 
+void DrawConsumableIcon(const Rect& rect, const ConsumableDef& item, bool dim)
+{
+    const float cx = rect.CenterX();
+    const float cy = rect.CenterY();
+    const float size = math::MinF(rect.Width(), rect.Height()) * 0.5f;
+    const ColorRGB color = dim ? item.color.Scaled(0.35f) : item.color;
+    const ColorRGB glass = dim ? palette::kTextDisabled : ColorRGB(220, 232, 246);
+    const ColorRGB cork(150, 112, 74);
+
+    switch (item.kind) {
+    case ConsumableKind::Recovery: {
+        // 丸いフラスコ：胴に液体、細い首、コルク栓
+        const float radius = size * 0.58f;
+        const float bodyY = cy + size * 0.22f;
+        draw::Circle(cx, bodyY, radius, color.Scaled(0.85f), true, 1.0f, 255);
+        draw::Circle(cx - radius * 0.35f, bodyY - radius * 0.35f, radius * 0.22f,
+                     palette::kWhite, true, 1.0f, dim ? 60 : 150);
+        draw::Circle(cx, bodyY, radius, glass, false, 2.0f, 255);
+        const Rect neck = Rect::FromCenter(cx, bodyY - radius - size * 0.14f, size * 0.32f, size * 0.36f);
+        draw::FillRect(neck, color.Scaled(0.55f), 255);
+        draw::StrokeRect(neck, glass, 2.0f, 255);
+        draw::FillRect(Rect::FromCenter(cx, neck.top - size * 0.06f, size * 0.40f, size * 0.16f),
+                       dim ? cork.Scaled(0.5f) : cork, 255);
+        break;
+    }
+    case ConsumableKind::Buff: {
+        // 細長い小瓶：上下に分かれた液体ときらめき
+        const Rect body = Rect::FromCenter(cx, cy + size * 0.18f, size * 0.62f, size * 1.20f);
+        draw::FillRect(Rect(body.left, body.top + body.Height() * 0.25f, body.right, body.bottom),
+                       color.Scaled(0.85f), 255);
+        draw::StrokeRect(body, glass, 2.0f, 255);
+        draw::FillRect(Rect::FromCenter(cx, body.top - size * 0.10f, size * 0.42f, size * 0.20f),
+                       dim ? cork.Scaled(0.5f) : cork, 255);
+        // きらめき（ひし形）
+        const float sx = cx + size * 0.62f;
+        const float sy = cy - size * 0.50f;
+        const float s = size * 0.20f;
+        draw::Triangle(Vec2(sx, sy - s * 1.6f), Vec2(sx - s * 0.6f, sy), Vec2(sx + s * 0.6f, sy),
+                       color, true, 255);
+        draw::Triangle(Vec2(sx, sy + s * 1.6f), Vec2(sx - s * 0.6f, sy), Vec2(sx + s * 0.6f, sy),
+                       color, true, 255);
+        break;
+    }
+    default: {
+        // 鉱石：ひし形の結晶を 2 つ重ねる
+        const float s = size * 0.70f;
+        const Vec2 top(cx - s * 0.15f, cy - s);
+        const Vec2 bottom(cx - s * 0.15f, cy + s * 0.9f);
+        const Vec2 left(cx - s * 0.85f, cy);
+        const Vec2 right(cx + s * 0.55f, cy - s * 0.05f);
+        draw::Triangle(top, left, right, color, true, 255);
+        draw::Triangle(bottom, left, right, color.Scaled(0.65f), true, 255);
+        draw::Triangle(Vec2(cx + s * 0.55f, cy - s * 0.35f), Vec2(cx + s * 0.25f, cy + s * 0.6f),
+                       Vec2(cx + s * 0.95f, cy + s * 0.55f), color.Scaled(0.8f), true, 255);
+        draw::Line(top.x, top.y, bottom.x, bottom.y, glass, 1.0f, dim ? 80 : 160);
+        break;
+    }
+    }
+}
+
 void DrawSlotIcon(const Rect& rect, EquipSlot slot, const ColorRGB& color)
 {
     const float cx = rect.CenterX();

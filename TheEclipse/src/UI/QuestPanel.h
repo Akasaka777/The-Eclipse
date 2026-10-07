@@ -30,8 +30,15 @@ public:
     bool StartRequested() const { return startRequested_; }
     int  SelectedQuestId() const { return selectedQuestId_; }
 
+    // --- 検証用 ---------------------------------------------------------------
+    const Rect& StartRect() const { return startButton_.GetRect(); }
+    bool StartEnabled() const { return startButton_.Enabled(); }
+
 private:
     void Layout();
+    // 開発者モード：ボスドロップの実際の確率を全候補ぶん表示する
+    void DrawDebugDrops(const GameContext& context, const QuestDef& quest, const Rect& detail,
+                        float y) const;
 
     Rect   window_;
     Button closeButton_;

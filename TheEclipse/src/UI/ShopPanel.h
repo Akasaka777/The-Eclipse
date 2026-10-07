@@ -5,6 +5,7 @@
 #pragma once
 
 #include "Core/Input.h"
+#include "Game/Consumable.h"
 #include "Game/GameContext.h"
 #include "Game/ItemDatabase.h"
 #include "UI/UIWidgets.h"
@@ -22,7 +23,7 @@ enum class ShopTab
 {
     Weapon,     // 武器
     Armor,      // 防具（頭・体・盾・腕・手・足）
-    Item,       // アイテム（今後実装）
+    Item,       // アイテム（回復・バフ。素材は売らない）
     Accessory,  // アクセサリー
     Count
 };
@@ -49,6 +50,7 @@ public:
     const Rect& WindowRect() const { return window_; }
     const Rect& TabRect(int index) const;
     const Rect& BuyRect() const { return buyButton_.GetRect(); }
+    const Rect& BuyTenRect() const { return buyTenButton_.GetRect(); }
     Rect RowRect(int row) const;
     ShopTab CurrentTab() const { return tab_; }
 
@@ -57,6 +59,16 @@ private:
     // 今のタブに並ぶ品
     std::vector<const ItemTemplate*> Goods() const;
     const ItemTemplate* Selected() const;
+    // アイテムタブの品（回復・バフ）
+    std::vector<const ConsumableDef*> ItemGoods() const;
+    const ConsumableDef* SelectedItem() const;
+    // 今のタブに並ぶ品の数
+    int GoodsCount() const;
+    // アイテムをまとめて買える個数（所持上限で頭打ち）
+    int ItemBuyCount(const GameContext& context, int wanted) const;
+    void BuyItem(GameContext& context, int wanted);
+    void DrawItemList(const GameContext& context) const;
+    void DrawItemDetail(const GameContext& context) const;
     void DrawList(const GameContext& context) const;
     void DrawDetail(const GameContext& context) const;
 
@@ -67,6 +79,7 @@ private:
     Rect   detailArea_;
     Button tabButtons_[kTabCount];
     Button buyButton_;
+    Button buyTenButton_;   // アイテムを 10 個まとめて買う（アイテムタブのみ）
     Button closeButton_;
 
     ShopTab tab_ = ShopTab::Weapon;

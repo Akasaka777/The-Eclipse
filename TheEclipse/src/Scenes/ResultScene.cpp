@@ -6,6 +6,7 @@
 #include "Core/GameConfig.h"
 #include "Core/Input.h"
 #include "Core/SceneManager.h"
+#include "Game/Consumable.h"
 #include "Game/GameContext.h"
 #include "Graphics/DrawUtil.h"
 
@@ -217,6 +218,24 @@ void ResultScene::DrawRewards(const GameContext& context) const
                    "初回クリアボーナス獲得！", draw::TextAlign::Right);
     }
     y += 44.0f;
+
+    // --- 素材（多いときは先頭 3 種だけ名前を出す）-------------------------------
+    if (!result.materials.empty()) {
+        constexpr size_t kNamedMaterials = 3;
+        std::string text = "素材  ";
+        for (size_t i = 0; i < result.materials.size() && i < kNamedMaterials; ++i) {
+            const ConsumableDef* def = ConsumableDatabase::Instance().Find(result.materials[i].itemId);
+            if (!def) continue;
+            if (i > 0) text += " ／ ";
+            text += str::Format("%s ×%d", def->name.c_str(), result.materials[i].count);
+        }
+        if (result.materials.size() > kNamedMaterials) {
+            text += str::Format("  ほか %d 種",
+                                static_cast<int>(result.materials.size() - kNamedMaterials));
+        }
+        draw::Text(FontSize::Small, panel.left + 32.0f, y - 6.0f, palette::kTextDim, text);
+        y += 32.0f;
+    }
 
     draw::Line(panel.left + 24.0f, y, panel.right - 24.0f, y, palette::kBorder, 1.0f, 140);
     y += 14.0f;
