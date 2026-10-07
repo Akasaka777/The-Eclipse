@@ -22,13 +22,6 @@ constexpr float kSkillBarBottom = 1030.0f;
 constexpr float kItemCardLeft = 40.0f;
 constexpr float kItemBackOffset = 26.0f;   // 奥のカードを右上へずらす量
 
-// ボス HP ゲージ（ボスの頭上の右上）
-constexpr float kBossGaugeWidth = 400.0f;
-constexpr float kBossBarHeight = 14.0f;
-constexpr float kBossBarGap = 6.0f;
-constexpr float kBossGaugeOffsetX = 36.0f;   // 頭から右へ
-constexpr float kBossGaugeOffsetY = 24.0f;   // 頭から上へ
-constexpr float kBossGaugeMargin = 16.0f;    // 画面端からの余白
 
 } // namespace
 
@@ -53,20 +46,6 @@ Rect BattleHud::ItemAreaRect() const
     return Rect(itemFront_.left, itemBack_.top, itemBack_.right, itemFront_.bottom);
 }
 
-float BattleHud::BossBarFill(float ratio, int index, int bars)
-{
-    // index 本目が受け持つ範囲：上から順に [1 - (index+1)/N, 1 - index/N]
-    const float share = 1.0f / static_cast<float>(math::MaxI(1, bars));
-    const float low = 1.0f - share * static_cast<float>(index + 1);
-    return math::Clamp((ratio - low) / share, 0.0f, 1.0f);
-}
-
-int BattleHud::BossBarCount(const Boss& boss)
-{
-    const BossDef* def = boss.Def();
-    return (def && def->hpBarCount > 0) ? def->hpBarCount : 3;
-}
-
 void BattleHud::ShowItemMessage(const std::string& message)
 {
     itemMessage_ = message;
@@ -76,7 +55,6 @@ void BattleHud::ShowItemMessage(const std::string& message)
 void BattleHud::Reset()
 {
     hpDelay_ = 1.0f;
-    bossHpDelay_ = 1.0f;
     clickedSkill_ = -1;
     time_ = 0.0f;
     itemUseRequested_ = false;
@@ -99,10 +77,8 @@ void BattleHud::Update(float dt, const Player& player, const Boss* boss, const I
     hpDelay_ = math::Approach(hpDelay_, player.HpRatio(), dt * 0.55f);
     if (hpDelay_ < player.HpRatio()) hpDelay_ = player.HpRatio();
 
-    if (boss) {
-        bossHpDelay_ = math::Approach(bossHpDelay_, boss->HpRatio(), dt * 0.4f);
-        if (bossHpDelay_ < boss->HpRatio()) bossHpDelay_ = boss->HpRatio();
-    }
+    // ボスの HP バーは Boss::Draw が頭上に描く（減少の残像もボス側で持つ）
+    (void)boss;
 
     // スキルアイコンのクリック
     const float mouseX = static_cast<float>(input.MouseX());
@@ -142,8 +118,8 @@ void BattleHud::Update(float dt, const Player& player, const Boss* boss, const I
 void BattleHud::Draw(const Player& player, const PlayerData& data, const Boss* boss,
                      const HudInfo& info) const
 {
+    (void)boss;   // ボスの HP バーは Boss::Draw で頭上に描く
     DrawPlayerStatus(player, data);
-    if (boss && boss->Def()) DrawBossStatus(*boss, info);
     DrawSkillBar(player, data);
     DrawItemSlots(player, data);
     DrawFloorInfo(info);
@@ -222,69 +198,6 @@ void BattleHud::DrawPlayerStatus(const Player& player, const PlayerData& data) c
         draw::Text(FontSize::Tiny, badge.CenterX(), badge.top + 5.0f, palette::kText, label,
                    draw::TextAlign::Center);
     }
-}
-
-void BattleHud::DrawBossStatus(const Boss& boss, const HudInfo& info) const
-{
-    const BossDef* def = boss.Def();
-    const int bars = BossBarCount(boss);
-
-    // 枠の大きさ：肩書き・名前・ゲージ N 本・HP の数値
-    const float height = 12.0f + 18.0f + 26.0f + 8.0f
-                       + (kBossBarHeight + kBossBarGap) * static_cast<float>(bars) + 22.0f;
-
-    // ボスの頭の右上に置く。画面からはみ出す場合は内側へ寄せる
-    const Vec2 head = info.hasBossHead ? info.bossHead : Vec2(kScreenW * 0.5f, 400.0f);
-    float left = head.x + kBossGaugeOffsetX;
-    float bottom = head.y - kBossGaugeOffsetY;
-    left = math::Clamp(left, kBossGaugeMargin, kScreenW - kBossGaugeMargin - kBossGaugeWidth);
-    // 左上のプレイヤー情報（〜x 648, y 152）とフロア情報（〜x 448, y 240）の下へ逃がす
-    float minTop = 24.0f;
-    if (left < 660.0f) minTop = 166.0f;
-    if (left < 460.0f) minTop = 252.0f;
-    bottom = math::Clamp(bottom, minTop + height, 860.0f);
-    const Rect panel(left, bottom - height, left + kBossGaugeWidth, bottom);
-    bossGauge_ = panel;
-
-    draw::ChamferRect(panel, 10.0f, palette::kPanelDark, 205);
-    draw::StrokeRect(panel, palette::kBossHp.Scaled(0.8f), 2.0f, 210);
-
-    float y = panel.top + 8.0f;
-    draw::Text(FontSize::Tiny, panel.left + 14.0f, y, palette::kTextDim, def->title);
-    // フェーズ表示
-    for (int i = 0; i < 3; ++i) {
-        const float x = panel.right - 20.0f - static_cast<float>(2 - i) * 20.0f;
-        const bool active = (i < boss.Phase());
-        draw::Circle(x, y + 8.0f, 6.0f, active ? palette::kBossHp : palette::kTextDisabled,
-                     true, 1.0f, 255);
-    }
-    y += 20.0f;
-    draw::TextShadow(FontSize::Small, panel.left + 14.0f, y, palette::kText, def->name);
-    y += 30.0f;
-
-    // --- HP ゲージ（上の 1 本から順に減り、下へ連なる）---------------------------
-    const float ratio = boss.HpRatio();
-    const ColorRGB color = palette::HpColor(ratio);
-    const float share = 1.0f / static_cast<float>(bars);
-    for (int i = 0; i < bars; ++i) {
-        const float fill = BossBarFill(ratio, i, bars);
-        const float delay = BossBarFill(bossHpDelay_, i, bars);
-
-        const Rect bar(panel.left + 14.0f, y, panel.right - 14.0f, y + kBossBarHeight);
-        draw::Bar(bar, fill, color, palette::kBlack, delay, ColorRGB(255, 190, 120));
-        draw::StrokeRect(bar, (fill > 0.0f) ? palette::kBorder.Scaled(0.8f) : palette::kTextDisabled,
-                         1.0f, 170);
-        y += kBossBarHeight + kBossBarGap;
-    }
-
-    draw::Text(FontSize::Tiny, panel.right - 14.0f, y, palette::kTextDim,
-               str::Format("%d / %d", static_cast<int>(boss.hp), static_cast<int>(boss.maxHp)),
-               draw::TextAlign::Right);
-    // 残りのゲージ本数
-    const int remaining = (ratio <= 0.0f) ? 0
-                        : math::ClampInt(static_cast<int>(std::ceil(ratio / share - 0.0001f)), 1, bars);
-    draw::Text(FontSize::Tiny, panel.left + 14.0f, y, palette::kBossHp,
-               str::Format("×%d", remaining));
 }
 
 void BattleHud::DrawSkillBar(const Player& player, const PlayerData& data) const

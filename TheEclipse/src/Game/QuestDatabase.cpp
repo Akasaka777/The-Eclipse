@@ -466,22 +466,31 @@ std::vector<EquipmentItem> QuestDatabase::RollDrops(const QuestDef& quest, bool 
     //   絶対に落ちない。
     //   特別クエスト（ユニークスキル用のセット武器）はセットで渡したいので、
     //   この部位抽選を通さず今までどおり全候補を引く。
+    //   ボスドロップは道中のドロップより前に並べる。持ち帰れる数の上限で
+    //   後ろから切り捨てても、初回クリアの確定ドロップが消えないようにするため。
+    std::vector<EquipmentItem> bossDrops;
     if (bossDefeated && !quest.bossDrops.empty()) {
         if (firstClear && !quest.special) {
             // 初回クリアだけは、主なボスドロップの中から必ず 1 つ落とす。
             //   部位抽選は通さない（どの部位が来るかも含めてランダム）。
-            const DropEntry& entry =
-                quest.bossDrops[static_cast<size_t>(
-                    math::RandInt(0, static_cast<int>(quest.bossDrops.size()) - 1))];
-            EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
-            if (item.IsValid()) drops.push_back(item);
+            //   定義が見つからない候補は除いて選ぶ（確定ドロップが空振りしないように）
+            std::vector<const DropEntry*> candidates;
+            for (const DropEntry& entry : quest.bossDrops) {
+                if (items.Find(entry.templateId)) candidates.push_back(&entry);
+            }
+            if (!candidates.empty()) {
+                const DropEntry& entry = *candidates[static_cast<size_t>(
+                    math::RandInt(0, static_cast<int>(candidates.size()) - 1))];
+                EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
+                if (item.IsValid()) bossDrops.push_back(item);
+            }
         } else if (quest.special) {
             bool gotAny = false;
             for (const DropEntry& entry : quest.bossDrops) {
                 if (!roll(entry.chance)) continue;
                 EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
                 if (item.IsValid()) {
-                    drops.push_back(item);
+                    bossDrops.push_back(item);
                     gotAny = true;
                 }
             }
@@ -489,7 +498,7 @@ std::vector<EquipmentItem> QuestDatabase::RollDrops(const QuestDef& quest, bool 
             if (!gotAny) {
                 const DropEntry& entry = quest.bossDrops[0];
                 EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
-                if (item.IsValid()) drops.push_back(item);
+                if (item.IsValid()) bossDrops.push_back(item);
             }
         } else {
             // 候補に含まれている部位を集める（武器は左右をまとめて 1 部位とする）
@@ -518,13 +527,15 @@ std::vector<EquipmentItem> QuestDatabase::RollDrops(const QuestDef& quest, bool 
                     EquipmentItem item = items.Create(entry.templateId,
                                                      RollIv(entry, quest.difficulty));
                     if (item.IsValid()) {
-                        drops.push_back(item);
+                        bossDrops.push_back(item);
                         break;   // 1 部位につき 1 個まで
                     }
                 }
             }
         }
     }
+
+    drops.insert(drops.begin(), bossDrops.begin(), bossDrops.end());
 
     // 一度に持ち帰れる数は制限する
     if (drops.size() > 12) drops.resize(12);

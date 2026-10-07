@@ -115,8 +115,10 @@ float EquipmentItem::DurabilityRatio() const
 int EquipmentItem::DurabilityDisplay() const
 {
     if (durability <= 0.0f) return 0;
-    // 1 未満でも「残っている」ことが分かるように切り上げる
-    return math::MaxI(1, static_cast<int>(durability + 0.999f));
+    // 1 未満でも「残っている」ことが分かるように切り上げる。
+    //   ただし最大値の表示（切り捨て）を超えないようにする（新品が「137/136」にならないように）
+    const int shown = math::MaxI(1, static_cast<int>(durability + 0.999f));
+    return math::MinI(shown, math::MaxI(1, MaxDurabilityDisplay()));
 }
 
 void EquipmentItem::Wear(float amount)

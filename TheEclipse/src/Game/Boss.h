@@ -44,7 +44,7 @@ struct BossDef
     float halfWidth = 62.0f;
     float height = 230.0f;
 
-    // HP ゲージを何本に分けて表示するか（上から順に減っていく）
+    // HP バーを何本に分けて表示するか（上の 1 本から順に減っていく）
     int   hpBarCount = 3;
 
     int   expReward = 320;
@@ -110,6 +110,13 @@ public:
         return state_ == BossState::Windup || state_ == BossState::Attack;
     }
 
+    // --- HP バー（雑魚敵と同じ見た目。頭上の右上に、下へ本数ぶん並べる）---------
+    int   HpBarCount() const;
+    // HP の割合 ratio のとき、上から index 本目（0 始まり）のバーがどれだけ残っているか
+    static float HpBarFill(float ratio, int index, int bars);
+    // HP バーと名前の位置（画面座標）。頭が画面外にあるときや撃破後は false（描かない）
+    bool  HpBarLayout(const Camera& camera, std::vector<Rect>& bars, Vec2& namePos) const;
+
 private:
     void ChoosePattern(float distance);
     void StartWindup(BossAttackKind kind);
@@ -121,6 +128,7 @@ private:
     void SpawnMeleeHit(CombatSystem& combat, float reachScale, float heightScale,
                        float damageMultiplier, float knockback, bool launch);
     void UpdatePose();
+    void DrawHpBars(const Camera& camera) const;
 
     const BossDef* def_ = nullptr;
     BossState state_ = BossState::Intro;

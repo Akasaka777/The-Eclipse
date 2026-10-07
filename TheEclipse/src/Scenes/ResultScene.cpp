@@ -8,6 +8,7 @@
 #include "Core/SceneManager.h"
 #include "Game/Consumable.h"
 #include "Game/GameContext.h"
+#include "Game/QuestDatabase.h"
 #include "Graphics/DrawUtil.h"
 
 #include <cmath>
@@ -270,6 +271,10 @@ void ResultScene::DrawRewards(const GameContext& context) const
         return;
     }
 
+    // 初回クリアでは、先頭のドロップが「主なボスドロップから確定で 1 つ」の品
+    const QuestDef* quest = QuestDatabase::Instance().Find(result.questId);
+    const bool guaranteedFirst = result.firstClear && quest && !quest->special;
+
     for (int row = 0; row < kVisibleDrops; ++row) {
         const int index = scroll_ + row;
         if (index >= static_cast<int>(result.drops.size())) break;
@@ -283,6 +288,15 @@ void ResultScene::DrawRewards(const GameContext& context) const
         if (appear <= 0.0f) continue;
 
         ui::DrawItemRow(rect, item, false, false, false);
+
+        // 初回クリアの確定ドロップ（ボスドロップは先頭に並ぶ）
+        if (index == 0 && guaranteedFirst) {
+            const Rect badge = Rect::FromXYWH(rect.right - 412.0f, rect.top + 10.0f, 112.0f, 24.0f);
+            draw::FillRect(badge, palette::kAccentWarm.Scaled(0.35f), 230);
+            draw::StrokeRect(badge, palette::kAccentWarm, 1.0f, 230);
+            draw::Text(FontSize::Tiny, badge.CenterX(), badge.top + 4.0f, palette::kAccentWarm,
+                       "初回クリア確定", draw::TextAlign::Center);
+        }
 
         // 特に戦力の高い装備は光らせる（個体値そのものは表示しない）
         if (item.iv >= 70) {

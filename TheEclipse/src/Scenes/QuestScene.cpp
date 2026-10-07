@@ -848,12 +848,6 @@ void QuestScene::Draw(GameContext& context)
     info.combo = combo_;
     info.comboTimer = comboTimer_;
     info.showFps = context.settings.showFps;
-    // ボス HP ゲージは頭上の右上に出すので、頭の画面座標を渡す
-    if (boss_ && boss_->Def()) {
-        const float headY = boss_->pos.y - boss_->height * boss_->DepthScale();
-        info.bossHead = camera_.WorldToScreen(Vec2(boss_->pos.x, headY));
-        info.hasBossHead = true;
-    }
 
     hud_.Draw(player_, context.player, boss_.get(), info);
 

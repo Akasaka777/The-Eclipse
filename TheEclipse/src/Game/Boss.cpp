@@ -683,6 +683,77 @@ void Boss::Draw(const Camera& camera) const
     }
 
     DrawBody(camera);
+    DrawHpBars(camera);
+}
+
+//------------------------------------------------------------------------------
+// HP バー
+//------------------------------------------------------------------------------
+namespace {
+constexpr float kHpBarWidth = 240.0f;
+constexpr float kHpBarHeight = 9.0f;
+constexpr float kHpBarGap = 6.0f;          // バー同士の間隔（1 本ずつ離して並べる）
+constexpr float kHpBarOffsetX = 36.0f;     // 頭から右へ
+constexpr float kHpBarOffsetY = 18.0f;     // 頭から上へ（いちばん下のバーの下端）
+constexpr float kHpBarNameGap = 26.0f;     // 名前とバーの間
+} // namespace
+
+int Boss::HpBarCount() const
+{
+    return (def_ && def_->hpBarCount > 0) ? def_->hpBarCount : 3;
+}
+
+float Boss::HpBarFill(float ratio, int index, int bars)
+{
+    // index 本目が受け持つ範囲：上から順に [1 - (index+1)/N, 1 - index/N]
+    const float share = 1.0f / static_cast<float>(math::MaxI(1, bars));
+    const float low = 1.0f - share * static_cast<float>(index + 1);
+    return math::Clamp((ratio - low) / share, 0.0f, 1.0f);
+}
+
+bool Boss::HpBarLayout(const Camera& camera, std::vector<Rect>& bars, Vec2& namePos) const
+{
+    bars.clear();
+    if (!def_ || !alive) return false;
+
+    // 頭が画面に入っているときだけ出す（画面外のボスのバーは出さない）
+    const Vec2 head = camera.WorldToScreen(Vec2(pos.x, pos.y - height * DepthScale()));
+    const float screenW = static_cast<float>(config::kScreenWidth);
+    const float screenH = static_cast<float>(config::kScreenHeight);
+    if (head.x < 0.0f || head.x > screenW || head.y < 0.0f || head.y > screenH) return false;
+
+    const int count = HpBarCount();
+    const float left = head.x + kHpBarOffsetX;
+    const float bottom = head.y - kHpBarOffsetY;
+    const float pitch = kHpBarHeight + kHpBarGap;
+    const float top = bottom - pitch * static_cast<float>(count) + kHpBarGap;
+    for (int i = 0; i < count; ++i) {
+        const float y = top + pitch * static_cast<float>(i);
+        bars.push_back(Rect(left, y, left + kHpBarWidth, y + kHpBarHeight));
+    }
+    namePos = Vec2(left, top - kHpBarNameGap);
+    return true;
+}
+
+void Boss::DrawHpBars(const Camera& camera) const
+{
+    std::vector<Rect> bars;
+    Vec2 namePos;
+    if (!HpBarLayout(camera, bars, namePos)) return;
+
+    // 名前（雑魚敵と同じく影つき）
+    draw::Text(FontSize::Small, namePos.x + 1.0f, namePos.y + 1.0f, palette::kBlack, def_->name);
+    draw::Text(FontSize::Small, namePos.x, namePos.y, def_->trim, def_->name);
+
+    const float ratio = HpRatio();
+    const ColorRGB color = palette::HpColor(ratio);
+    const int count = static_cast<int>(bars.size());
+    for (int i = 0; i < count; ++i) {
+        const Rect& bar = bars[static_cast<size_t>(i)];
+        draw::FillRect(bar.Expanded(2.0f), palette::kBlack, 190);
+        draw::Bar(bar, HpBarFill(ratio, i, count), color, ColorRGB(40, 40, 48),
+                  HpBarFill(hpDisplay_, i, count), palette::kHpLoss);
+    }
 }
 
 } // namespace ecl

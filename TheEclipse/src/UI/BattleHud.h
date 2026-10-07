@@ -1,7 +1,7 @@
 //==============================================================================
 // BattleHud.h : 戦闘中の HUD
 //   左上 : キャラアイコン＋HP/MP  右下 : スキルバー
-//   ボスの頭上の右上 : ボス HP（下へ複数段に連なるゲージ）
+//   ボスの HP バーは雑魚敵と同じく Boss::Draw で頭上に描く（HUD には出さない）
 //   左下 : アイテムスロット（回復 / バフの 2 枚を前後に重ねたカード）
 //==============================================================================
 #pragma once
@@ -31,9 +31,6 @@ struct HudInfo
     int   combo = 0;
     float comboTimer = 0.0f;
     bool  showFps = false;
-    // ボスの頭の位置（画面座標）。HP ゲージをこの右上に出す
-    Vec2  bossHead;
-    bool  hasBossHead = false;
 };
 
 class BattleHud
@@ -67,16 +64,9 @@ public:
     const Rect& ItemBackRect() const { return itemBack_; }
     // 2 枚を合わせた範囲
     Rect ItemAreaRect() const;
-    // ボス HP ゲージの枠（Draw で最後に描いた位置）
-    const Rect& BossGaugeRect() const { return bossGauge_; }
-    // ボスの HP ゲージを何本に分けるか（定義が無ければ 3）
-    static int BossBarCount(const Boss& boss);
-    // HP の割合 ratio のとき、上から index 本目（0 始まり）のゲージがどれだけ残っているか
-    static float BossBarFill(float ratio, int index, int bars);
 
 private:
     void DrawPlayerStatus(const Player& player, const PlayerData& data) const;
-    void DrawBossStatus(const Boss& boss, const HudInfo& info) const;
     void DrawSkillBar(const Player& player, const PlayerData& data) const;
     void DrawFloorInfo(const HudInfo& info) const;
     void DrawCombo(const HudInfo& info) const;
@@ -86,7 +76,6 @@ private:
 
     Rect   skillRects_[kSkillSlotCount];
     float  hpDelay_ = 1.0f;
-    float  bossHpDelay_ = 1.0f;
     int    clickedSkill_ = -1;
     float  time_ = 0.0f;
 
@@ -99,9 +88,6 @@ private:
     bool      itemClickConsumed_ = false;
     std::string itemMessage_;
     float     itemMessageTimer_ = 0.0f;
-
-    // ボス HP ゲージ（Draw の中で位置が決まる）
-    mutable Rect bossGauge_;
 };
 
 } // namespace ui
