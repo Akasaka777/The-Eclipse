@@ -94,7 +94,7 @@ EnemyDatabase::EnemyDatabase()
         // 竜王の火山 : 火を吐きながら距離を取る飛竜
         EnemyDef e;
         e.id = 7; e.name = "レッドドレイク";
-        e.style = ArtStyle::Wisp;
+        e.style = ArtStyle::Dragon;
         e.main = ColorRGB(128, 38, 30); e.accent = ColorRGB(255, 190, 120); e.trim = ColorRGB(255, 120, 48);
         e.maxHp = 7600.0f; e.attack = 2700.0f; e.defense = 180.0f; e.moveSpeed = 210.0f;
         e.halfWidth = 42.0f; e.height = 112.0f;
@@ -110,7 +110,7 @@ EnemyDatabase::EnemyDatabase()
         // 竜王の火山 : 小型で手数が多い幼竜
         EnemyDef e;
         e.id = 8; e.name = "ドラゴンハッチリング";
-        e.style = ArtStyle::Imp;
+        e.style = ArtStyle::Dragon;
         e.main = ColorRGB(96, 52, 40); e.accent = ColorRGB(255, 214, 150); e.trim = ColorRGB(255, 156, 72);
         e.maxHp = 5200.0f; e.attack = 2300.0f; e.defense = 120.0f; e.moveSpeed = 320.0f;
         e.halfWidth = 28.0f; e.height = 104.0f;

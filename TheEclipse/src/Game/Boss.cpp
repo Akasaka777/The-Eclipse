@@ -141,7 +141,7 @@ BossDatabase::BossDatabase()
         b.id = 5;
         b.name = "ヴァルグリム・ザ・エンシェントドラゴン";
         b.title = "竜王";
-        b.style = ArtStyle::Beast;
+        b.style = ArtStyle::Dragon;
         b.main = ColorRGB(94, 30, 26);
         b.accent = ColorRGB(255, 200, 128);
         b.trim = ColorRGB(255, 108, 40);
