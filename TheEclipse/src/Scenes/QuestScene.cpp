@@ -188,7 +188,7 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
         player_.UseSkill(clickedSkill, combat_);
     }
 
-    // アイテムスライダー（E かクリックで使う。フロア移動の暗転中は使えない）
+    // アイテムカード（E か手前のカードのクリックで使う。フロア移動の暗転中は使えない）
     if (hud_.ItemUseRequested() && !transitioning_
         && (phase_ == Phase::Battle || phase_ == Phase::FloorClear || phase_ == Phase::FloorIntro)) {
         UseQuickItem(context);
@@ -427,7 +427,7 @@ void QuestScene::UpdateActors(float dt, GameContext& context)
     const bool controlEnabled = (phase_ == Phase::Battle || phase_ == Phase::FloorClear
                                  || phase_ == Phase::FloorIntro);
 
-    // アイテムスライダーをクリックしたフレームは、同じクリックで攻撃を出さない
+    // アイテムカードをクリックしたフレームは、同じクリックで攻撃を出さない
     player_.Update(dt, stage_, combat_, input,
                    controlEnabled && !menu_.IsOpen() && !hud_.ItemClickConsumed());
 
@@ -848,6 +848,12 @@ void QuestScene::Draw(GameContext& context)
     info.combo = combo_;
     info.comboTimer = comboTimer_;
     info.showFps = context.settings.showFps;
+    // ボス HP ゲージは頭上の右上に出すので、頭の画面座標を渡す
+    if (boss_ && boss_->Def()) {
+        const float headY = boss_->pos.y - boss_->height * boss_->DepthScale();
+        info.bossHead = camera_.WorldToScreen(Vec2(boss_->pos.x, headY));
+        info.hasBossHead = true;
+    }
 
     hud_.Draw(player_, context.player, boss_.get(), info);
 

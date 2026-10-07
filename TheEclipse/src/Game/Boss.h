@@ -44,6 +44,9 @@ struct BossDef
     float halfWidth = 62.0f;
     float height = 230.0f;
 
+    // HP ゲージを何本に分けて表示するか（上から順に減っていく）
+    int   hpBarCount = 3;
+
     int   expReward = 320;
     int   colReward = 520;
 

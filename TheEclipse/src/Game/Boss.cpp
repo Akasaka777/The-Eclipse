@@ -149,6 +149,8 @@ BossDatabase::BossDatabase()
         b.maxHp = 68000.0f; b.attack = 8600.0f; b.defense = 880.0f; b.moveSpeed = 245.0f;
         b.halfWidth = 86.0f; b.height = 300.0f;
         b.assetFolder = "valgrim";
+        // 最上位のボスなので HP ゲージは 5 本
+        b.hpBarCount = 5;
         b.expReward = 9200; b.colReward = 12000;
         b.patterns = { BossAttackKind::Swipe, BossAttackKind::Charge, BossAttackKind::JumpSlam,
                        BossAttackKind::Shot, BossAttackKind::Combo, BossAttackKind::Burst };

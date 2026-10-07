@@ -323,7 +323,7 @@ void ItemPanel::DrawDetail(const GameContext& context) const
         draw::Text(FontSize::Small, detailArea_.CenterX(), y + 10.0f, palette::kTextDisabled,
                    "アイテムを選んでください", draw::TextAlign::Center);
         draw::Text(FontSize::Tiny, detailArea_.CenterX(), y + 48.0f, palette::kTextDim,
-                   "回復とバフを 1 つずつ装備すると、戦闘画面の右下から使えます",
+                   "回復とバフを 1 つずつ装備すると、戦闘画面の左下から使えます",
                    draw::TextAlign::Center);
         return;
     }
@@ -354,14 +354,14 @@ void ItemPanel::DrawDetail(const GameContext& context) const
     switch (selected->kind) {
     case ConsumableKind::Recovery:
         draw::Text(FontSize::Tiny, x, y, palette::kTextDim,
-                   "戦闘中に右下のスライダーで「回復」を選び、E キーかクリックで使います。");
+                   "戦闘中は左下のカードを Q で「回復」を手前にし、E キーかクリックで使います。");
         y += 24.0f;
         draw::Text(FontSize::Tiny, x, y, palette::kTextDim,
                    "HP / MP が満タンのときは使われません。");
         break;
     case ConsumableKind::Buff:
         draw::Text(FontSize::Tiny, x, y, palette::kTextDim,
-                   "戦闘中に右下のスライダーで「バフ」を選び、E キーかクリックで使います。");
+                   "戦闘中は左下のカードを Q で「バフ」を手前にし、E キーかクリックで使います。");
         y += 24.0f;
         draw::Text(FontSize::Tiny, x, y, palette::kTextDim,
                    "使ったアイテムは無くなります。別のバフを使うと効果が上書きされます。");

@@ -18,11 +18,17 @@ constexpr float kScreenW = static_cast<float>(config::kScreenWidth);
 constexpr float kSkillIconSize = 104.0f;
 constexpr float kSkillBarBottom = 1030.0f;
 
-// アイテムスライダー（スキルバーの左に置く）
-constexpr float kItemPanelWidth = 330.0f;
-constexpr float kItemPanelHeight = 128.0f;
-constexpr float kItemPanelGap = 30.0f;
-constexpr float kItemTabHeight = 36.0f;
+// アイテムスロット（左下。スキルアイコンと同じ大きさの正方形を前後に重ねる）
+constexpr float kItemCardLeft = 40.0f;
+constexpr float kItemBackOffset = 26.0f;   // 奥のカードを右上へずらす量
+
+// ボス HP ゲージ（ボスの頭上の右上）
+constexpr float kBossGaugeWidth = 400.0f;
+constexpr float kBossBarHeight = 14.0f;
+constexpr float kBossBarGap = 6.0f;
+constexpr float kBossGaugeOffsetX = 36.0f;   // 頭から右へ
+constexpr float kBossGaugeOffsetY = 24.0f;   // 頭から上へ
+constexpr float kBossGaugeMargin = 16.0f;    // 画面端からの余白
 
 } // namespace
 
@@ -35,22 +41,30 @@ BattleHud::BattleHud()
         skillRects_[i] = Rect::FromXYWH(x, kSkillBarBottom - kSkillIconSize, kSkillIconSize, kSkillIconSize);
     }
 
-    // アイテムスライダー：上段が 回復 / バフ の見出し、下段がアイテム本体
-    const float right = skillRects_[0].left - kItemPanelGap;
-    itemPanel_ = Rect(right - kItemPanelWidth, kSkillBarBottom - kItemPanelHeight, right,
-                      kSkillBarBottom);
-    const float half = itemPanel_.Width() * 0.5f;
-    for (int i = 0; i < kQuickSlotCount; ++i) {
-        const float left = itemPanel_.left + half * static_cast<float>(i);
-        itemTabs_[i] = Rect(left, itemPanel_.top, left + half, itemPanel_.top + kItemTabHeight);
-    }
-    itemBody_ = Rect(itemPanel_.left, itemPanel_.top + kItemTabHeight, itemPanel_.right,
-                     itemPanel_.bottom);
+    // アイテムスロット：手前のカードはスキルバーと底をそろえ、奥のカードを右上へずらす
+    itemFront_ = Rect::FromXYWH(kItemCardLeft, kSkillBarBottom - kSkillIconSize, kSkillIconSize,
+                                kSkillIconSize);
+    itemBack_ = Rect::FromXYWH(itemFront_.left + kItemBackOffset, itemFront_.top - kItemBackOffset,
+                               kSkillIconSize, kSkillIconSize);
 }
 
-const Rect& BattleHud::ItemTabRect(QuickSlot slot) const
+Rect BattleHud::ItemAreaRect() const
 {
-    return itemTabs_[math::ClampInt(static_cast<int>(slot), 0, kQuickSlotCount - 1)];
+    return Rect(itemFront_.left, itemBack_.top, itemBack_.right, itemFront_.bottom);
+}
+
+float BattleHud::BossBarFill(float ratio, int index, int bars)
+{
+    // index 本目が受け持つ範囲：上から順に [1 - (index+1)/N, 1 - index/N]
+    const float share = 1.0f / static_cast<float>(math::MaxI(1, bars));
+    const float low = 1.0f - share * static_cast<float>(index + 1);
+    return math::Clamp((ratio - low) / share, 0.0f, 1.0f);
+}
+
+int BattleHud::BossBarCount(const Boss& boss)
+{
+    const BossDef* def = boss.Def();
+    return (def && def->hpBarCount > 0) ? def->hpBarCount : 3;
 }
 
 void BattleHud::ShowItemMessage(const std::string& message)
@@ -103,21 +117,22 @@ void BattleHud::Update(float dt, const Player& player, const Boss* boss, const I
         }
     }
 
-    // --- アイテムスライダー ----------------------------------------------------
-    if (input.Pressed(GameAction::ItemSwitch)) {
+    // --- アイテムスロット ------------------------------------------------------
+    auto swapSlot = [this]() {
         itemSlot_ = (itemSlot_ == QuickSlot::Recovery) ? QuickSlot::Buff : QuickSlot::Recovery;
-    }
+    };
+    if (input.Pressed(GameAction::ItemSwitch)) swapSlot();
     if (input.Pressed(GameAction::ItemUse)) itemUseRequested_ = true;
 
-    if (input.MouseClicked(MouseButton::Left) && itemPanel_.Contains(mouseX, mouseY)) {
-        itemClickConsumed_ = true;
-        bool onTab = false;
-        for (int i = 0; i < kQuickSlotCount; ++i) {
-            if (!itemTabs_[i].Contains(mouseX, mouseY)) continue;
-            itemSlot_ = static_cast<QuickSlot>(i);
-            onTab = true;
+    if (input.MouseClicked(MouseButton::Left) && ItemAreaRect().Contains(mouseX, mouseY)) {
+        // 手前のカードは使う、見えている奥のカードは前後を入れ替える
+        if (itemFront_.Contains(mouseX, mouseY)) {
+            itemUseRequested_ = true;
+            itemClickConsumed_ = true;
+        } else if (itemBack_.Contains(mouseX, mouseY)) {
+            swapSlot();
+            itemClickConsumed_ = true;
         }
-        if (!onTab && itemBody_.Contains(mouseX, mouseY)) itemUseRequested_ = true;
     }
 
     const float target = (itemSlot_ == QuickSlot::Buff) ? 1.0f : 0.0f;
@@ -128,9 +143,9 @@ void BattleHud::Draw(const Player& player, const PlayerData& data, const Boss* b
                      const HudInfo& info) const
 {
     DrawPlayerStatus(player, data);
-    if (boss && boss->Def()) DrawBossStatus(*boss);
+    if (boss && boss->Def()) DrawBossStatus(*boss, info);
     DrawSkillBar(player, data);
-    DrawItemSlider(player, data);
+    DrawItemSlots(player, data);
     DrawFloorInfo(info);
     DrawCombo(info);
 
@@ -209,39 +224,67 @@ void BattleHud::DrawPlayerStatus(const Player& player, const PlayerData& data) c
     }
 }
 
-void BattleHud::DrawBossStatus(const Boss& boss) const
+void BattleHud::DrawBossStatus(const Boss& boss, const HudInfo& info) const
 {
     const BossDef* def = boss.Def();
-    const Rect panel = Rect::FromXYWH(kScreenW * 0.5f - 460.0f, 30.0f, 920.0f, 96.0f);
+    const int bars = BossBarCount(boss);
 
-    draw::ChamferRect(panel, 14.0f, palette::kPanelDark, 215);
-    draw::StrokeRect(panel, palette::kBossHp.Scaled(0.8f), 2.0f, 220);
+    // 枠の大きさ：肩書き・名前・ゲージ N 本・HP の数値
+    const float height = 12.0f + 18.0f + 26.0f + 8.0f
+                       + (kBossBarHeight + kBossBarGap) * static_cast<float>(bars) + 22.0f;
 
-    draw::Text(FontSize::Small, panel.left + 20.0f, panel.top + 8.0f, palette::kTextDim, def->title);
-    draw::TextShadow(FontSize::Medium, panel.left + 20.0f, panel.top + 28.0f, palette::kText, def->name);
+    // ボスの頭の右上に置く。画面からはみ出す場合は内側へ寄せる
+    const Vec2 head = info.hasBossHead ? info.bossHead : Vec2(kScreenW * 0.5f, 400.0f);
+    float left = head.x + kBossGaugeOffsetX;
+    float bottom = head.y - kBossGaugeOffsetY;
+    left = math::Clamp(left, kBossGaugeMargin, kScreenW - kBossGaugeMargin - kBossGaugeWidth);
+    // 左上のプレイヤー情報（〜x 648, y 152）とフロア情報（〜x 448, y 240）の下へ逃がす
+    float minTop = 24.0f;
+    if (left < 660.0f) minTop = 166.0f;
+    if (left < 460.0f) minTop = 252.0f;
+    bottom = math::Clamp(bottom, minTop + height, 860.0f);
+    const Rect panel(left, bottom - height, left + kBossGaugeWidth, bottom);
+    bossGauge_ = panel;
 
+    draw::ChamferRect(panel, 10.0f, palette::kPanelDark, 205);
+    draw::StrokeRect(panel, palette::kBossHp.Scaled(0.8f), 2.0f, 210);
+
+    float y = panel.top + 8.0f;
+    draw::Text(FontSize::Tiny, panel.left + 14.0f, y, palette::kTextDim, def->title);
     // フェーズ表示
     for (int i = 0; i < 3; ++i) {
-        const float x = panel.right - 30.0f - static_cast<float>(2 - i) * 26.0f;
+        const float x = panel.right - 20.0f - static_cast<float>(2 - i) * 20.0f;
         const bool active = (i < boss.Phase());
-        draw::Circle(x, panel.top + 24.0f, 8.0f, active ? palette::kBossHp : palette::kTextDisabled,
+        draw::Circle(x, y + 8.0f, 6.0f, active ? palette::kBossHp : palette::kTextDisabled,
                      true, 1.0f, 255);
     }
+    y += 20.0f;
+    draw::TextShadow(FontSize::Small, panel.left + 14.0f, y, palette::kText, def->name);
+    y += 30.0f;
 
-    const Rect bar = Rect::FromXYWH(panel.left + 20.0f, panel.bottom - 30.0f, panel.Width() - 40.0f, 20.0f);
-    draw::Bar(bar, boss.HpRatio(), palette::HpColor(boss.HpRatio()), palette::kPanelDark,
-              bossHpDelay_, ColorRGB(255, 190, 120));
-    draw::StrokeRect(bar, palette::kBorder.Scaled(0.7f), 1.0f, 160);
+    // --- HP ゲージ（上の 1 本から順に減り、下へ連なる）---------------------------
+    const float ratio = boss.HpRatio();
+    const ColorRGB color = palette::HpColor(ratio);
+    const float share = 1.0f / static_cast<float>(bars);
+    for (int i = 0; i < bars; ++i) {
+        const float fill = BossBarFill(ratio, i, bars);
+        const float delay = BossBarFill(bossHpDelay_, i, bars);
 
-    // フェーズ境界の目盛り
-    for (float ratio : { 0.35f, 0.70f }) {
-        const float x = bar.left + bar.Width() * ratio;
-        draw::Line(x, bar.top, x, bar.bottom, palette::kBlack, 2.0f, 180);
+        const Rect bar(panel.left + 14.0f, y, panel.right - 14.0f, y + kBossBarHeight);
+        draw::Bar(bar, fill, color, palette::kBlack, delay, ColorRGB(255, 190, 120));
+        draw::StrokeRect(bar, (fill > 0.0f) ? palette::kBorder.Scaled(0.8f) : palette::kTextDisabled,
+                         1.0f, 170);
+        y += kBossBarHeight + kBossBarGap;
     }
 
-    draw::Text(FontSize::Tiny, bar.right, bar.top - 20.0f, palette::kTextDim,
+    draw::Text(FontSize::Tiny, panel.right - 14.0f, y, palette::kTextDim,
                str::Format("%d / %d", static_cast<int>(boss.hp), static_cast<int>(boss.maxHp)),
                draw::TextAlign::Right);
+    // 残りのゲージ本数
+    const int remaining = (ratio <= 0.0f) ? 0
+                        : math::ClampInt(static_cast<int>(std::ceil(ratio / share - 0.0001f)), 1, bars);
+    draw::Text(FontSize::Tiny, panel.left + 14.0f, y, palette::kBossHp,
+               str::Format("×%d", remaining));
 }
 
 void BattleHud::DrawSkillBar(const Player& player, const PlayerData& data) const
@@ -314,97 +357,117 @@ void BattleHud::DrawSkillBar(const Player& player, const PlayerData& data) const
                str::Format("1〜%d / クリックでソードスキル     ESC : メニュー", limit));
 }
 
-void BattleHud::DrawItemSlider(const Player& player, const PlayerData& data) const
+void BattleHud::DrawItemSlots(const Player& player, const PlayerData& data) const
+{
+    // 入れ替えの途中は 2 枚が前後の位置を行き来する。
+    //   回復カードは itemSlide_ = 0 で手前、1 で奥。バフカードはその逆。
+    auto lerpRect = [](const Rect& a, const Rect& b, float t) {
+        return Rect(math::Lerp(a.left, b.left, t), math::Lerp(a.top, b.top, t),
+                    math::Lerp(a.right, b.right, t), math::Lerp(a.bottom, b.bottom, t));
+    };
+    // 奥へ回るカードは一度左上へ浮かせて、すれ違うように見せる
+    const float lift = std::sin(itemSlide_ * 3.14159265f) * 22.0f;
+    Rect recovery = lerpRect(itemFront_, itemBack_, itemSlide_);
+    Rect buff = lerpRect(itemBack_, itemFront_, itemSlide_);
+    if (itemSlot_ == QuickSlot::Buff) { recovery.top -= lift; recovery.bottom -= lift; }
+    else                               { buff.top -= lift; buff.bottom -= lift; }
+
+    // 手前に近い方を後から描く
+    const bool recoveryFront = itemSlide_ < 0.5f;
+    if (recoveryFront) {
+        DrawItemCard(buff, QuickSlot::Buff, false, player, data);
+        DrawItemCard(recovery, QuickSlot::Recovery, true, player, data);
+    } else {
+        DrawItemCard(recovery, QuickSlot::Recovery, false, player, data);
+        DrawItemCard(buff, QuickSlot::Buff, true, player, data);
+    }
+
+    // 選んでいる枠と操作キー
+    const Rect area = ItemAreaRect();
+    draw::Text(FontSize::Tiny, area.left, area.top - 24.0f, palette::kTextDim,
+               str::Format("%sアイテム   %s : 切替  %s : 使用", QuickSlotName(itemSlot_),
+                           Input::Instance().ActionKeyName(GameAction::ItemSwitch),
+                           Input::Instance().ActionKeyName(GameAction::ItemUse)));
+
+    // 通知（スロットの上）
+    if (itemMessageTimer_ > 0.0f) {
+        const int alpha = static_cast<int>(math::Clamp(itemMessageTimer_ / 0.4f, 0.0f, 1.0f) * 255.0f);
+        draw::TextAlpha(FontSize::Small, area.left, area.top - 54.0f, palette::kDanger,
+                        itemMessage_, alpha);
+    }
+}
+
+void BattleHud::DrawItemCard(const Rect& rect, QuickSlot slot, bool front, const Player& player,
+                             const PlayerData& data) const
 {
     const Inventory& inventory = data.GetInventory();
-    const Rect& panel = itemPanel_;
+    const ConsumableDef* item = ConsumableDatabase::Instance().Find(inventory.QuickItem(slot));
+    const int count = item ? inventory.ItemCount(item->id) : 0;
+    const bool usable = item && count > 0 && player.ItemCooldown() <= 0.0f;
+    const ColorRGB slotColor = (slot == QuickSlot::Buff) ? ColorRGB(255, 170, 60)
+                                                         : ColorRGB(110, 230, 130);
+    const ColorRGB itemColor = item ? item->color : slotColor;
 
-    draw::ChamferRect(panel, 10.0f, palette::kPanelDark, 225);
-    draw::StrokeRect(panel, palette::kBorder.Scaled(0.8f), 1.0f, 200);
+    draw::ChamferRect(rect, 10.0f, palette::kPanelDark, front ? 235 : 215);
+    draw::GradientRectV(rect.Expanded(-4.0f), itemColor.Scaled(front && usable ? 0.42f : 0.16f),
+                        palette::kPanelDark, front ? 235 : 200, 10);
 
-    // --- 見出し（回復 / バフ）と滑る帯 --------------------------------------------
-    const float half = panel.Width() * 0.5f;
-    const float slideLeft = panel.left + half * itemSlide_;
-    const Rect highlight(slideLeft + 4.0f, panel.top + 4.0f, slideLeft + half - 4.0f,
-                         panel.top + kItemTabHeight - 2.0f);
-    const ColorRGB slideColor = ColorRGB::Lerp(ColorRGB(110, 230, 130), ColorRGB(255, 170, 60),
-                                               itemSlide_);
-    draw::FillRect(highlight, slideColor.Scaled(0.40f), 235);
-    draw::Line(highlight.left, highlight.bottom, highlight.right, highlight.bottom, slideColor,
-               3.0f, 255);
-
-    const ConsumableDef* activeBuff = player.ItemBuff();
-    for (int i = 0; i < kQuickSlotCount; ++i) {
-        const QuickSlot slot = static_cast<QuickSlot>(i);
-        const bool active = (slot == itemSlot_);
-        // バフが効いている間は、バフの見出しに残り時間を添える
-        if (slot == QuickSlot::Buff && activeBuff) {
-            draw::Text(FontSize::Small, itemTabs_[i].CenterX(), itemTabs_[i].top + 5.0f,
-                       activeBuff->color,
-                       str::Format("%s %.0fs", QuickSlotName(slot), player.ItemBuffRemain()),
-                       draw::TextAlign::Center);
-            continue;
-        }
-        draw::Text(FontSize::Small, itemTabs_[i].CenterX(), itemTabs_[i].top + 5.0f,
-                   active ? palette::kText : palette::kTextDim, QuickSlotName(slot),
-                   draw::TextAlign::Center);
+    if (!front) {
+        // 奥のカード：見えている右上の帯に種類と切り替えキーだけ出す
+        draw::StrokeRect(rect, slotColor.Scaled(0.6f), 2.0f, 200);
+        const ConsumableDef* buff = (slot == QuickSlot::Buff) ? player.ItemBuff() : nullptr;
+        draw::Text(FontSize::Tiny, rect.right - 6.0f, rect.top + 4.0f,
+                   buff ? buff->color : palette::kTextDim,
+                   buff ? str::Format("%s %.0fs", QuickSlotName(slot), player.ItemBuffRemain())
+                        : std::string(QuickSlotName(slot)),
+                   draw::TextAlign::Right);
+        return;
     }
-    draw::Line(panel.left + 8.0f, itemBody_.top, panel.right - 8.0f, itemBody_.top,
-               palette::kBorder, 1.0f, 140);
-
-    // 操作キー（パネルの上に小さく出す）
-    draw::Text(FontSize::Tiny, panel.left + 4.0f, panel.top - 26.0f, palette::kTextDim,
-               str::Format("%s : 切替", Input::Instance().ActionKeyName(GameAction::ItemSwitch)));
-    draw::Text(FontSize::Tiny, panel.right - 4.0f, panel.top - 26.0f, palette::kTextDim,
-               str::Format("%s / クリック : 使用",
-                           Input::Instance().ActionKeyName(GameAction::ItemUse)),
-               draw::TextAlign::Right);
-
-    // --- 本体 -------------------------------------------------------------------
-    const Rect icon = Rect::FromXYWH(itemBody_.left + 12.0f, itemBody_.top + 8.0f, 72.0f, 72.0f);
-    const float textX = icon.right + 14.0f;
-    const ConsumableDef* item = ConsumableDatabase::Instance().Find(inventory.QuickItem(itemSlot_));
 
     if (!item) {
-        draw::StrokeRect(icon, palette::kTextDisabled, 1.0f, 160);
-        draw::Text(FontSize::Small, icon.CenterX(), icon.CenterY() - 12.0f, palette::kTextDisabled,
+        draw::StrokeRect(rect, palette::kTextDisabled, 2.0f, 200);
+        draw::Text(FontSize::Small, rect.CenterX(), rect.CenterY() - 20.0f, palette::kTextDisabled,
                    "---", draw::TextAlign::Center);
-        draw::Text(FontSize::Small, textX, itemBody_.top + 12.0f, palette::kTextDisabled, "未装備");
-        draw::Text(FontSize::Tiny, textX, itemBody_.top + 46.0f, palette::kTextDim,
-                   "プレイヤー → アイテムで装備");
+        draw::Text(FontSize::Tiny, rect.CenterX(), rect.bottom - 22.0f, palette::kTextDisabled,
+                   "未装備", draw::TextAlign::Center);
     } else {
-        const int count = inventory.ItemCount(item->id);
-        const bool empty = (count <= 0);
-        DrawConsumableIcon(icon, *item, empty);
-        draw::Text(FontSize::Small, textX, itemBody_.top + 10.0f,
-                   empty ? palette::kTextDisabled : palette::kText, item->name);
-        draw::Text(FontSize::Small, itemBody_.right - 12.0f, itemBody_.top + 10.0f,
-                   empty ? palette::kDanger : palette::kAccentWarm,
-                   str::Format("×%d", count), draw::TextAlign::Right);
-        draw::Text(FontSize::Tiny, textX, itemBody_.top + 42.0f, palette::kTextDim,
-                   item->shortEffect);
+        // 左上の使用キーと右上の個数に掛からない大きさ
+        DrawConsumableIcon(Rect::FromCenter(rect.CenterX(), rect.CenterY() + 2.0f, 48.0f, 48.0f),
+                           *item, count <= 0);
 
-        // 使った直後の待ち時間（下から満ちる）
+        // 使った直後の待ち時間（スキルと同じく下から満ちる）
         if (player.ItemCooldown() > 0.0f) {
-            Rect cover = icon;
+            Rect cover = rect.Expanded(-4.0f);
             cover.top = cover.bottom - cover.Height() * (player.ItemCooldown() / kItemUseCooldown);
             draw::FillRect(cover, palette::kBlack, 150);
         }
+
+        draw::Text(FontSize::Tiny, rect.CenterX(), rect.bottom - 22.0f,
+                   count > 0 ? palette::kText : palette::kTextDisabled, item->name,
+                   draw::TextAlign::Center);
+        draw::Text(FontSize::Tiny, rect.right - 6.0f, rect.top + 4.0f,
+                   count > 0 ? palette::kAccentWarm : palette::kDanger,
+                   str::Format("×%d", count), draw::TextAlign::Right);
+        draw::StrokeRect(rect, usable ? item->color : palette::kTextDisabled, usable ? 3.0f : 2.0f, 255);
+        if (usable) {
+            const float pulse = 0.5f + 0.5f * std::sin(time_ * 4.0f);
+            draw::StrokeRect(rect.Expanded(3.0f), item->color, 1.0f, static_cast<int>(120.0f * pulse));
+        }
     }
 
-    // --- 効いているバフの残り時間（本体の下端に細い帯で出す）---------------------
-    if (activeBuff) {
-        const Rect bar(textX, itemBody_.bottom - 14.0f, itemBody_.right - 12.0f,
-                       itemBody_.bottom - 8.0f);
-        draw::Bar(bar, player.ItemBuffRatio(), activeBuff->color, palette::kPanel);
+    // 効いているバフの残り時間（バフカードの上端に細い帯）
+    if (slot == QuickSlot::Buff) {
+        if (const ConsumableDef* buff = player.ItemBuff()) {
+            const Rect bar(rect.left + 6.0f, rect.top + 28.0f, rect.right - 6.0f, rect.top + 33.0f);
+            draw::Bar(bar, player.ItemBuffRatio(), buff->color, palette::kPanel);
+        }
     }
 
-    // --- 通知（パネルの上） -------------------------------------------------------
-    if (itemMessageTimer_ > 0.0f) {
-        const int alpha = static_cast<int>(math::Clamp(itemMessageTimer_ / 0.4f, 0.0f, 1.0f) * 255.0f);
-        draw::TextAlpha(FontSize::Small, panel.CenterX(), panel.top - 58.0f, palette::kDanger,
-                        itemMessage_, alpha, draw::TextAlign::Center);
-    }
+    // 使用キー（スキルの番号と同じ位置）
+    const Rect keyTag = Rect::FromXYWH(rect.left + 4.0f, rect.top + 4.0f, 24.0f, 22.0f);
+    draw::FillRect(keyTag, palette::kBlack, 190);
+    draw::Text(FontSize::Tiny, keyTag.CenterX(), keyTag.top + 2.0f, palette::kText,
+               Input::Instance().ActionKeyName(GameAction::ItemUse), draw::TextAlign::Center);
 }
 
 void BattleHud::DrawFloorInfo(const HudInfo& info) const

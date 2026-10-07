@@ -530,7 +530,7 @@ void ShopPanel::DrawItemDetail(const GameContext& context) const
     draw::Text(FontSize::Tiny, x, y, palette::kTextDim,
                (item->kind == ConsumableKind::Buff)
                    ? "バフは使うと無くなり、効果時間のあいだだけ能力が上がります。"
-                   : "戦闘中に右下のスライダーから使えます。");
+                   : "戦闘中に左下のアイテムカードから使えます。");
     y += 34.0f;
 
     draw::Line(x, y, right, y, palette::kBorder, 1.0f, 120); y += 16.0f;
