@@ -36,6 +36,7 @@ private:
     enum class Phase
     {
         FloorIntro,  // フロア名の表示
+        BossIntro,   // ボスフロアの登場演出（カメラがボスへ寄り、咆哮と名前の札）
         Battle,      // 戦闘中
         FloorClear,  // 全滅後、ゲートへ
         Victory,     // ボス撃破
@@ -65,6 +66,14 @@ private:
     // ID からアクターを探す
     Actor* FindActorById(int actorId);
     void FinishQuest(bool cleared, bool retired, GameContext& context);
+
+    // --- ボスの登場演出 ---------------------------------------------------------
+    void StartBossIntro();
+    void UpdateBossIntro(float dt, const Input& input);
+    void EndBossIntro();
+    // 演出中のカメラの狙い（ワールド X）
+    float BossIntroCameraX() const;
+    void DrawBossIntro() const;
 
     void DrawWorld(const GameContext& context);
     void DrawBanner() const;
@@ -99,6 +108,13 @@ private:
     bool  transitioning_ = false;
     float transitionAlpha_ = 0.0f;
     int   pendingFloor_ = 0;
+
+    // ボスの登場演出
+    float bossIntroTimer_ = 0.0f;
+    bool  bossIntroRoared_ = false;
+    bool  bossIntroSkipped_ = false;
+    float bossIntroOutroFromX_ = 0.0f;   // 戻りのパンを始めたときのカメラ位置
+    bool  bossIntroOutroStarted_ = false;
 
     // バナー表示
     std::string bannerMain_;

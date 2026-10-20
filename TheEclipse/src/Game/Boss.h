@@ -103,6 +103,20 @@ public:
     // 残りのバーをまとめて削って倒す（開発者モードの「殲滅」用）
     void ForceKill(CombatSystem& combat);
 
+    // --- 登場演出（QuestScene が進める）-------------------------------------------
+    // hold を立てている間は登場状態のまま待つ（攻撃せず、ダメージも受けない）。
+    // 立てると HP バーは隠れる。
+    void HoldIntro(bool hold);
+    bool IsIntroHeld() const { return introHeld_; }
+    // 隠していた HP バーを出し、空から満タンまで溜める（演出の見せ場で呼ぶ）。
+    // 呼ばないまま hold を外したときも、外した時点から溜まる。
+    void RevealHpBars();
+    // 咆哮のポーズ（登場演出の見せ場）
+    void SetIntroRoar(bool roar);
+    bool IsIntroRoaring() const { return introRoar_; }
+    // HP バーの溜まり具合（0〜1。演出の後に溜まる。普段は 1）
+    float HpBarReveal() const { return barReveal_; }
+
     const BossDef* Def() const { return def_; }
     // 今の形態（1 本目のバーを削っている間が 1。最後のバーで HpBarCount() になる）
     int   Phase() const { return phase_; }
@@ -163,6 +177,13 @@ private:
     float hpDisplay_ = 1.0f;
     float moveTarget_ = 0.0f;
     int   lastPatternIndex_ = -1;
+
+    // 登場演出
+    bool  introHeld_ = false;
+    bool  barsRevealing_ = false;
+    bool  introRoar_ = false;
+    float roarTimer_ = 0.0f;
+    float barReveal_ = 1.0f;
 };
 
 } // namespace ecl

@@ -207,6 +207,11 @@ void Boss::Setup(const BossDef& def, const Vec2& position, float powerScale, int
     alive = true;
     state_ = BossState::Intro;
     stateTimer_ = 0.0f;
+    introHeld_ = false;
+    barsRevealing_ = false;
+    introRoar_ = false;
+    roarTimer_ = 0.0f;
+    barReveal_ = 1.0f;
     phase_ = 1;
     damageBoost_ = 1.0f;
     speedBoost_ = 1.0f;
@@ -219,6 +224,33 @@ float Boss::PhaseFloorHp() const
     // phase_ 本目のバーの下端。最後のバーなら 0（倒れるまで削る）
     const int left = math::MaxI(0, hpBars_ - phase_);
     return maxHp * static_cast<float>(left) / static_cast<float>(hpBars_);
+}
+
+void Boss::HoldIntro(bool hold)
+{
+    if (hold == introHeld_) return;
+    introHeld_ = hold;
+    if (hold) {
+        state_ = BossState::Intro;
+        stateTimer_ = 0.0f;
+        barReveal_ = 0.0f;
+        barsRevealing_ = false;
+    } else {
+        introRoar_ = false;
+        // 演出が終わったら一呼吸おいて動き出す（スキップしたときも同じ）
+        stateTimer_ = math::MaxF(stateTimer_, 1.8f);
+    }
+}
+
+void Boss::RevealHpBars()
+{
+    barsRevealing_ = true;
+}
+
+void Boss::SetIntroRoar(bool roar)
+{
+    if (roar && !introRoar_) roarTimer_ = 0.0f;
+    introRoar_ = roar;
 }
 
 int Boss::ApplyDirectDamage(int damage, float knockbackX, CombatSystem& combat)
@@ -522,6 +554,9 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
 
     stateTimer_ += dt;
     hpDisplay_ = math::Approach(hpDisplay_, HpRatio(), dt * 0.55f);
+    roarTimer_ += dt;
+    // 登場演出の見せ場（または演出の終わり）から、空の HP バーを満タンまで溜める
+    if (!introHeld_ || barsRevealing_) barReveal_ = math::Approach(barReveal_, 1.0f, dt / 0.9f);
 
     if (!alive) {
         state_ = BossState::Dead;
@@ -545,7 +580,8 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
     case BossState::Intro: {
         velocity.x *= 0.9f;
         pose = PoseKind::Idle;
-        if (stateTimer_ >= 2.2f) {
+        FaceTowards(playerPos.x);
+        if (!introHeld_ && stateTimer_ >= 2.2f) {
             state_ = BossState::Idle;
             stateTimer_ = 0.0f;
         }
@@ -641,6 +677,16 @@ void Boss::UpdatePose()
                   % math::MaxI(1, WeaponComboLength(art.weapon));
 
     switch (state_) {
+    case BossState::Intro:
+        // 登場演出の咆哮：口を開き（武器持ちは振りかぶり）、そのまま吠え続ける
+        if (introRoar_) {
+            pose = PoseKind::Attack;
+            motionVariant = static_cast<int>(BossAttackKind::Burst) % math::MaxI(1, WeaponComboLength(art.weapon));
+            motionPhase = math::Clamp(0.15f + roarTimer_ * 1.2f, 0.15f, 0.55f);
+        } else {
+            pose = PoseKind::Idle;
+        }
+        break;
     case BossState::Windup:
         pose = PoseKind::Attack;
         if (windupTime_ > 0.0f) {
@@ -731,7 +777,8 @@ float Boss::HpBarFill(float ratio, int index, int bars)
 bool Boss::HpBarLayout(const Camera& camera, std::vector<Rect>& bars, Vec2& namePos) const
 {
     bars.clear();
-    if (!def_ || !alive) return false;
+    // 撃破後と、登場演出で出すまでの間は描かない
+    if (!def_ || !alive || (introHeld_ && !barsRevealing_)) return false;
 
     // 頭が画面に入っているときだけ出す（画面外のボスのバーは出さない）
     const Vec2 head = camera.WorldToScreen(Vec2(pos.x, pos.y - height * DepthScale()));
@@ -758,20 +805,23 @@ void Boss::DrawHpBars(const Camera& camera) const
     std::vector<Rect> bars;
     Vec2 namePos;
     if (!HpBarLayout(camera, bars, namePos)) return;
+    // 登場演出の直後は、空のバーが下から順に溜まっていく
+    const float reveal = barReveal_;
 
     // 名前（雑魚敵と同じく影つきで、頭の真上の中央に）
     draw::Text(FontSize::Small, namePos.x + 1.0f, namePos.y + 1.0f, palette::kBlack, def_->name,
                draw::TextAlign::Center);
     draw::Text(FontSize::Small, namePos.x, namePos.y, def_->trim, def_->name, draw::TextAlign::Center);
 
-    const float ratio = HpRatio();
+    const float ratio = math::MinF(HpRatio(), reveal);
+    const float delayed = math::MinF(hpDisplay_, reveal);
     const ColorRGB color = palette::HpColor(ratio);
     const int count = static_cast<int>(bars.size());
     for (int i = 0; i < count; ++i) {
         const Rect& bar = bars[static_cast<size_t>(i)];
         draw::FillRect(bar.Expanded(1.5f), palette::kBlack, 190);
         draw::Bar(bar, HpBarFill(ratio, i, count), color, ColorRGB(40, 40, 48),
-                  HpBarFill(hpDisplay_, i, count), palette::kHpLoss);
+                  HpBarFill(delayed, i, count), palette::kHpLoss);
     }
 }
 

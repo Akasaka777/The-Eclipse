@@ -32,6 +32,31 @@ constexpr float kWeaponWearPerHit = 0.30f;
 constexpr float kArmorWearPerHit = 0.28f;
 constexpr float kShieldWearPerGuard = 0.45f;
 
+//------------------------------------------------------------------------------
+// ボスの登場演出の流れ（秒）
+//   暗転明け → 上下に黒帯 → カメラがボスへ → 咆哮 → 名前の札 → カメラが戻って戦闘開始
+//   ENTER / 通常攻撃 / クリックで飛ばせる（戻りのパンだけは見せる）
+//------------------------------------------------------------------------------
+constexpr float kBossIntroFadeIn = 0.6f;    // 暗転から明ける
+constexpr float kBossIntroBarTime = 0.5f;   // 黒帯が出入りする時間
+constexpr float kBossIntroPanStart = 0.3f;  // ボスへのパン
+constexpr float kBossIntroPanEnd = 1.8f;
+constexpr float kBossIntroRoar = 1.8f;      // 咆哮（画面振動・衝撃波・閃光）
+constexpr float kBossIntroRoarTime = 1.1f;
+constexpr float kBossIntroBars = 2.3f;      // ボスの HP バーを出して溜める
+constexpr float kBossIntroCardIn = 2.1f;    // 名前の札
+constexpr float kBossIntroCardOut = 4.4f;
+constexpr float kBossIntroOutro = 4.5f;     // プレイヤーへ戻るパン
+constexpr float kBossIntroEnd = 5.4f;
+constexpr float kBossIntroSkipAfter = 0.4f; // これより前の入力は飛ばしに使わない
+constexpr float kLetterboxHeight = 120.0f;
+
+float EaseInOut(float t)
+{
+    t = math::Clamp(t, 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
 } // namespace
 
 QuestScene::QuestScene() = default;
@@ -102,18 +127,173 @@ void QuestScene::LoadFloor(int index, GameContext& context)
             boss_->Setup(*def, Vec2(stage_.Width() - 600.0f, stage_.GroundYAt(bossZ)),
                          quest_->enemyPowerScale, QuestDatabase::BossHpBarCount(*quest_));
             boss_->z = bossZ;
-            bannerMain_ = def->name;
-            bannerSub_ = def->title;
-            bannerTimer_ = 2.6f;
         }
+    }
+
+    phaseTimer_ = 0.0f;
+    if (boss_) {
+        // ボスフロアは登場演出から始める（フロア名のバナーの代わり）
+        StartBossIntro();
     } else {
         bannerMain_ = floor.name;
         bannerSub_ = quest_->name;
         bannerTimer_ = 2.0f;
+        phase_ = Phase::FloorIntro;
+    }
+}
+
+//==============================================================================
+// ボスの登場演出
+//==============================================================================
+void QuestScene::StartBossIntro()
+{
+    phase_ = Phase::BossIntro;
+    bossIntroTimer_ = 0.0f;
+    bossIntroRoared_ = false;
+    bossIntroSkipped_ = false;
+    bossIntroOutroStarted_ = false;
+    bossIntroOutroFromX_ = 0.0f;
+    bannerTimer_ = 0.0f;
+    // ボスは演出が終わるまで登場状態で待つ（攻撃も被弾もしない）
+    if (boss_) boss_->HoldIntro(true);
+}
+
+void QuestScene::EndBossIntro()
+{
+    if (boss_) boss_->HoldIntro(false);
+    phase_ = Phase::Battle;
+    phaseTimer_ = 0.0f;
+}
+
+float QuestScene::BossIntroCameraX() const
+{
+    // 普段の追従と同じ狙い（向いている側を少し広く見せる）
+    const float playerX = player_.pos.x + static_cast<float>(player_.facing) * 140.0f;
+    if (!boss_) return playerX;
+    const float bossX = boss_->pos.x;
+
+    const float t = bossIntroTimer_;
+    if (bossIntroOutroStarted_) {
+        const float back = EaseInOut((t - kBossIntroOutro) / (kBossIntroEnd - kBossIntroOutro));
+        return math::Lerp(bossIntroOutroFromX_, playerX, back);
+    }
+    const float pan = EaseInOut((t - kBossIntroPanStart) / (kBossIntroPanEnd - kBossIntroPanStart));
+    return math::Lerp(playerX, bossX, pan);
+}
+
+void QuestScene::UpdateBossIntro(float dt, const Input& input)
+{
+    // デバッグの殲滅などで演出中に倒れたら、そのまま戦闘へ（撃破の処理に進む）
+    if (!BossAlive()) {
+        EndBossIntro();
+        return;
     }
 
-    phase_ = Phase::FloorIntro;
-    phaseTimer_ = 0.0f;
+    bossIntroTimer_ += dt;
+
+    // 飛ばす：名前の札までを省いて、戻りのパンから見せる
+    const bool skip = input.Pressed(GameAction::Confirm) || input.Pressed(GameAction::Attack)
+                   || input.MouseClicked(MouseButton::Left);
+    if (skip && bossIntroTimer_ >= kBossIntroSkipAfter && bossIntroTimer_ < kBossIntroOutro) {
+        bossIntroSkipped_ = true;
+        bossIntroTimer_ = kBossIntroOutro;
+        boss_->RevealHpBars();
+    }
+
+    // 戻りのパンは、今のカメラ位置から始める（飛ばしたときも滑らかに戻る）
+    if (!bossIntroOutroStarted_ && bossIntroTimer_ >= kBossIntroOutro) {
+        bossIntroOutroStarted_ = true;
+        bossIntroOutroFromX_ = camera_.Center().x;
+        boss_->SetIntroRoar(false);
+    }
+
+    // 咆哮
+    if (!bossIntroRoared_ && !bossIntroSkipped_ && bossIntroTimer_ >= kBossIntroRoar) {
+        bossIntroRoared_ = true;
+        const ColorRGB color = boss_->art.trim;
+        boss_->SetIntroRoar(true);
+        camera_.Shake(16.0f, 0.8f);
+        combat_.AddRing(Vec2(boss_->pos.x, boss_->pos.y), 620.0f, color, 0.9f);
+        combat_.AddRing(Vec2(boss_->pos.x, boss_->pos.y), 380.0f, palette::kWhite, 0.6f);
+        combat_.AddImpact(Vec2(boss_->pos.x, boss_->pos.y - boss_->height * 0.6f), color, 46, 780.0f);
+        combat_.AddDust(Vec2(boss_->pos.x, boss_->pos.y), 1, 18);
+        combat_.AddDust(Vec2(boss_->pos.x, boss_->pos.y), -1, 18);
+    }
+    if (bossIntroRoared_ && bossIntroTimer_ >= kBossIntroRoar + kBossIntroRoarTime) {
+        boss_->SetIntroRoar(false);
+    }
+    // 咆哮のあと、カメラがボスを映している間に HP バーを出して溜める
+    if (bossIntroTimer_ >= kBossIntroBars) boss_->RevealHpBars();
+
+    if (bossIntroTimer_ >= kBossIntroEnd) EndBossIntro();
+}
+
+void QuestScene::DrawBossIntro() const
+{
+    if (!boss_ || !boss_->Def()) return;
+    const BossDef& def = *boss_->Def();
+    const float t = bossIntroTimer_;
+
+    // --- 暗転明け ---------------------------------------------------------------
+    if (t < kBossIntroFadeIn) {
+        draw::FillRect(Rect(0.0f, 0.0f, kScreenW, kScreenH), palette::kBlack,
+                       static_cast<int>((1.0f - t / kBossIntroFadeIn) * 255.0f));
+    }
+
+    // --- 咆哮の閃光 ---------------------------------------------------------------
+    if (bossIntroRoared_ && t >= kBossIntroRoar && t < kBossIntroRoar + 0.4f) {
+        const float flash = 1.0f - (t - kBossIntroRoar) / 0.4f;
+        draw::FillRect(Rect(0.0f, 0.0f, kScreenW, kScreenH), def.trim.Scaled(1.4f),
+                       static_cast<int>(flash * 110.0f));
+    }
+
+    // --- 名前の札 ---------------------------------------------------------------
+    if (!bossIntroSkipped_ && t >= kBossIntroCardIn && t < kBossIntroCardOut + 0.3f) {
+        const float in = EaseInOut((t - kBossIntroCardIn) / 0.35f);
+        const float out = 1.0f - EaseInOut((t - kBossIntroCardOut) / 0.3f);
+        const float appear = math::MinF(in, out);
+        const int alpha = static_cast<int>(appear * 255.0f);
+        const float cx = kScreenW * 0.5f;
+        const float slide = (1.0f - in) * -80.0f;   // 左から滑り込む
+        const float top = 196.0f;
+
+        // 帯（半透明の 1 枚。分割して重ねると継ぎ目が濃く見えるため）
+        const Rect band(0.0f, top, kScreenW, top + 186.0f);
+        draw::FillRect(band, def.main.Scaled(0.18f), static_cast<int>(appear * 200.0f));
+        // 上下の線は中央から左右へ伸びる
+        const float lineHalf = kScreenW * 0.5f * in;
+        draw::Line(cx - lineHalf, band.top, cx + lineHalf, band.top, def.trim, 2.0f, alpha);
+        draw::Line(cx - lineHalf, band.bottom, cx + lineHalf, band.bottom, def.trim, 2.0f, alpha);
+
+        draw::TextAlpha(FontSize::Medium, cx + slide, top + 18.0f, def.trim, def.title, alpha,
+                        draw::TextAlign::Center);
+        draw::TextAlpha(FontSize::Huge, cx + slide * 0.6f, top + 58.0f, palette::kWhite, def.name, alpha,
+                        draw::TextAlign::Center);
+        // 難易度（★）
+        if (quest_ && quest_->difficulty > 0) {
+            std::string stars;
+            for (int i = 0; i < quest_->difficulty; ++i) stars += "★";
+            draw::TextAlpha(FontSize::Small, cx + slide * 0.3f, top + 138.0f, def.trim, stars, alpha,
+                            draw::TextAlign::Center);
+        }
+    }
+
+    // --- 上下の黒帯 ---------------------------------------------------------------
+    const float barIn = EaseInOut(t / kBossIntroBarTime);
+    const float barOut = EaseInOut((kBossIntroEnd - t) / kBossIntroBarTime);
+    const float barH = kLetterboxHeight * math::MinF(barIn, barOut);
+    if (barH > 0.5f) {
+        draw::FillRect(Rect(0.0f, 0.0f, kScreenW, barH), palette::kBlack, 255);
+        draw::FillRect(Rect(0.0f, kScreenH - barH, kScreenW, kScreenH), palette::kBlack, 255);
+        const int textAlpha = static_cast<int>(math::Clamp((barH - 60.0f) / 60.0f, 0.0f, 1.0f) * 255.0f);
+        if (textAlpha > 0) {
+            draw::TextAlpha(FontSize::Small, 60.0f, barH - 46.0f, palette::kDanger, "BOSS BATTLE", textAlpha);
+            if (!bossIntroOutroStarted_) {
+                draw::TextAlpha(FontSize::Small, kScreenW - 60.0f, kScreenH - barH + 30.0f, palette::kTextDim,
+                                "ENTER / クリックでスキップ", textAlpha, draw::TextAlign::Right);
+            }
+        }
+    }
 }
 
 void QuestScene::SpawnFloorEnemies(const GameContext& context)
@@ -234,6 +414,10 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
         }
         break;
 
+    case Phase::BossIntro:
+        UpdateBossIntro(dt, input);
+        break;
+
     case Phase::Battle:
         if (!player_.alive) {
             phase_ = Phase::Defeat;
@@ -298,6 +482,13 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
     }
 
     // --- カメラ -------------------------------------------------------------
+    if (phase_ == Phase::BossIntro) {
+        // 登場演出：決めた動きのとおりに動かす（追従の遅れを入れない）
+        camera_.SetTarget(Vec2(BossIntroCameraX(), kScreenH * 0.5f));
+        camera_.SnapToTarget();
+        camera_.Update(dt);
+        return;
+    }
     float targetX = player_.pos.x + static_cast<float>(player_.facing) * 140.0f;
     if (BossAlive() && math::Abs(boss_->pos.x - player_.pos.x) < 900.0f) {
         // ボス戦では両者が収まるように中間を狙う
@@ -852,7 +1043,12 @@ void QuestScene::Draw(GameContext& context)
     info.comboTimer = comboTimer_;
     info.showFps = context.settings.showFps;
 
-    hud_.Draw(player_, context.player, boss_.get(), info);
+    // ボスの登場演出の間は HUD を隠して映画のように見せる
+    if (phase_ == Phase::BossIntro) {
+        DrawBossIntro();
+    } else {
+        hud_.Draw(player_, context.player, boss_.get(), info);
+    }
 
     DrawDebugOverlay(context);
 
