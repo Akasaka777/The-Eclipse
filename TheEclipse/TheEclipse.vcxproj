@@ -201,6 +201,7 @@
     <ClCompile Include="src\Core\FontManager.cpp" />
     <ClCompile Include="src\Core\GameConfig.cpp" />
     <ClCompile Include="src\Core\Input.cpp" />
+    <ClCompile Include="src\Core\KeyConfig.cpp" />
     <ClCompile Include="src\Core\ResourceManager.cpp" />
     <ClCompile Include="src\Core\SceneManager.cpp" />
     <ClCompile Include="src\Game\Ability.cpp" />
@@ -235,6 +236,7 @@
     <ClCompile Include="src\UI\BattleMenu.cpp" />
     <ClCompile Include="src\UI\EquipPanel.cpp" />
     <ClCompile Include="src\UI\ItemPanel.cpp" />
+    <ClCompile Include="src\UI\KeyConfigPanel.cpp" />
     <ClCompile Include="src\UI\NamePanel.cpp" />
     <ClCompile Include="src\UI\PlayerPanel.cpp" />
     <ClCompile Include="src\UI\QuestPanel.cpp" />
@@ -257,6 +259,7 @@
     <ClInclude Include="src\Core\FontManager.h" />
     <ClInclude Include="src\Core\GameConfig.h" />
     <ClInclude Include="src\Core\Input.h" />
+    <ClInclude Include="src\Core\KeyConfig.h" />
     <ClInclude Include="src\Core\ResourceManager.h" />
     <ClInclude Include="src\Core\Scene.h" />
     <ClInclude Include="src\Core\SceneManager.h" />
@@ -293,6 +296,7 @@
     <ClInclude Include="src\UI\BattleMenu.h" />
     <ClInclude Include="src\UI\EquipPanel.h" />
     <ClInclude Include="src\UI\ItemPanel.h" />
+    <ClInclude Include="src\UI\KeyConfigPanel.h" />
     <ClInclude Include="src\UI\NamePanel.h" />
     <ClInclude Include="src\UI\PlayerPanel.h" />
     <ClInclude Include="src\UI\QuestPanel.h" />

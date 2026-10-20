@@ -3,42 +3,12 @@
 //==============================================================================
 #pragma once
 
+#include "Core/KeyConfig.h"
+
+#include <string>
 #include <vector>
 
 namespace ecl {
-
-//------------------------------------------------------------------------------
-// ゲーム内アクション（キーコンフィグの単位）
-//------------------------------------------------------------------------------
-enum class GameAction
-{
-    MoveLeft,
-    MoveRight,
-    MoveUp,
-    MoveDown,
-    Jump,
-    Attack,
-    Guard,
-    Dash,
-    Skill1,
-    Skill2,
-    Skill3,
-    Skill4,
-    ItemSwitch,   // 戦闘中のアイテム枠を 回復 ⇔ バフ で切り替える
-    ItemUse,      // 選んでいる枠のアイテムを使う
-    Menu,
-    Confirm,
-    Cancel,
-    Count
-};
-
-enum class MouseButton
-{
-    Left = 0,
-    Right = 1,
-    Middle = 2,
-    Count
-};
 
 //------------------------------------------------------------------------------
 // 入力シングルトン
@@ -72,20 +42,31 @@ public:
     // 左右移動の軸（-1 / 0 / +1）
     float MoveAxisX() const;
 
-    // アクションに割り当てられたキー名（操作説明用）
+    // アクションに割り当てられたキー名（操作説明用。「A / ←」など）
     const char* ActionKeyName(GameAction action) const;
+    // 1 つ目に割り当てたキーの名前（HUD のキー表示用）
+    std::string PrimaryKeyName(GameAction action) const;
+
+    // --- キー設定 -------------------------------------------------------------
+    // キー配置を反映する（内容が変わったときだけ作り直す）
+    void ApplyKeyConfig(const KeyConfig& config);
+    const KeyConfig& GetKeyConfig() const { return keyConfig_; }
+    // このフレームで押されたキー（KEY_INPUT_*）。無ければ -1（キー設定の入力待ちで使う）
+    int  FirstPressedKey() const;
 
 private:
     Input() = default;
+    void RebuildBindings();
 
     struct Binding
     {
         std::vector<int> keys;
-        int mouseButton = -1; // -1 なら未割り当て
-        const char* label = "";
+        std::vector<int> mouseBits;   // MOUSE_INPUT_* のビット
+        std::string label;
     };
 
-    Binding bindings_[static_cast<int>(GameAction::Count)];
+    Binding bindings_[kGameActionCount];
+    KeyConfig keyConfig_;
 
     char currentKeys_[256] = {};
     char previousKeys_[256] = {};

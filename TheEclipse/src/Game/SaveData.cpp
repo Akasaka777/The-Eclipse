@@ -202,6 +202,14 @@ bool SaveSystem::Save(const GameContext& context)
     file << "showfps " << (settings.showFps ? 1 : 0) << "\n";
     file << "fullscreen " << (settings.fullScreen ? 1 : 0) << "\n";
     file << "debugmode " << (settings.debugMode ? 1 : 0) << "\n";
+    // キー配置（アクション名 と 入力コード 2 つ。-1 は割り当てなし）
+    for (int i = 0; i < kGameActionCount; ++i) {
+        const GameAction action = static_cast<GameAction>(i);
+        if (!KeyConfig::IsConfigurable(action)) continue;
+        file << "keybind " << KeyConfig::ActionId(action);
+        for (int s = 0; s < kKeySlotsPerAction; ++s) file << " " << settings.keys.Get(action, s);
+        file << "\n";
+    }
 
     g_lastError.clear();
     return true;
@@ -375,6 +383,18 @@ bool SaveSystem::Load(GameContext& context)
         else if (key == "showfps") settings.showFps = ToInt(arg(1), 0) != 0;
         else if (key == "fullscreen") settings.fullScreen = ToInt(arg(1), 0) != 0;
         else if (key == "debugmode") settings.debugMode = ToInt(arg(1), 0) != 0;
+        else if (key == "keybind") {
+            // 変更できないアクションや、割り当てられない入力は読み飛ばす（初期設定のまま）
+            const GameAction action = KeyConfig::FindActionById(arg(1));
+            if (KeyConfig::IsConfigurable(action)) {
+                for (int s = 0; s < kKeySlotsPerAction; ++s) {
+                    const int code = ToInt(arg(2 + static_cast<size_t>(s)), kNoInput);
+                    if (code == kNoInput || KeyConfig::IsAssignable(code)) {
+                        settings.keys.codes[static_cast<int>(action)][s] = code;
+                    }
+                }
+            }
+        }
     }
 
     if (version <= 0) {

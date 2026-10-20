@@ -73,6 +73,8 @@ void Application::Run()
     while (ProcessMessage() == 0) {
         const float dt = CalcDeltaTime();
 
+        // 設定のキー配置を反映する（セーブの読み込みやキー設定の変更を拾う）
+        Input::Instance().ApplyKeyConfig(context_.settings.keys);
         Input::Instance().Update();
         context_.globalTime += dt;
 

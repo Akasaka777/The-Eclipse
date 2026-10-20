@@ -131,6 +131,12 @@ void QuestPanel::Draw(const GameContext& context) const
 
         draw::Text(FontSize::Medium, rect.left + 20.0f, rect.top + 12.0f, palette::kText, quest.name);
         draw::Text(FontSize::Tiny, rect.left + 22.0f, rect.top + 50.0f, palette::kTextDim, quest.subtitle);
+        // 開発者モード：ボスの HP バーの本数（推奨戦力から自動で決まる）
+        if (context.settings.debugMode) {
+            draw::Text(FontSize::Tiny, rect.right - 20.0f, rect.top + 16.0f, palette::kAccentWarm,
+                       str::Format("ボス HP バー %d 本", QuestDatabase::BossHpBarCount(quest)),
+                       draw::TextAlign::Right);
+        }
 
         draw::Text(FontSize::Small, rect.left + 20.0f, rect.bottom - 34.0f, palette::kTextDim,
                    str::Format("推奨戦力 %s ／ %dフロア",

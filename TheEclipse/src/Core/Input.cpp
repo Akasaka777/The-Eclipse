@@ -24,31 +24,9 @@ Input& Input::Instance()
 
 void Input::Initialize()
 {
-    auto bind = [this](GameAction action, std::vector<int> keys, int mouseButton, const char* label) {
-        Binding& b = bindings_[static_cast<int>(action)];
-        b.keys = std::move(keys);
-        b.mouseButton = mouseButton;
-        b.label = label;
-    };
-
-    bind(GameAction::MoveLeft,  { KEY_INPUT_A, KEY_INPUT_LEFT },  -1, "A / ←");
-    bind(GameAction::MoveRight, { KEY_INPUT_D, KEY_INPUT_RIGHT }, -1, "D / →");
-    bind(GameAction::MoveUp,    { KEY_INPUT_W, KEY_INPUT_UP },    -1, "W / ↑");
-    bind(GameAction::MoveDown,  { KEY_INPUT_S, KEY_INPUT_DOWN },  -1, "S / ↓");
-    // 上下は奥行き移動に使うため、ジャンプは SPACE のみ
-    bind(GameAction::Jump,      { KEY_INPUT_SPACE }, -1, "SPACE");
-    bind(GameAction::Attack,    { KEY_INPUT_J },  MOUSE_INPUT_LEFT,  "左クリック / J");
-    bind(GameAction::Guard,     { KEY_INPUT_K },  MOUSE_INPUT_RIGHT, "右クリック / K");
-    bind(GameAction::Dash,      { KEY_INPUT_LSHIFT, KEY_INPUT_RSHIFT }, -1, "SHIFT");
-    bind(GameAction::Skill1,    { KEY_INPUT_1, KEY_INPUT_NUMPAD1 }, -1, "1");
-    bind(GameAction::Skill2,    { KEY_INPUT_2, KEY_INPUT_NUMPAD2 }, -1, "2");
-    bind(GameAction::Skill3,    { KEY_INPUT_3, KEY_INPUT_NUMPAD3 }, -1, "3");
-    bind(GameAction::Skill4,    { KEY_INPUT_4, KEY_INPUT_NUMPAD4 }, -1, "4");
-    bind(GameAction::ItemSwitch, { KEY_INPUT_Q }, -1, "Q");
-    bind(GameAction::ItemUse,    { KEY_INPUT_E }, -1, "E");
-    bind(GameAction::Menu,      { KEY_INPUT_ESCAPE }, -1, "ESC");
-    bind(GameAction::Confirm,   { KEY_INPUT_RETURN }, -1, "ENTER");
-    bind(GameAction::Cancel,    { KEY_INPUT_ESCAPE, KEY_INPUT_BACK }, -1, "ESC");
+    // 初期のキー配置（セーブデータの設定は GameContext から ApplyKeyConfig で反映する）
+    keyConfig_ = KeyConfig();
+    RebuildBindings();
 
     GetHitKeyStateAll(currentKeys_);
     for (int i = 0; i < 256; ++i) previousKeys_[i] = currentKeys_[i];
@@ -73,13 +51,42 @@ void Input::Update()
     wheelDelta_ = GetMouseWheelRotVol();
 }
 
+void Input::ApplyKeyConfig(const KeyConfig& config)
+{
+    if (config == keyConfig_) return;
+    keyConfig_ = config;
+    RebuildBindings();
+}
+
+void Input::RebuildBindings()
+{
+    for (int i = 0; i < kGameActionCount; ++i) {
+        const GameAction action = static_cast<GameAction>(i);
+        Binding& b = bindings_[i];
+        b.keys.clear();
+        b.mouseBits.clear();
+        for (int s = 0; s < kKeySlotsPerAction; ++s) {
+            const int code = keyConfig_.Get(action, s);
+            if (code == kNoInput) continue;
+            if (IsMouseInputCode(code)) {
+                b.mouseBits.push_back(MouseBit(MouseButtonOfCode(code)));
+            } else {
+                b.keys.push_back(code);
+            }
+        }
+        b.label = keyConfig_.Describe(action);
+    }
+}
+
 bool Input::Down(GameAction action) const
 {
     const Binding& b = bindings_[static_cast<int>(action)];
     for (int key : b.keys) {
         if (KeyDown(key)) return true;
     }
-    if (b.mouseButton >= 0 && (mouseState_ & b.mouseButton) != 0) return true;
+    for (int bit : b.mouseBits) {
+        if ((mouseState_ & bit) != 0) return true;
+    }
     return false;
 }
 
@@ -89,9 +96,9 @@ bool Input::Pressed(GameAction action) const
     for (int key : b.keys) {
         if (KeyPressed(key)) return true;
     }
-    if (b.mouseButton >= 0) {
-        const bool now = (mouseState_ & b.mouseButton) != 0;
-        const bool before = (prevMouseState_ & b.mouseButton) != 0;
+    for (int bit : b.mouseBits) {
+        const bool now = (mouseState_ & bit) != 0;
+        const bool before = (prevMouseState_ & bit) != 0;
         if (now && !before) return true;
     }
     return false;
@@ -103,9 +110,9 @@ bool Input::Released(GameAction action) const
     for (int key : b.keys) {
         if (key >= 0 && key < 256 && previousKeys_[key] != 0 && currentKeys_[key] == 0) return true;
     }
-    if (b.mouseButton >= 0) {
-        const bool now = (mouseState_ & b.mouseButton) != 0;
-        const bool before = (prevMouseState_ & b.mouseButton) != 0;
+    for (int bit : b.mouseBits) {
+        const bool now = (mouseState_ & bit) != 0;
+        const bool before = (prevMouseState_ & bit) != 0;
         if (!now && before) return true;
     }
     return false;
@@ -150,7 +157,20 @@ float Input::MoveAxisX() const
 
 const char* Input::ActionKeyName(GameAction action) const
 {
-    return bindings_[static_cast<int>(action)].label;
+    return bindings_[static_cast<int>(action)].label.c_str();
+}
+
+std::string Input::PrimaryKeyName(GameAction action) const
+{
+    return keyConfig_.PrimaryName(action);
+}
+
+int Input::FirstPressedKey() const
+{
+    for (int i = 0; i < 256; ++i) {
+        if (KeyPressed(i)) return i;
+    }
+    return -1;
 }
 
 } // namespace ecl

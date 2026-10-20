@@ -4,6 +4,7 @@
 #pragma once
 
 #include "Common/Types.h"
+#include "Core/KeyConfig.h"
 
 namespace ecl {
 
@@ -86,6 +87,8 @@ struct GameSettings
     bool softwareCursor = false;
     // 開発者向けの表示と操作を有効にする
     bool debugMode = false;
+    // キー配置（設定タブの「キー設定」で変更する）
+    KeyConfig keys;
 };
 
 } // namespace ecl

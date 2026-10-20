@@ -17,6 +17,19 @@ namespace ecl {
 namespace ui {
 
 //------------------------------------------------------------------------------
+// アイテムの購入数を変えるボタン
+//------------------------------------------------------------------------------
+enum class QuantityButton
+{
+    Minus10,   // -10
+    Minus1,    // -1
+    Plus1,     // +1
+    Plus10,    // +10
+    Max,       // 買える最大数
+    Count
+};
+
+//------------------------------------------------------------------------------
 // ショップの品揃え
 //------------------------------------------------------------------------------
 enum class ShopTab
@@ -50,7 +63,9 @@ public:
     const Rect& WindowRect() const { return window_; }
     const Rect& TabRect(int index) const;
     const Rect& BuyRect() const { return buyButton_.GetRect(); }
-    const Rect& BuyTenRect() const { return buyTenButton_.GetRect(); }
+    const Rect& QuantityRect(QuantityButton button) const;
+    // アイテムタブで選んでいる購入数
+    int Quantity() const { return quantity_; }
     Rect RowRect(int row) const;
     ShopTab CurrentTab() const { return tab_; }
 
@@ -67,24 +82,34 @@ private:
     // アイテムをまとめて買える個数（所持上限で頭打ち）
     int ItemBuyCount(const GameContext& context, int wanted) const;
     void BuyItem(GameContext& context, int wanted);
+    // 購入数の増減（アイテムタブ）
+    void UpdateQuantity(float dt, const Input& input, const GameContext& context);
+    void StepQuantity(QuantityButton button, const GameContext& context);
     void DrawItemList(const GameContext& context) const;
     void DrawItemDetail(const GameContext& context) const;
     void DrawList(const GameContext& context) const;
     void DrawDetail(const GameContext& context) const;
 
     static constexpr int kTabCount = static_cast<int>(ShopTab::Count);
+    static constexpr int kQuantityButtonCount = static_cast<int>(QuantityButton::Count);
 
     Rect   window_;
     Rect   listArea_;
     Rect   detailArea_;
     Button tabButtons_[kTabCount];
     Button buyButton_;
-    Button buyTenButton_;   // アイテムを 10 個まとめて買う（アイテムタブのみ）
     Button closeButton_;
+    // 購入数の選択（アイテムタブのみ）
+    Button quantityButtons_[kQuantityButtonCount];
+    Rect   quantityBox_;
 
     ShopTab tab_ = ShopTab::Weapon;
     int   selectedId_ = 0;
     int   scroll_ = 0;
+    int   quantity_ = 1;
+    // 増減ボタンの長押し（押しっぱなしで連続して増減する）
+    int   holdButton_ = -1;
+    float holdTimer_ = 0.0f;
     bool  open_ = false;
     bool  closeRequested_ = false;
     bool  purchased_ = false;

@@ -474,6 +474,8 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
     const Input& input = Input::Instance();
 
     // --- パネル操作 ----------------------------------------------------------
+    // ESC でパネルを閉じたフレームに、同じ ESC で設定タブを開き直さないよう覚えておく
+    const bool panelOpenBefore = AnyPanelOpen();
     if (playerPanel_.IsOpen()) {
         playerPanel_.Update(dt, input, context);
         // 装備やステータスの変更を見た目と能力へ即反映
@@ -521,8 +523,8 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
         }
     }
 
-    // 数字キーでもタブを開ける
-    if (!panelOpen) {
+    // 数字キーでもタブを開ける（パネルを閉じたのと同じフレームでは開かない）
+    if (!panelOpen && !panelOpenBefore) {
         const GameAction keys[4] = { GameAction::Skill1, GameAction::Skill2,
                                      GameAction::Skill3, GameAction::Skill4 };
         for (int i = 0; i < 4 && i < kTabCount; ++i) {
@@ -604,7 +606,7 @@ void HomeScene::Draw(GameContext& context)
         questPanel_.Draw(context);
         shopPanel_.Draw(context);
         smithPanel_.Draw(context);
-        settingsPanel_.Draw();
+        settingsPanel_.Draw(context);
     }
 
     if (saveNoticeTimer_ > 0.0f) {
@@ -665,19 +667,31 @@ void HomeScene::DrawFieldForeground(const GameContext& context)
 
 void HomeScene::DrawFieldGuide(const GameContext& context) const
 {
-    (void)context;
-    // 操作ヒント
-    const Rect hint = Rect::FromXYWH(kScreenW - 420.0f, kScreenH - kTabBarHeight - 132.0f,
-                                     392.0f, 116.0f);
+    // 操作ヒント（キー設定で変えたキーを出す。各操作の 1 つ目のキー）
+    const KeyConfig& keys = context.settings.keys;
+    auto key = [&keys](GameAction action) { return keys.PrimaryName(action); };
+
+    // タブを開くキー（ソードスキルのキーが初期設定のままなら「1〜4」とまとめる）
+    const std::string tabKeys = keys.SkillKeysSummary(4);
+
+    const Rect hint = Rect::FromXYWH(kScreenW - 508.0f, kScreenH - kTabBarHeight - 132.0f,
+                                     480.0f, 116.0f);
     draw::ChamferRect(hint, 10.0f, palette::kPanelDark, 190);
     draw::StrokeRect(hint, palette::kBorder.Scaled(0.6f), 1.0f, 150);
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 12.0f, palette::kAccent, "操作");
+    draw::Text(FontSize::Tiny, hint.right - 16.0f, hint.top + 12.0f, palette::kTextDisabled,
+               "設定 → キー設定 で変更できます", draw::TextAlign::Right);
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 38.0f, palette::kTextDim,
-               "移動 : A / D   奥行き : W / S   ジャンプ : SPACE");
+               str::Format("移動 : %s / %s   奥行き : %s / %s   ジャンプ : %s",
+                           key(GameAction::MoveLeft).c_str(), key(GameAction::MoveRight).c_str(),
+                           key(GameAction::MoveUp).c_str(), key(GameAction::MoveDown).c_str(),
+                           key(GameAction::Jump).c_str()));
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 62.0f, palette::kTextDim,
-               "攻撃 : 左クリック   ガード : 右クリック長押し");
+               str::Format("攻撃 : %s   ガード : %s長押し   回避 : %s", key(GameAction::Attack).c_str(),
+                           key(GameAction::Guard).c_str(), key(GameAction::Dash).c_str()));
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 86.0f, palette::kTextDim,
-               "回避 : SHIFT   パリィ : ガード中に左クリック   タブ : 1〜5");
+               str::Format("パリィ : ガード中に%s   タブ : %s・ESC", key(GameAction::Attack).c_str(),
+                           tabKeys.c_str()));
 }
 
 void HomeScene::DrawPlayerSummary(const GameContext& context) const

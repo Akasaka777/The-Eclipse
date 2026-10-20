@@ -1,5 +1,5 @@
 //==============================================================================
-// Boss.h : ボス敵（パターン選択型 AI ＋ HP によるフェーズ変化）
+// Boss.h : ボス敵（パターン選択型 AI ＋ HP バー 1 本ごとの形態変化）
 //==============================================================================
 #pragma once
 
@@ -44,9 +44,6 @@ struct BossDef
     float halfWidth = 62.0f;
     float height = 230.0f;
 
-    // HP バーを何本に分けて表示するか（上の 1 本から順に減っていく）
-    int   hpBarCount = 3;
-
     int   expReward = 320;
     int   colReward = 520;
 
@@ -83,21 +80,35 @@ enum class BossState
     Dead
 };
 
+//------------------------------------------------------------------------------
+// HP バーの本数（クエストの強さで決まる。QuestDatabase::BossHpBarCount を参照）
+//------------------------------------------------------------------------------
+constexpr int kMinBossHpBars = 3;
+constexpr int kMaxBossHpBars = 10;
+
 class Boss : public Actor
 {
 public:
-    void Setup(const BossDef& def, const Vec2& position, float powerScale);
+    // hpBars : HP バーの本数（3〜10）。1 本削りきるごとに形態変化する。
+    void Setup(const BossDef& def, const Vec2& position, float powerScale, int hpBars = kMinBossHpBars);
 
     void Update(float dt, const Stage& stage, CombatSystem& combat,
                 const Vec2& playerPos, bool playerAlive, float playerZ);
     void Draw(const Camera& camera) const;
 
+    // 1 本のバーを削りきったところで止まる（あふれた分は次のバーに持ち越さない）
     int  ApplyDirectDamage(int damage, float knockbackX, CombatSystem& combat) override;
     void OnDeath(CombatSystem& combat) override;
     void Stagger(float duration) override;
+    // 残りのバーをまとめて削って倒す（開発者モードの「殲滅」用）
+    void ForceKill(CombatSystem& combat);
 
     const BossDef* Def() const { return def_; }
+    // 今の形態（1 本目のバーを削っている間が 1。最後のバーで HpBarCount() になる）
     int   Phase() const { return phase_; }
+    // この形態のバーを削りきる HP（これを下回ると次の形態へ）
+    float PhaseFloorHp() const;
+    bool  IsPhaseShifting() const { return state_ == BossState::PhaseShift; }
     bool  IsIntroFinished() const { return state_ != BossState::Intro; }
     bool  IsRemovable() const { return !alive && deathTimer > 2.6f; }
     const std::string& CurrentActionName() const { return actionName_; }
@@ -110,11 +121,12 @@ public:
         return state_ == BossState::Windup || state_ == BossState::Attack;
     }
 
-    // --- HP バー（雑魚敵と同じ見た目。頭上の右上に、下へ本数ぶん並べる）---------
-    int   HpBarCount() const;
+    // --- HP バー（雑魚敵と同じ見た目。頭の真上に本数ぶん重ね、その上に名前）-------
+    int   HpBarCount() const { return hpBars_; }
     // HP の割合 ratio のとき、上から index 本目（0 始まり）のバーがどれだけ残っているか
     static float HpBarFill(float ratio, int index, int bars);
-    // HP バーと名前の位置（画面座標）。頭が画面外にあるときや撃破後は false（描かない）
+    // HP バーと名前の位置（画面座標。namePos は名前の中央上端）。
+    // 頭が画面外にあるときや撃破後は false（描かない）
     bool  HpBarLayout(const Camera& camera, std::vector<Rect>& bars, Vec2& namePos) const;
 
 private:
@@ -144,6 +156,7 @@ private:
     float nextStepTime_ = 0.0f;
 
     int   phase_ = 1;
+    int   hpBars_ = kMinBossHpBars;
     float powerScale_ = 1.0f;
     float damageBoost_ = 1.0f;
     float speedBoost_ = 1.0f;

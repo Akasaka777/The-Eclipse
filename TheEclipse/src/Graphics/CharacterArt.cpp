@@ -277,7 +277,30 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
 
     // --- 奥の腕（盾を持つ / 歩きで振る）---------------------------------------
     const Vec2 backShoulder(cx - dir * torsoW * 0.30f + lean * 0.55f, shoulderY + h * 0.06f);
-    if (!art.hasOffHandWeapon) {
+    if (art.hasWeapon && art.hasOffHandWeapon) {
+        // --- 二刀流：左手（逆手）の武器は体の奥に描く ------------------------------
+        //   右手の武器は手前、左手の武器は胴体に隠れる側。奥なので少し暗くする。
+        const float weaponLen = h * 0.46f * WeaponReachScale(art.weapon);
+        const Vec2 offShoulder(cx - dir * torsoW * 0.35f + lean * 0.5f, shoulderY + h * 0.06f);
+        // 主武器とずらして振る（ずらし方はモーションごとに決まっている）
+        const float offAngle = angle + math::DegToRad(dir > 0.0f ? swing.offHandDeg
+                                                                : -swing.offHandDeg);
+        Vec2 offHand = Rotate(offShoulder, armLen * 0.95f, offAngle - armTwist);
+        offHand.x += handOffset.x * 0.8f;
+        offHand.y += handOffset.y * 0.8f;
+        const Vec2 offElbow = Joint(offShoulder, offHand, armLen * 0.55f,
+                                    armLen * 0.55f + h * swing.reachOut * 0.4f, -dir);
+
+        if (pose == PoseKind::Skill) {
+            const Vec2 tip = Rotate(offHand, weaponLen * 0.95f, offAngle);
+            draw::Glow(tip.x, tip.y, h * 0.14f, art.trim, 130, 4);
+        }
+        Capsule(offShoulder, offElbow, h * 0.024f, clothDark.Scaled(0.85f), ink, alpha);
+        Capsule(offElbow, offHand, h * 0.021f, ColorRGB::Lerp(armor, clothDark, 0.4f).Scaled(0.85f), ink, alpha);
+        DrawWeapon(offHand, offAngle, facing, weaponLen * 0.95f, art.weapon,
+                   accent.Scaled(0.78f), art.trim.Scaled(0.85f), alpha);
+        Ball(offHand, h * 0.021f, armor.Scaled(0.7f), ink * 0.8f, alpha);
+    } else {
         Vec2 backHand(backShoulder.x - dir * h * 0.02f - legSwing * 0.35f, backShoulder.y + h * 0.21f);
         if (art.hasShield) {
             backHand = Vec2(cx - dir * torsoW * 0.45f + lean * 0.5f
@@ -532,28 +555,6 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
             draw::Glow(tip.x, tip.y, h * 0.16f, art.trim, 150, 4);
         }
 
-        // --- 二刀流：逆手にもう一振り --------------------------------------
-        if (art.hasOffHandWeapon) {
-            const Vec2 offShoulder(cx - dir * torsoW * 0.35f + lean * 0.5f, shoulderY + h * 0.06f);
-            // 主武器とずらして振る（ずらし方はモーションごとに決まっている）
-            const float offAngle = angle + math::DegToRad(dir > 0.0f ? swing.offHandDeg
-                                                                    : -swing.offHandDeg);
-            Vec2 offHand = Rotate(offShoulder, armLen * 0.95f, offAngle - armTwist);
-            offHand.x += handOffset.x * 0.8f;
-            offHand.y += handOffset.y * 0.8f;
-            const Vec2 offElbow = Joint(offShoulder, offHand, armLen * 0.55f,
-                                        armLen * 0.55f + h * swing.reachOut * 0.4f, -dir);
-            Capsule(offShoulder, offElbow, h * 0.024f, cloth, ink, alpha);
-            Capsule(offElbow, offHand, h * 0.021f, ColorRGB::Lerp(armor, cloth, 0.4f), ink, alpha);
-            DrawWeapon(offHand, offAngle, facing, weaponLen * 0.95f, art.weapon,
-                       accent.Scaled(0.9f), art.trim, alpha);
-            Ball(offHand, h * 0.021f, armor.Scaled(0.9f), ink * 0.8f, alpha);
-
-            if (pose == PoseKind::Skill) {
-                const Vec2 tip = Rotate(offHand, weaponLen * 0.95f, offAngle);
-                draw::Glow(tip.x, tip.y, h * 0.14f, art.trim, 130, 4);
-            }
-        }
     }
 }
 

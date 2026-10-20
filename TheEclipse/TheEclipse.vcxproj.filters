@@ -28,6 +28,9 @@
     <ClCompile Include="src\Core\Input.cpp">
       <Filter></Filter>
     </ClCompile>
+    <ClCompile Include="src\Core\KeyConfig.cpp">
+      <Filter></Filter>
+    </ClCompile>
     <ClCompile Include="src\Core\ResourceManager.cpp">
       <Filter></Filter>
     </ClCompile>
@@ -130,6 +133,9 @@
     <ClCompile Include="src\UI\ItemPanel.cpp">
       <Filter></Filter>
     </ClCompile>
+    <ClCompile Include="src\UI\KeyConfigPanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
     <ClCompile Include="src\UI\NamePanel.cpp">
       <Filter></Filter>
     </ClCompile>
@@ -190,6 +196,9 @@
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\Core\Input.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\KeyConfig.h">
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\Core\ResourceManager.h">
@@ -298,6 +307,9 @@
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\UI\ItemPanel.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\KeyConfigPanel.h">
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\UI\NamePanel.h">

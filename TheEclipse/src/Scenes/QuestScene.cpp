@@ -100,7 +100,7 @@ void QuestScene::LoadFloor(int index, GameContext& context)
             boss_.reset(new Boss());
             const float bossZ = stage_.Depth() * 0.5f;
             boss_->Setup(*def, Vec2(stage_.Width() - 600.0f, stage_.GroundYAt(bossZ)),
-                         quest_->enemyPowerScale);
+                         quest_->enemyPowerScale, QuestDatabase::BossHpBarCount(*quest_));
             boss_->z = bossZ;
             bannerMain_ = def->name;
             bannerSub_ = def->title;
@@ -334,7 +334,8 @@ void QuestScene::UpdateDebug(const Input& input, GameContext& context)
             ++killed;
         }
         if (boss_ && boss_->alive) {
-            boss_->ApplyDirectDamage(static_cast<int>(boss_->hp) + 1, 0.0f, combat_);
+            // ボスは 1 回の攻撃でバー 1 本までしか削れないので、まとめて倒す
+            boss_->ForceKill(combat_);
             ++killed;
         }
         notify(str::Format("敵を殲滅しました（%d 体）", killed));
@@ -823,11 +824,13 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
         && context.player.MakeUniqueSkillAvailable(UniqueSkillType::DualWield)) {
         result.unlockedUniqueSkill = true;
         result.unlockedUniqueSkillName = UniqueSkillName(UniqueSkillType::DualWield);
+        result.unlockedUniqueSkillType = UniqueSkillType::DualWield;
     }
     // 神聖剣 : パリィの累計成功回数（クリアしなくても判定する）
     else if (context.player.TryUnlockByParry()) {
         result.unlockedUniqueSkill = true;
         result.unlockedUniqueSkillName = UniqueSkillName(UniqueSkillType::HolySword);
+        result.unlockedUniqueSkillType = UniqueSkillType::HolySword;
     }
 }
 

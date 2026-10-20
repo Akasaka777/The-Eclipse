@@ -5,6 +5,7 @@
 
 #include "Core/Input.h"
 #include "Game/GameContext.h"
+#include "UI/KeyConfigPanel.h"
 #include "UI/NamePanel.h"
 #include "UI/UIWidgets.h"
 
@@ -24,13 +25,18 @@ public:
 
     // 設定の変更を ctx に反映する
     void Update(float dt, const Input& input, GameContext& context);
-    void Draw() const;
+    void Draw(const GameContext& context) const;
 
     bool CloseRequested() const { return closeRequested_; }
 
+    // --- 検証用 ---------------------------------------------------------------
+    const Rect& KeyConfigRect() const { return keyConfigButton_.GetRect(); }
+    const KeyConfigPanel& KeyPanel() const { return keyConfigPanel_; }
+
 private:
     void Layout();
-    void DrawKeyGuide() const;
+    // 操作一覧（今のキー配置で表示する）
+    void DrawKeyGuide(const GameContext& context) const;
     void DrawSectionHeader(float x, float y, float width, const char* title) const;
 
     // 左カラムの範囲
@@ -52,6 +58,10 @@ private:
     // プレイヤー名の変更（デバッグモード中のみ表示）
     Button    nameButton_;
     NamePanel namePanel_;
+
+    // キー設定
+    Button         keyConfigButton_;
+    KeyConfigPanel keyConfigPanel_;
 
     // セーブ削除の確認中か
     bool   confirmingDelete_ = false;

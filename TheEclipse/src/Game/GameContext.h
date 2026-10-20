@@ -7,6 +7,7 @@
 #include "Game/Consumable.h"
 #include "Game/Equipment.h"
 #include "Game/PlayerData.h"
+#include "Game/UniqueSkill.h"
 
 #include <string>
 #include <vector>
@@ -45,6 +46,7 @@ struct QuestResult
     // このクエストでユニークスキルの解放条件を満たしたか
     bool unlockedUniqueSkill = false;
     std::string unlockedUniqueSkillName;
+    UniqueSkillType unlockedUniqueSkillType = UniqueSkillType::None;
 
     void Reset();
     // S / A / B / C 評価

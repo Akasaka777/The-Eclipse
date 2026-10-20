@@ -6,31 +6,68 @@
 #include "Game/SaveData.h"
 #include "Graphics/DrawUtil.h"
 
+#include <vector>
+
 namespace ecl {
 namespace ui {
 
 namespace {
 
-// 操作説明の一覧
+// 操作説明の 1 行
 struct KeyGuide
 {
-    const char* action;
-    const char* key;
+    std::string action;
+    std::string key;
 };
 
-const KeyGuide kGuides[] = {
-    { "移動",           "A / D   ← / →" },
-    { "奥・手前へ",     "W / S   ↑ / ↓" },
-    { "ジャンプ",       "SPACE" },
-    { "通常攻撃（3連）", "左クリック / J" },
-    { "ガード",         "右クリック / K（長押し）" },
-    { "パリィ",         "ガード中に左クリック" },
-    { "回避ダッシュ",   "SHIFT" },
-    { "ソードスキル",   "1 / 2 / 3 / 4" },
-    { "アイテム切替",   "Q（回復 ⇔ バフの前後入替）" },
-    { "アイテム使用",   "E / 手前のカードをクリック" },
-    { "メニュー",       "ESC" },
-};
+// 対になる 2 つの操作（左右・奥手前）を「A / D   ← / →」のように枠ごとにまとめる
+std::string PairKeys(const KeyConfig& keys, GameAction a, GameAction b)
+{
+    std::string text;
+    for (int slot = 0; slot < kKeySlotsPerAction; ++slot) {
+        std::string part;
+        const int codeA = keys.Get(a, slot);
+        const int codeB = keys.Get(b, slot);
+        if (codeA != kNoInput) part = KeyConfig::InputName(codeA);
+        if (codeB != kNoInput) part += (part.empty() ? "" : " / ") + KeyConfig::InputName(codeB);
+        if (part.empty()) continue;
+        if (!text.empty()) text += "   ";
+        text += part;
+    }
+    return text.empty() ? std::string("未設定") : text;
+}
+
+// ソードスキル 1〜4 の 1 つ目のキーを並べる
+std::string SkillKeys(const KeyConfig& keys)
+{
+    const GameAction skills[4] = { GameAction::Skill1, GameAction::Skill2, GameAction::Skill3,
+                                   GameAction::Skill4 };
+    std::string text;
+    for (GameAction skill : skills) {
+        if (!text.empty()) text += " / ";
+        const std::string name = keys.PrimaryName(skill);
+        text += name.empty() ? std::string("-") : name;
+    }
+    return text;
+}
+
+std::vector<KeyGuide> BuildGuides(const KeyConfig& keys)
+{
+    const std::string attack = keys.PrimaryName(GameAction::Attack);
+    return {
+        { "移動",            PairKeys(keys, GameAction::MoveLeft, GameAction::MoveRight) },
+        { "奥・手前へ",      PairKeys(keys, GameAction::MoveUp, GameAction::MoveDown) },
+        { "ジャンプ",        keys.Describe(GameAction::Jump) },
+        { "通常攻撃（3連）", keys.Describe(GameAction::Attack) },
+        { "ガード",          keys.Describe(GameAction::Guard) + "（長押し）" },
+        { "パリィ",          "ガード中に " + (attack.empty() ? std::string("通常攻撃") : attack) },
+        { "回避ダッシュ",    keys.Describe(GameAction::Dash) },
+        { "ソードスキル",    SkillKeys(keys) },
+        { "アイテム切替",    keys.Describe(GameAction::ItemSwitch) + "（回復 ⇔ バフの前後入替）" },
+        { "アイテム使用",    keys.Describe(GameAction::ItemUse) + " / 手前のカードをクリック" },
+        { "メニュー",        "ESC" },
+    };
+}
 
 } // namespace
 
@@ -86,6 +123,10 @@ void SettingsPanel::Layout()
                            "ログアウト", FontSize::Small);
     logoutButton_.SetAccent(palette::kAccentWarm);
 
+    // キー設定（右カラムの操作一覧の下）
+    keyConfigButton_ = Button(Rect::FromXYWH(right + 44.0f, window_.top + 640.0f, 300.0f, 52.0f),
+                              "キー設定を変更", FontSize::Small);
+
     closeButton_ = Button(Rect::FromXYWH(window_.CenterX() - 110.0f, window_.bottom - 80.0f,
                                          220.0f, 56.0f), "閉じる");
 
@@ -126,6 +167,7 @@ void SettingsPanel::Open(const GameSettings& settings)
     confirmingLogout_ = false;
     deleteSaveButton_.SetLabel("セーブデータ削除");
     logoutButton_.SetLabel("ログアウト");
+    keyConfigPanel_.Close();
     message_.clear();
     messageTimer_ = 0.0f;
 }
@@ -144,6 +186,16 @@ void SettingsPanel::Update(float dt, const Input& input, GameContext& context)
                                    context.player.Name().c_str());
             messageTimer_ = 3.0f;
         }
+        return;
+    }
+
+    // --- キー設定を開いている間はそちらを優先 --------------------------------------
+    if (keyConfigPanel_.IsOpen()) {
+        keyConfigPanel_.Update(dt, input, context);
+        return;
+    }
+    if (keyConfigButton_.Update(input, dt)) {
+        keyConfigPanel_.Open();
         return;
     }
 
@@ -216,10 +268,11 @@ void SettingsPanel::Update(float dt, const Input& input, GameContext& context)
         deleteSaveButton_.SetLabel("セーブデータ削除");
         logoutButton_.SetLabel("ログアウト");
         namePanel_.Close();
+        keyConfigPanel_.Close();
     }
 }
 
-void SettingsPanel::Draw() const
+void SettingsPanel::Draw(const GameContext& context) const
 {
     if (!open_) return;
 
@@ -259,7 +312,8 @@ void SettingsPanel::Draw() const
     logoutButton_.Draw();
 
     // --- 操作一覧（右カラム） --------------------------------------------------
-    DrawKeyGuide();
+    DrawKeyGuide(context);
+    keyConfigButton_.Draw();
 
     closeButton_.Draw();
 
@@ -267,11 +321,12 @@ void SettingsPanel::Draw() const
         draw::Text(FontSize::Tiny, columnLeft_, window_.top + 812.0f, palette::kAccent, message_);
     }
 
-    // 名前入力は最前面に重ねる
+    // 名前入力とキー設定は最前面に重ねる
     namePanel_.Draw();
+    keyConfigPanel_.Draw(context);
 }
 
-void SettingsPanel::DrawKeyGuide() const
+void SettingsPanel::DrawKeyGuide(const GameContext& context) const
 {
     const float left = columnRight_ + 44.0f;
     const float right = window_.right - 36.0f;
@@ -279,7 +334,7 @@ void SettingsPanel::DrawKeyGuide() const
     DrawSectionHeader(left, window_.top + 70.0f, right - left, "操作一覧");
 
     float y = window_.top + 112.0f;
-    for (const KeyGuide& guide : kGuides) {
+    for (const KeyGuide& guide : BuildGuides(context.settings.keys)) {
         draw::Text(FontSize::Small, left + 4.0f, y, palette::kText, guide.action);
         draw::Text(FontSize::Tiny, right, y + 4.0f, palette::kTextDim, guide.key,
                    draw::TextAlign::Right);
@@ -294,7 +349,8 @@ void SettingsPanel::DrawKeyGuide() const
                "・UI はすべてマウスで操作できます");
     y += 26.0f;
     draw::Text(FontSize::Tiny, left + 4.0f, y, palette::kTextDim,
-               "・ホームのタブは 1〜5 キーでも開けます");
+               str::Format("・ホームのタブはソードスキルのキー（%s）と ESC でも開けます",
+                           SkillKeys(context.settings.keys).c_str()));
     y += 26.0f;
     draw::Text(FontSize::Tiny, left + 4.0f, y, palette::kTextDim,
                "・奥行きが合っていないと攻撃は当たりません");

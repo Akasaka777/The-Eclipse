@@ -9,6 +9,8 @@
 #include "Game/Consumable.h"
 #include "Game/GameContext.h"
 #include "Game/QuestDatabase.h"
+#include "Game/SwordSkill.h"
+#include "Game/UniqueSkill.h"
 #include "Graphics/DrawUtil.h"
 
 #include <cmath>
@@ -21,6 +23,12 @@ constexpr float kScreenW = static_cast<float>(config::kScreenWidth);
 constexpr float kScreenH = static_cast<float>(config::kScreenHeight);
 constexpr int   kVisibleDrops = 7;
 constexpr float kDropRowHeight = 68.0f;
+
+// 開放・習得のお知らせ：リザルトの表示がひととおり出そろってから出す（秒）
+constexpr float kAnnounceDelay = 1.0f;
+constexpr float kAnnounceFade = 0.35f;
+// 出してすぐの誤操作で閉じないよう、少し待ってから受け付ける（秒）
+constexpr float kAnnounceInputDelay = 0.5f;
 
 ColorRGB RankColor(const char* rank)
 {
@@ -37,13 +45,58 @@ ResultScene::ResultScene()
 {
     homeButton_ = ui::Button(Rect::FromXYWH(kScreenW * 0.5f - 190.0f, kScreenH - 120.0f, 380.0f, 72.0f),
                              "ホームへ戻る", FontSize::Medium);
+
+    announceCard_ = Rect::FromCenter(kScreenW * 0.5f, kScreenH * 0.5f, 1000.0f, 560.0f);
+    announceButton_ = ui::Button(Rect::FromXYWH(announceCard_.CenterX() - 130.0f, announceCard_.bottom - 92.0f,
+                                                260.0f, 60.0f),
+                                 "確認", FontSize::Medium);
+    announceButton_.SetAccent(palette::kExp);
 }
 
 void ResultScene::OnEnter(GameContext& context)
 {
-    (void)context;
     time_ = 0.0f;
     scroll_ = 0;
+    BuildAnnouncements(context);
+}
+
+void ResultScene::BuildAnnouncements(const GameContext& context)
+{
+    announcements_.clear();
+    announceIndex_ = 0;
+    announceTimer_ = 0.0f;
+
+    const QuestResult& result = context.lastResult;
+
+    // --- ユニークスキルの解放 ----------------------------------------------------
+    if (result.unlockedUniqueSkill) {
+        const UniqueSkillDef* def = UniqueSkillDatabase::Instance().Find(result.unlockedUniqueSkillType);
+        Announcement a;
+        a.tag = "ユニークスキル開放";
+        a.name = def ? def->name : result.unlockedUniqueSkillName;
+        a.color = palette::kExp;
+        if (def) {
+            a.description = def->description;
+            a.details = def->details;
+            a.condition = str::Format("達成した条件 : %s", def->unlockCondition.c_str());
+            if (def->HasDedicatedSkills()) {
+                const SwordSkill* first = SkillDatabase::Instance().Find(def->skillIds.front());
+                a.guide = str::Format("ホーム →「プレイヤー」→「スキル」→「%s」の「%s」を解放すると習得",
+                                      def->name.c_str(), first ? first->name.c_str() : "先頭のスキル");
+            } else {
+                a.guide = str::Format("ホーム →「プレイヤー」→「スキル」→「%s」の習得ボタンで習得",
+                                      def->name.c_str());
+            }
+        } else {
+            a.guide = "ホーム →「プレイヤー」→「スキル」から習得できます";
+        }
+        announcements_.push_back(a);
+    }
+}
+
+bool ResultScene::AnnouncementShown() const
+{
+    return time_ >= kAnnounceDelay && announceIndex_ < static_cast<int>(announcements_.size());
 }
 
 void ResultScene::Update(float dt, GameContext& context, SceneManager& manager)
@@ -57,6 +110,18 @@ void ResultScene::Update(float dt, GameContext& context, SceneManager& manager)
     if (wheel != 0) scroll_ = math::ClampInt(scroll_ - wheel, 0, maxScroll);
 
     if (manager.IsTransitioning()) return;
+
+    // 開放・習得のお知らせを確認するまでは、ほかの操作を受け付けない
+    if (AnnouncementShown()) {
+        announceTimer_ += dt;
+        const bool ready = announceTimer_ >= kAnnounceInputDelay;
+        if ((announceButton_.Update(input, dt) && ready)
+            || (ready && (input.Pressed(GameAction::Confirm) || input.Pressed(GameAction::Cancel)))) {
+            ++announceIndex_;
+            announceTimer_ = 0.0f;
+        }
+        return;
+    }
 
     // 誤操作防止のため少し待ってから受け付ける
     if (time_ < 0.5f) return;
@@ -87,6 +152,71 @@ void ResultScene::Draw(GameContext& context)
     DrawRewards(context);
 
     if (time_ >= 0.5f) homeButton_.Draw();
+
+    // 開放・習得のお知らせは最前面（画面を薄暗くして中央に出す）
+    if (AnnouncementShown()) DrawAnnouncement();
+}
+
+void ResultScene::DrawAnnouncement() const
+{
+    const Announcement& a = announcements_[static_cast<size_t>(announceIndex_)];
+    // 1 件目は暗転から、2 件目以降は札だけを入れ替える
+    const float since = (announceIndex_ == 0) ? time_ - kAnnounceDelay : announceTimer_;
+    const float appear = math::Clamp(since / kAnnounceFade, 0.0f, 1.0f);
+    const int alpha = static_cast<int>(appear * 255.0f);
+
+    // 画面全体を薄暗くする
+    draw::FillRect(Rect(0.0f, 0.0f, kScreenW, kScreenH), palette::kBlack, static_cast<int>(appear * 175.0f));
+
+    // 中央の札（少し下から浮き上がる）
+    const Rect card = announceCard_.Offset(0.0f, (1.0f - appear) * 30.0f);
+    const float pulse = 0.6f + 0.4f * std::sin(time_ * 3.0f);
+    draw::Glow(card.CenterX(), card.top + 128.0f, 260.0f * appear, a.color, static_cast<int>(70.0f * pulse), 5);
+    draw::Panel(card, palette::kPanel, a.color, static_cast<int>(appear * 240.0f), 3.0f);
+
+    const float cx = card.CenterX();
+    float y = card.top + 34.0f;
+
+    // 見出し（「― ユニークスキル開放 ―」）
+    const float tagWidth = static_cast<float>(draw::TextWidth(FontSize::Normal, a.tag));
+    draw::TextAlpha(FontSize::Normal, cx, y, a.color, a.tag, alpha, draw::TextAlign::Center);
+    draw::Line(cx - tagWidth * 0.5f - 150.0f, y + 14.0f, cx - tagWidth * 0.5f - 20.0f, y + 14.0f, a.color, 2.0f, alpha);
+    draw::Line(cx + tagWidth * 0.5f + 20.0f, y + 14.0f, cx + tagWidth * 0.5f + 150.0f, y + 14.0f, a.color, 2.0f, alpha);
+    y += 48.0f;
+
+    // 名前
+    draw::TextAlpha(FontSize::Huge, cx, y, palette::kWhite, a.name, alpha, draw::TextAlign::Center);
+    y += 84.0f;
+
+    if (!a.description.empty()) {
+        draw::TextAlpha(FontSize::Small, cx, y, palette::kText, a.description, alpha, draw::TextAlign::Center);
+        y += 36.0f;
+    }
+    draw::Line(card.left + 80.0f, y, card.right - 80.0f, y, palette::kBorder, 1.0f, alpha / 2);
+    y += 16.0f;
+
+    // 効果（2 列に並べる）
+    const size_t half = (a.details.size() + 1) / 2;
+    for (size_t i = 0; i < a.details.size(); ++i) {
+        const float x = (i < half) ? card.left + 110.0f : cx + 30.0f;
+        const float rowY = y + 30.0f * static_cast<float>(i < half ? i : i - half);
+        draw::TextAlpha(FontSize::Small, x, rowY, palette::kTextDim, a.details[i], alpha);
+    }
+    y += 30.0f * static_cast<float>(half) + 18.0f;
+
+    if (!a.condition.empty()) {
+        draw::TextAlpha(FontSize::Small, cx, y, palette::kAccentWarm, a.condition, alpha, draw::TextAlign::Center);
+        y += 34.0f;
+    }
+    draw::TextAlpha(FontSize::Small, cx, y, palette::kAccent, a.guide, alpha, draw::TextAlign::Center);
+
+    // 確認ボタン（何件目か）
+    if (announceTimer_ >= kAnnounceInputDelay * 0.5f || since >= kAnnounceFade) announceButton_.Draw();
+    if (announcements_.size() > 1) {
+        draw::TextAlpha(FontSize::Tiny, card.right - 24.0f, card.bottom - 30.0f, palette::kTextDim,
+                        str::Format("%d / %d", announceIndex_ + 1, static_cast<int>(announcements_.size())), alpha,
+                        draw::TextAlign::Right);
+    }
 }
 
 void ResultScene::DrawHeader(const GameContext& context) const
@@ -169,8 +299,12 @@ void ResultScene::DrawStats(const GameContext& context) const
                    str::Format("ユニークスキル「%s」が解放可能に！",
                                result.unlockedUniqueSkillName.c_str()),
                    draw::TextAlign::Center);
+        // 専用スキルを持たないもの（神聖剣）はスキルの解放ではなく習得ボタンで覚える
+        const UniqueSkillDef* def = UniqueSkillDatabase::Instance().Find(result.unlockedUniqueSkillType);
+        const bool viaButton = def && !def->HasDedicatedSkills();
         draw::Text(FontSize::Tiny, notice.CenterX(), notice.top + 32.0f, palette::kText,
-                   str::Format("「スキル」タブ →「%s」の先頭スキルを解放すると習得",
+                   str::Format(viaButton ? "「スキル」タブ →「%s」の習得ボタンで習得"
+                                         : "「スキル」タブ →「%s」の先頭スキルを解放すると習得",
                                result.unlockedUniqueSkillName.c_str()),
                    draw::TextAlign::Center);
     }

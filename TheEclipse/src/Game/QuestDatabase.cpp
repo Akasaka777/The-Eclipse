@@ -1,6 +1,7 @@
 #include "Game/QuestDatabase.h"
 
 #include "Common/MathUtil.h"
+#include "Game/Boss.h"
 #include "Game/ItemDatabase.h"
 #include "Game/UniqueSkill.h"
 
@@ -638,6 +639,35 @@ std::vector<BossDropOdds> QuestDatabase::CalcBossDropOdds(const QuestDef& quest,
         odds.push_back(o);
     }
     return odds;
+}
+
+//------------------------------------------------------------------------------
+// ボスの HP バーの本数
+//   クエストを 100 個ほどまで増やしても 3〜10 本に収まるよう、推奨戦力の倍数で増やす。
+//     〜1,499 : 3 本   1,500〜 : 4 本   3,000〜 : 5 本   6,000〜 : 6 本
+//     12,000〜 : 7 本  24,000〜 : 8 本  48,000〜 : 9 本  96,000〜 : 10 本
+//   起点（kBossHpBarBasePower）と倍率（kBossHpBarPowerStep）を変えれば全体の配分が変わる。
+//------------------------------------------------------------------------------
+namespace {
+constexpr int kBossHpBarBasePower = 1500;   // 4 本目が付く推奨戦力
+constexpr int kBossHpBarPowerStep = 2;      // 推奨戦力が何倍になるごとに 1 本増やすか
+} // namespace
+
+int QuestDatabase::BossHpBarCountForPower(int recommendedPower)
+{
+    int bars = kMinBossHpBars;
+    long long threshold = kBossHpBarBasePower;
+    while (bars < kMaxBossHpBars && recommendedPower >= threshold) {
+        ++bars;
+        threshold *= kBossHpBarPowerStep;
+    }
+    return bars;
+}
+
+int QuestDatabase::BossHpBarCount(const QuestDef& quest)
+{
+    if (quest.bossHpBars > 0) return math::ClampInt(quest.bossHpBars, kMinBossHpBars, kMaxBossHpBars);
+    return BossHpBarCountForPower(quest.recommendedPower);
 }
 
 } // namespace ecl

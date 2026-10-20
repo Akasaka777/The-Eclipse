@@ -63,6 +63,8 @@ struct QuestDef
     int         colReward = 400;
     int         expReward = 300;
     int         firstClearCol = 1500;
+    // ボスの HP バーの本数（3〜10）。0 なら推奨戦力から自動で決める
+    int         bossHpBars = 0;
     std::vector<FloorDef>  floors;
     std::vector<DropEntry> bossDrops;   // ボス撃破時の抽選
     std::vector<DropEntry> floorDrops;  // 道中の抽選
@@ -99,6 +101,13 @@ public:
     // ボスドロップの実際の確率（RollDrops と同じ手順で計算する）
     std::vector<BossDropOdds> CalcBossDropOdds(const QuestDef& quest,
                                                float dropRate = 1.0f) const;
+
+    // ボスの HP バーの本数（3〜10 本）
+    //   bossHpBars を指定していればその本数、0 なら推奨戦力から決める。
+    //   推奨戦力 1,500 未満は 3 本で、そこから推奨戦力が 2 倍になるごとに 1 本増える
+    //   （1,500 で 4 本 … 96,000 以上で 10 本）。
+    static int BossHpBarCount(const QuestDef& quest);
+    static int BossHpBarCountForPower(int recommendedPower);
 
 private:
     QuestDatabase();

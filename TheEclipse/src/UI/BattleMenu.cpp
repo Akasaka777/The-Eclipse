@@ -114,7 +114,7 @@ void BattleMenu::Draw(const GameContext& context) const
         return;
     }
     if (settings_.IsOpen()) {
-        settings_.Draw();
+        settings_.Draw(context);
         return;
     }
 

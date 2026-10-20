@@ -15,8 +15,21 @@ constexpr float kRowHeight = 66.0f;
 
 // ショップで買った装備の個体値（低めに固定。良い個体値はドロップで狙う）
 constexpr int kShopIv = 35;
-// アイテムのまとめ買いの個数
-constexpr int kBulkBuyCount = 10;
+// 購入数の増減ボタン：長押しで連続して増減するまでの時間と間隔（秒）
+constexpr float kHoldDelay = 0.45f;
+constexpr float kHoldRepeat = 0.07f;
+
+const char* QuantityLabel(QuantityButton button)
+{
+    switch (button) {
+    case QuantityButton::Minus10: return "-10";
+    case QuantityButton::Minus1:  return "-1";
+    case QuantityButton::Plus1:   return "+1";
+    case QuantityButton::Plus10:  return "+10";
+    case QuantityButton::Max:     return "最大";
+    default: return "";
+    }
+}
 
 } // namespace
 
@@ -58,12 +71,32 @@ void ShopPanel::Layout()
     buyButton_ = Button(Rect::FromXYWH(detailArea_.left, window_.bottom - 82.0f, 220.0f, 54.0f),
                         "購入する");
     buyButton_.SetAccent(palette::kAccentWarm);
-    buyTenButton_ = Button(Rect::FromXYWH(detailArea_.left + 236.0f, window_.bottom - 82.0f,
-                                          220.0f, 54.0f),
-                           str::Format("%d 個購入", kBulkBuyCount));
-    buyTenButton_.SetAccent(palette::kAccentWarm);
+
+    // --- 購入数（アイテムタブ）：[-10][-1]  N 個  [+1][+10] [最大] ----------------
+    const float qtyTop = detailArea_.bottom - 140.0f;
+    const float qtyHeight = 52.0f;
+    const float gap = 10.0f;
+    float qx = detailArea_.left + 24.0f;
+    auto place = [&](QuantityButton button, float width) {
+        Button& b = quantityButtons_[static_cast<int>(button)];
+        b = Button(Rect::FromXYWH(qx, qtyTop, width, qtyHeight), QuantityLabel(button), FontSize::Small);
+        b.SetAccent(palette::kAccentWarm);
+        qx += width + gap;
+    };
+    place(QuantityButton::Minus10, 76.0f);
+    place(QuantityButton::Minus1, 62.0f);
+    quantityBox_ = Rect::FromXYWH(qx, qtyTop, 150.0f, qtyHeight);
+    qx += 150.0f + gap;
+    place(QuantityButton::Plus1, 62.0f);
+    place(QuantityButton::Plus10, 76.0f);
+    place(QuantityButton::Max, 96.0f);
     closeButton_ = Button(Rect::FromXYWH(window_.right - 200.0f, window_.bottom - 82.0f,
                                          160.0f, 54.0f), "閉じる");
+}
+
+const Rect& ShopPanel::QuantityRect(QuantityButton button) const
+{
+    return quantityButtons_[math::ClampInt(static_cast<int>(button), 0, kQuantityButtonCount - 1)].GetRect();
 }
 
 const Rect& ShopPanel::TabRect(int index) const
@@ -86,6 +119,8 @@ void ShopPanel::Open()
     tab_ = ShopTab::Weapon;
     selectedId_ = 0;
     scroll_ = 0;
+    quantity_ = 1;
+    holdButton_ = -1;
     message_.clear();
     messageTimer_ = 0.0f;
 }
@@ -181,6 +216,8 @@ void ShopPanel::Update(float dt, const Input& input, GameContext& context)
             tab_ = static_cast<ShopTab>(i);
             selectedId_ = 0;
             scroll_ = 0;
+            quantity_ = 1;
+            holdButton_ = -1;
             message_.clear();
             // 同じクリックで下の一覧まで拾わないよう、タブ切り替えで抜ける
             return;
@@ -204,8 +241,11 @@ void ShopPanel::Update(float dt, const Input& input, GameContext& context)
             const int index = scroll_ + row;
             if (index >= goodsCount) break;
             if (!RowRect(row).Contains(mouseX, mouseY)) continue;
-            selectedId_ = (tab_ == ShopTab::Item) ? itemGoods[static_cast<size_t>(index)]->id
-                                                  : goods[static_cast<size_t>(index)]->id;
+            const int id = (tab_ == ShopTab::Item) ? itemGoods[static_cast<size_t>(index)]->id
+                                                   : goods[static_cast<size_t>(index)]->id;
+            // 別の品を選んだら購入数は 1 に戻す
+            if (id != selectedId_) quantity_ = 1;
+            selectedId_ = id;
             message_.clear();
             break;
         }
@@ -214,26 +254,23 @@ void ShopPanel::Update(float dt, const Input& input, GameContext& context)
 
     // --- 購入（アイテム）----------------------------------------------------------
     if (tab_ == ShopTab::Item) {
+        UpdateQuantity(dt, input, context);
+
         const ConsumableDef* item = SelectedItem();
-        const int col = inventory.Col();
-        const int one = ItemBuyCount(context, 1);
-        const int bulk = ItemBuyCount(context, kBulkBuyCount);
-        buyButton_.SetEnabled(item && one > 0 && col >= item->price * one);
-        buyTenButton_.SetEnabled(item && bulk > 0 && col >= item->price * bulk);
-        // 上限が近いときは買える数だけ表示する
-        buyTenButton_.SetLabel(str::Format("%d 個購入", (item && bulk > 0) ? bulk : kBulkBuyCount));
+        const int count = ItemBuyCount(context, quantity_);
+        buyButton_.SetEnabled(item && count > 0 && inventory.Col() >= item->price * count);
+        buyButton_.SetLabel(item ? str::Format("%d 個購入する", quantity_) : std::string("購入する"));
 
         const bool clicked = input.MouseClicked(MouseButton::Left);
         if (buyButton_.Update(input, dt) || (clicked && item && !buyButton_.Enabled()
                                              && buyButton_.GetRect().Contains(mouseX, mouseY))) {
-            BuyItem(context, 1);   // 買えない理由もここで知らせる
-        }
-        if (buyTenButton_.Update(input, dt) || (clicked && item && !buyTenButton_.Enabled()
-                                                && buyTenButton_.GetRect().Contains(mouseX, mouseY))) {
-            BuyItem(context, kBulkBuyCount);
+            BuyItem(context, quantity_);   // 買えない理由もここで知らせる
+            // 上限に近づいたら、次に買える数へ合わせる
+            const int room = item ? item->MaxStack() - inventory.ItemCount(item->id) : 0;
+            quantity_ = math::ClampInt(quantity_, 1, math::MaxI(1, room));
         }
 
-        if (closeButton_.Update(input, dt)) {
+        if (closeButton_.Update(input, dt) || input.Pressed(GameAction::Cancel)) {
             closeRequested_ = true;
             open_ = false;
         }
@@ -242,6 +279,7 @@ void ShopPanel::Update(float dt, const Input& input, GameContext& context)
 
     // --- 購入（装備）-------------------------------------------------------------
     const ItemTemplate* selected = Selected();
+    buyButton_.SetLabel("購入する");
     buyButton_.SetEnabled(selected != nullptr && inventory.Col() >= selected->price);
     if (buyButton_.Update(input, dt) && buyButton_.Enabled() && selected) {
         inventory.AddCol(-selected->price);
@@ -257,10 +295,77 @@ void ShopPanel::Update(float dt, const Input& input, GameContext& context)
         messageTimer_ = 2.0f;
     }
 
-    if (closeButton_.Update(input, dt)) {
+    if (closeButton_.Update(input, dt) || input.Pressed(GameAction::Cancel)) {
         closeRequested_ = true;
         open_ = false;
     }
+}
+
+void ShopPanel::UpdateQuantity(float dt, const Input& input, const GameContext& context)
+{
+    const ConsumableDef* item = SelectedItem();
+    const int room = item ? math::MaxI(0, item->MaxStack() - context.player.GetInventory().ItemCount(item->id))
+                          : 0;
+    quantity_ = math::ClampInt(quantity_, 1, math::MaxI(1, room));
+
+    auto& minus10 = quantityButtons_[static_cast<int>(QuantityButton::Minus10)];
+    auto& minus1 = quantityButtons_[static_cast<int>(QuantityButton::Minus1)];
+    auto& plus1 = quantityButtons_[static_cast<int>(QuantityButton::Plus1)];
+    auto& plus10 = quantityButtons_[static_cast<int>(QuantityButton::Plus10)];
+    auto& maxButton = quantityButtons_[static_cast<int>(QuantityButton::Max)];
+    minus10.SetEnabled(item && quantity_ > 1);
+    minus1.SetEnabled(item && quantity_ > 1);
+    plus1.SetEnabled(item && quantity_ < room);
+    plus10.SetEnabled(item && quantity_ < room);
+    maxButton.SetEnabled(item && room > 0);
+
+    for (int i = 0; i < kQuantityButtonCount; ++i) {
+        Button& button = quantityButtons_[i];
+        if (button.Update(input, dt) && button.Enabled()) {
+            StepQuantity(static_cast<QuantityButton>(i), context);
+            holdButton_ = i;
+            holdTimer_ = 0.0f;
+        }
+    }
+
+    // 増減ボタンは押しっぱなしで連続して増減する（「最大」は 1 回だけ）
+    if (holdButton_ >= 0) {
+        const Button& held = quantityButtons_[holdButton_];
+        const bool repeatable = (static_cast<QuantityButton>(holdButton_) != QuantityButton::Max);
+        if (repeatable && input.MouseDown(MouseButton::Left) && held.Hovered() && held.Enabled()) {
+            holdTimer_ += dt;
+            if (holdTimer_ >= kHoldDelay) {
+                StepQuantity(static_cast<QuantityButton>(holdButton_), context);
+                holdTimer_ = kHoldDelay - kHoldRepeat;
+            }
+        } else {
+            holdButton_ = -1;
+        }
+    }
+}
+
+void ShopPanel::StepQuantity(QuantityButton button, const GameContext& context)
+{
+    const ConsumableDef* item = SelectedItem();
+    if (!item) return;
+    const Inventory& inventory = context.player.GetInventory();
+    const int room = math::MaxI(0, item->MaxStack() - inventory.ItemCount(item->id));
+
+    switch (button) {
+    case QuantityButton::Minus10: quantity_ -= 10; break;
+    case QuantityButton::Minus1:  quantity_ -= 1; break;
+    case QuantityButton::Plus1:   quantity_ += 1; break;
+    case QuantityButton::Plus10:  quantity_ += 10; break;
+    case QuantityButton::Max: {
+        // 所持上限と手持ちの col の両方で買える最大数（1 個も買えなければ所持上限まで）
+        const int affordable = (item->price > 0) ? inventory.Col() / item->price : room;
+        quantity_ = (affordable > 0) ? math::MinI(room, affordable) : room;
+        break;
+    }
+    default:
+        break;
+    }
+    quantity_ = math::ClampInt(quantity_, 1, math::MaxI(1, room));
 }
 
 void ShopPanel::Draw(const GameContext& context) const
@@ -279,7 +384,6 @@ void ShopPanel::Draw(const GameContext& context) const
     DrawDetail(context);
 
     buyButton_.Draw();
-    if (tab_ == ShopTab::Item) buyTenButton_.Draw();
     closeButton_.Draw();
 
     if (messageTimer_ > 0.0f) {
@@ -536,20 +640,39 @@ void ShopPanel::DrawItemDetail(const GameContext& context) const
     draw::Line(x, y, right, y, palette::kBorder, 1.0f, 120); y += 16.0f;
 
     const int col = inventory.Col();
-    const bool affordable = (col >= item->price);
     draw::Text(FontSize::Normal, x, y, palette::kTextDim, "価格（1 個）");
-    draw::Text(FontSize::Normal, right, y, affordable ? palette::kAccentWarm : palette::kDanger,
+    draw::Text(FontSize::Normal, right, y, (col >= item->price) ? palette::kAccentWarm : palette::kDanger,
                str::Format("%s col", str::Comma(item->price).c_str()), draw::TextAlign::Right);
-    y += 34.0f;
-    const int bulk = ItemBuyCount(context, kBulkBuyCount);
-    if (bulk > 0) {
-        draw::Text(FontSize::Small, x, y, palette::kTextDim, str::Format("%d 個まとめて", bulk));
-        draw::Text(FontSize::Small, right, y,
-                   (col >= item->price * bulk) ? palette::kAccentWarm : palette::kDanger,
-                   str::Format("%s col", str::Comma(item->price * bulk).c_str()),
-                   draw::TextAlign::Right);
+
+    // --- 購入数 -----------------------------------------------------------------
+    draw::Text(FontSize::Small, x, quantityBox_.top - 34.0f, palette::kTextDim,
+               "購入数（ボタンで増減。押しっぱなしで連続）");
+    for (int i = 0; i < kQuantityButtonCount; ++i) quantityButtons_[i].Draw();
+    draw::FillRect(quantityBox_, palette::kPanel, 235);
+    draw::StrokeRect(quantityBox_, palette::kAccentWarm, 2.0f, 255);
+    draw::Text(FontSize::Medium, quantityBox_.CenterX(), quantityBox_.top + 10.0f, palette::kText,
+               str::Format("%d 個", quantity_), draw::TextAlign::Center);
+
+    // --- 合計 -------------------------------------------------------------------
+    const int room = item->MaxStack() - inventory.ItemCount(item->id);
+    const int total = item->price * quantity_;
+    float ty = quantityBox_.bottom + 14.0f;
+    if (room <= 0) {
+        draw::Text(FontSize::Small, x, ty, palette::kDanger, "所持数が上限に達しています");
+        return;
+    }
+    const bool affordable = (col >= total);
+    draw::Text(FontSize::Normal, x, ty, palette::kTextDim, "合計");
+    draw::Text(FontSize::Normal, right, ty, affordable ? palette::kAccentWarm : palette::kDanger,
+               str::Format("%s col", str::Comma(total).c_str()), draw::TextAlign::Right);
+    ty += 32.0f;
+    if (!affordable) {
+        draw::Text(FontSize::Tiny, x, ty, palette::kDanger,
+                   str::Format("あと %s col 必要です", str::Comma(total - col).c_str()));
     } else {
-        draw::Text(FontSize::Small, x, y, palette::kDanger, "所持数が上限に達しています");
+        draw::Text(FontSize::Tiny, x, ty, palette::kTextDim,
+                   str::Format("購入後の所持数 %d / %d", inventory.ItemCount(item->id) + quantity_,
+                               item->MaxStack()));
     }
 }
 

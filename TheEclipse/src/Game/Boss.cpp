@@ -149,8 +149,6 @@ BossDatabase::BossDatabase()
         b.maxHp = 68000.0f; b.attack = 8600.0f; b.defense = 880.0f; b.moveSpeed = 245.0f;
         b.halfWidth = 86.0f; b.height = 300.0f;
         b.assetFolder = "valgrim";
-        // 最上位のボスなので HP ゲージは 5 本
-        b.hpBarCount = 5;
         b.expReward = 9200; b.colReward = 12000;
         b.patterns = { BossAttackKind::Swipe, BossAttackKind::Charge, BossAttackKind::JumpSlam,
                        BossAttackKind::Shot, BossAttackKind::Combo, BossAttackKind::Burst };
@@ -173,9 +171,10 @@ const BossDef* BossDatabase::Find(int id) const
 }
 
 //==============================================================================
-void Boss::Setup(const BossDef& def, const Vec2& position, float powerScale)
+void Boss::Setup(const BossDef& def, const Vec2& position, float powerScale, int hpBars)
 {
     def_ = &def;
+    hpBars_ = math::ClampInt(hpBars, kMinBossHpBars, kMaxBossHpBars);
     id = IssueActorId();
     team = Team::Enemy;
     powerScale_ = math::MaxF(0.2f, powerScale);
@@ -215,14 +214,35 @@ void Boss::Setup(const BossDef& def, const Vec2& position, float powerScale)
     actionName_.clear();
 }
 
+float Boss::PhaseFloorHp() const
+{
+    // phase_ 本目のバーの下端。最後のバーなら 0（倒れるまで削る）
+    const int left = math::MaxI(0, hpBars_ - phase_);
+    return maxHp * static_cast<float>(left) / static_cast<float>(hpBars_);
+}
+
 int Boss::ApplyDirectDamage(int damage, float knockbackX, CombatSystem& combat)
 {
     if (state_ == BossState::Intro || state_ == BossState::PhaseShift) return 0;
+
+    // 1 本のバーを削りきったところで止め、形態変化を必ず挟む
+    //   （大技でバーを 2 本まとめて飛ばしたり、形態変化を素通りしたりしない）
+    if (alive && phase_ < hpBars_) {
+        const float floorHp = PhaseFloorHp();
+        const int toFloor = math::MaxI(1, static_cast<int>(std::ceil(hp - floorHp)));
+        damage = math::MinI(damage, toFloor);
+    }
 
     // ボスはのけぞらない（ノックバックを大幅に軽減）
     const int dealt = Actor::ApplyDirectDamage(damage, knockbackX * 0.08f, combat);
     if (dealt > 0) CheckPhaseShift(combat);
     return dealt;
+}
+
+void Boss::ForceKill(CombatSystem& combat)
+{
+    if (!alive) return;
+    Actor::ApplyDirectDamage(static_cast<int>(std::ceil(hp)) + 1, 0.0f, combat);
 }
 
 void Boss::Stagger(float duration)
@@ -247,13 +267,14 @@ void Boss::OnDeath(CombatSystem& combat)
 
 void Boss::CheckPhaseShift(CombatSystem& combat)
 {
-    const float ratio = HpRatio();
-    const int nextPhase = (ratio <= 0.35f) ? 3 : (ratio <= 0.70f ? 2 : 1);
-    if (nextPhase <= phase_ || !alive) return;
+    // 今のバーを削りきったら次の形態へ（バー 1 本につき 1 回）
+    if (!alive || phase_ >= hpBars_ || hp > PhaseFloorHp()) return;
 
-    phase_ = nextPhase;
-    damageBoost_ = 1.0f + 0.18f * static_cast<float>(phase_ - 1);
-    speedBoost_ = 1.0f + 0.22f * static_cast<float>(phase_ - 1);
+    ++phase_;
+    // 最後のバーで攻撃 +36% / 速さ +44%。本数が多いボスほど少しずつ強くなる
+    const float progress = static_cast<float>(phase_ - 1) / static_cast<float>(hpBars_ - 1);
+    damageBoost_ = 1.0f + 0.36f * progress;
+    speedBoost_ = 1.0f + 0.44f * progress;
 
     state_ = BossState::PhaseShift;
     stateTimer_ = 0.0f;
@@ -263,7 +284,7 @@ void Boss::CheckPhaseShift(CombatSystem& combat)
     combat.AddRing(Vec2(pos.x, pos.y), 520.0f, art.trim, 0.7f);
     combat.AddImpact(Vec2(pos.x, pos.y - height * 0.5f), art.trim, 40, 620.0f);
     combat.AddPopup(Vec2(pos.x, pos.y - height - 60.0f),
-                    (phase_ >= 3) ? "激昂！" : "形態変化", art.trim, true);
+                    (phase_ >= hpBars_) ? "激昂！" : "形態変化", art.trim, true);
 }
 
 void Boss::ChoosePattern(float distance)
@@ -676,10 +697,12 @@ void Boss::Draw(const Camera& camera) const
         }
     }
 
-    // フェーズ 3 ではオーラを纏う
-    if (alive && phase_ >= 3) {
+    // 形態変化のたびにオーラが濃くなる（最後のバーで最大）
+    if (alive && phase_ >= 2) {
+        const float progress = static_cast<float>(phase_ - 1) / static_cast<float>(hpBars_ - 1);
         const Vec2 center = camera.WorldToScreen(Center());
-        draw::Glow(center.x, center.y, height * 0.55f, art.trim, 90, 4);
+        draw::Glow(center.x, center.y, height * (0.40f + 0.15f * progress), art.trim,
+                   static_cast<int>(30.0f + 60.0f * progress), 4);
     }
 
     DrawBody(camera);
@@ -690,18 +713,12 @@ void Boss::Draw(const Camera& camera) const
 // HP バー
 //------------------------------------------------------------------------------
 namespace {
-constexpr float kHpBarWidth = 240.0f;
-constexpr float kHpBarHeight = 9.0f;
-constexpr float kHpBarGap = 6.0f;          // バー同士の間隔（1 本ずつ離して並べる）
-constexpr float kHpBarOffsetX = 36.0f;     // 頭から右へ
-constexpr float kHpBarOffsetY = 18.0f;     // 頭から上へ（いちばん下のバーの下端）
-constexpr float kHpBarNameGap = 26.0f;     // 名前とバーの間
+constexpr float kHpBarWidth = 220.0f;
+constexpr float kHpBarHeight = 6.0f;
+constexpr float kHpBarGap = 3.0f;          // バー同士の間隔（1 本ずつ離して並べる）
+constexpr float kHpBarOffsetY = 16.0f;     // 頭から上へ（いちばん下のバーの下端）
+constexpr float kHpBarNameGap = 24.0f;     // 名前の上端からいちばん上のバーまで
 } // namespace
-
-int Boss::HpBarCount() const
-{
-    return (def_ && def_->hpBarCount > 0) ? def_->hpBarCount : 3;
-}
 
 float Boss::HpBarFill(float ratio, int index, int bars)
 {
@@ -722,8 +739,9 @@ bool Boss::HpBarLayout(const Camera& camera, std::vector<Rect>& bars, Vec2& name
     const float screenH = static_cast<float>(config::kScreenHeight);
     if (head.x < 0.0f || head.x > screenW || head.y < 0.0f || head.y > screenH) return false;
 
+    // 頭の真上に中央をそろえて重ねる（いちばん下のバーが頭のすぐ上）
     const int count = HpBarCount();
-    const float left = head.x + kHpBarOffsetX;
+    const float left = head.x - kHpBarWidth * 0.5f;
     const float bottom = head.y - kHpBarOffsetY;
     const float pitch = kHpBarHeight + kHpBarGap;
     const float top = bottom - pitch * static_cast<float>(count) + kHpBarGap;
@@ -731,7 +749,7 @@ bool Boss::HpBarLayout(const Camera& camera, std::vector<Rect>& bars, Vec2& name
         const float y = top + pitch * static_cast<float>(i);
         bars.push_back(Rect(left, y, left + kHpBarWidth, y + kHpBarHeight));
     }
-    namePos = Vec2(left, top - kHpBarNameGap);
+    namePos = Vec2(head.x, top - kHpBarNameGap);
     return true;
 }
 
@@ -741,16 +759,17 @@ void Boss::DrawHpBars(const Camera& camera) const
     Vec2 namePos;
     if (!HpBarLayout(camera, bars, namePos)) return;
 
-    // 名前（雑魚敵と同じく影つき）
-    draw::Text(FontSize::Small, namePos.x + 1.0f, namePos.y + 1.0f, palette::kBlack, def_->name);
-    draw::Text(FontSize::Small, namePos.x, namePos.y, def_->trim, def_->name);
+    // 名前（雑魚敵と同じく影つきで、頭の真上の中央に）
+    draw::Text(FontSize::Small, namePos.x + 1.0f, namePos.y + 1.0f, palette::kBlack, def_->name,
+               draw::TextAlign::Center);
+    draw::Text(FontSize::Small, namePos.x, namePos.y, def_->trim, def_->name, draw::TextAlign::Center);
 
     const float ratio = HpRatio();
     const ColorRGB color = palette::HpColor(ratio);
     const int count = static_cast<int>(bars.size());
     for (int i = 0; i < count; ++i) {
         const Rect& bar = bars[static_cast<size_t>(i)];
-        draw::FillRect(bar.Expanded(2.0f), palette::kBlack, 190);
+        draw::FillRect(bar.Expanded(1.5f), palette::kBlack, 190);
         draw::Bar(bar, HpBarFill(ratio, i, count), color, ColorRGB(40, 40, 48),
                   HpBarFill(hpDisplay_, i, count), palette::kHpLoss);
     }

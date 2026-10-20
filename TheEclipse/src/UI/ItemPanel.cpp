@@ -351,17 +351,22 @@ void ItemPanel::DrawDetail(const GameContext& context) const
     draw::Line(x, y, right, y, palette::kBorder, 1.0f, 120);
     y += 16.0f;
 
+    // 操作の説明は今のキー設定に合わせる
+    const std::string switchKey = context.settings.keys.PrimaryName(GameAction::ItemSwitch);
+    const std::string useKey = context.settings.keys.PrimaryName(GameAction::ItemUse);
     switch (selected->kind) {
     case ConsumableKind::Recovery:
         draw::Text(FontSize::Tiny, x, y, palette::kTextDim,
-                   "戦闘中は左下のカードを Q で「回復」を手前にし、E キーかクリックで使います。");
+                   str::Format("戦闘中は左下のカードを %s で「回復」を手前にし、%s かクリックで使います。",
+                               switchKey.c_str(), useKey.c_str()));
         y += 24.0f;
         draw::Text(FontSize::Tiny, x, y, palette::kTextDim,
                    "HP / MP が満タンのときは使われません。");
         break;
     case ConsumableKind::Buff:
         draw::Text(FontSize::Tiny, x, y, palette::kTextDim,
-                   "戦闘中は左下のカードを Q で「バフ」を手前にし、E キーかクリックで使います。");
+                   str::Format("戦闘中は左下のカードを %s で「バフ」を手前にし、%s かクリックで使います。",
+                               switchKey.c_str(), useKey.c_str()));
         y += 24.0f;
         draw::Text(FontSize::Tiny, x, y, palette::kTextDim,
                    "使ったアイテムは無くなります。別のバフを使うと効果が上書きされます。");

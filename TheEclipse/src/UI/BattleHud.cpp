@@ -22,6 +22,16 @@ constexpr float kSkillBarBottom = 1030.0f;
 constexpr float kItemCardLeft = 40.0f;
 constexpr float kItemBackOffset = 26.0f;   // 奥のカードを右上へずらす量
 
+// アイコンの左上に発動キーの札を出す（キー設定で長い名前になっても収まるよう幅を合わせる）
+void DrawKeyTag(const Rect& icon, const std::string& name)
+{
+    if (name.empty()) return;
+    const float width = math::MaxF(24.0f, static_cast<float>(draw::TextWidth(FontSize::Tiny, name)) + 10.0f);
+    const Rect tag = Rect::FromXYWH(icon.left + 4.0f, icon.top + 4.0f, math::MinF(width, icon.Width() - 8.0f),
+                                    22.0f);
+    draw::FillRect(tag, palette::kBlack, 190);
+    draw::Text(FontSize::Tiny, tag.CenterX(), tag.top + 2.0f, palette::kText, name, draw::TextAlign::Center);
+}
 
 } // namespace
 
@@ -252,11 +262,10 @@ void BattleHud::DrawSkillBar(const Player& player, const PlayerData& data) const
                              1.0f, static_cast<int>(120.0f * pulse));
         }
 
-        // キー番号
-        const Rect keyTag = Rect::FromXYWH(rect.left + 4.0f, rect.top + 4.0f, 24.0f, 22.0f);
-        draw::FillRect(keyTag, palette::kBlack, 190);
-        draw::Text(FontSize::Tiny, keyTag.CenterX(), keyTag.top + 2.0f, palette::kText,
-                   str::Format("%d", i + 1), draw::TextAlign::Center);
+        // 発動キー（キー設定で変えたものを出す）
+        const GameAction skillKeys[4] = { GameAction::Skill1, GameAction::Skill2,
+                                          GameAction::Skill3, GameAction::Skill4 };
+        DrawKeyTag(rect, Input::Instance().PrimaryKeyName(skillKeys[i % 4]));
 
         // スキル名と消費 MP
         draw::Text(FontSize::Tiny, rect.CenterX(), rect.bottom - 22.0f, palette::kText,
@@ -267,7 +276,8 @@ void BattleHud::DrawSkillBar(const Player& player, const PlayerData& data) const
 
     // 操作ヒント
     draw::Text(FontSize::Tiny, skillRects_[0].left, skillRects_[0].top - 26.0f, palette::kTextDim,
-               str::Format("1〜%d / クリックでソードスキル     ESC : メニュー", limit));
+               str::Format("%s / クリックでソードスキル     ESC : メニュー",
+                           Input::Instance().GetKeyConfig().SkillKeysSummary(limit).c_str()));
 }
 
 void BattleHud::DrawItemSlots(const Player& player, const PlayerData& data) const
@@ -377,10 +387,7 @@ void BattleHud::DrawItemCard(const Rect& rect, QuickSlot slot, bool front, const
     }
 
     // 使用キー（スキルの番号と同じ位置）
-    const Rect keyTag = Rect::FromXYWH(rect.left + 4.0f, rect.top + 4.0f, 24.0f, 22.0f);
-    draw::FillRect(keyTag, palette::kBlack, 190);
-    draw::Text(FontSize::Tiny, keyTag.CenterX(), keyTag.top + 2.0f, palette::kText,
-               Input::Instance().ActionKeyName(GameAction::ItemUse), draw::TextAlign::Center);
+    DrawKeyTag(rect, Input::Instance().PrimaryKeyName(GameAction::ItemUse));
 }
 
 void BattleHud::DrawFloorInfo(const HudInfo& info) const
