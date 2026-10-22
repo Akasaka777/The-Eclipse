@@ -40,6 +40,8 @@ enum class MouseButton
     Left = 0,
     Right = 1,
     Middle = 2,
+    SideBack = 3,      // サイドボタン（戻る）＝ MOUSE_INPUT_4
+    SideForward = 4,   // サイドボタン（進む）＝ MOUSE_INPUT_5
     Count
 };
 

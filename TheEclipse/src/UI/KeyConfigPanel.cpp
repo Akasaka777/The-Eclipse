@@ -147,7 +147,8 @@ bool KeyConfigPanel::UpdateWaiting(const Input& input, GameContext& context)
     }
 
     // マウスのボタン
-    const MouseButton buttons[] = { MouseButton::Left, MouseButton::Right, MouseButton::Middle };
+    const MouseButton buttons[] = { MouseButton::Left, MouseButton::Right, MouseButton::Middle,
+                                    MouseButton::SideBack, MouseButton::SideForward };
     for (MouseButton button : buttons) {
         if (input.MouseClicked(button)) {
             AssignTo(MouseInputCode(button), context);
@@ -193,7 +194,7 @@ void KeyConfigPanel::Draw(const GameContext& context) const
     const float right = window_.right - 40.0f;
 
     draw::Text(FontSize::Small, left, window_.top + 70.0f, palette::kText,
-               "変えたい枠をクリックして、割り当てるキーかマウスのボタンを押してください。");
+               "変えたい枠をクリックして、割り当てるキーかマウスのボタン（サイドボタンも可）を押してください。");
     draw::Text(FontSize::Tiny, left, window_.top + 100.0f, palette::kTextDim,
                "ESC：取り消し ／ BackSpace：枠を空にする ／ ほかで使っているキーは、その操作と入れ替わります");
 

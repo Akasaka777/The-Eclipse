@@ -254,6 +254,8 @@ std::string KeyConfig::InputName(int code)
     case MouseButton::Left:   return "左クリック";
     case MouseButton::Right:  return "右クリック";
     case MouseButton::Middle: return "中クリック";
+    case MouseButton::SideBack:    return "サイド(戻る)";
+    case MouseButton::SideForward: return "サイド(進む)";
     default: break;
     }
     if (code == KEY_INPUT_ESCAPE) return "ESC";

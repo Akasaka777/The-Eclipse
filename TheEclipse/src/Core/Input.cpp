@@ -11,6 +11,8 @@ int MouseBit(MouseButton button)
     case MouseButton::Left:   return MOUSE_INPUT_LEFT;
     case MouseButton::Right:  return MOUSE_INPUT_RIGHT;
     case MouseButton::Middle: return MOUSE_INPUT_MIDDLE;
+    case MouseButton::SideBack:    return MOUSE_INPUT_4;
+    case MouseButton::SideForward: return MOUSE_INPUT_5;
     default: return 0;
     }
 }
@@ -47,6 +49,14 @@ void Input::Update()
 
     prevMouseState_ = mouseState_;
     mouseState_ = GetMouseInput();
+#if defined(_WIN32)
+    // マウスのサイドボタン（戻る / 進む）は環境によって GetMouseInput に乗らないことがあるため、
+    // ウィンドウが前面にあるときだけ OS からも直接読む
+    if (GetForegroundWindow() == GetMainWindowHandle()) {
+        if ((GetAsyncKeyState(VK_XBUTTON1) & 0x8000) != 0) mouseState_ |= MOUSE_INPUT_4;
+        if ((GetAsyncKeyState(VK_XBUTTON2) & 0x8000) != 0) mouseState_ |= MOUSE_INPUT_5;
+    }
+#endif
 
     wheelDelta_ = GetMouseWheelRotVol();
 }
