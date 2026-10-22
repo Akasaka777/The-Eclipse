@@ -7,6 +7,7 @@
 #include "Graphics/DrawUtil.h"
 
 #include <cmath>
+#include <utility>
 
 namespace ecl {
 
@@ -767,10 +768,11 @@ void Boss::Draw(const Camera& camera) const
 namespace {
 constexpr float kHpBarThickness = 5.0f;    // バー 1 本の太さ
 constexpr float kHpBarGap = 3.0f;          // バー同士の間隔（1 本ずつ離して重ねる）
-constexpr float kHpBarSpanDeg = 160.0f;    // 弧の広がり（頭頂を中心に左右へ 80 度ずつ）
+constexpr float kHpBarSpanDeg = 70.0f;     // バーの長さ（弧の角度。上下へ 35 度ずつ）
 constexpr float kHpBarHeadGap = 10.0f;     // 頭の輪郭といちばん内側のバーのすき間
-constexpr float kHpBarMinRadius = 36.0f;   // いちばん内側の弧の半径の下限
-constexpr float kHpBarNameGap = 28.0f;     // 名前の上端からいちばん外側の弧の頂点まで
+constexpr float kHpBarCurveRate = 2.4f;    // 湾曲のゆるさ：内側のバーの半径 = 頭の半径 × これ ＋ 下の値
+constexpr float kHpBarCurveAdd = 20.0f;
+constexpr float kHpBarNameGap = 8.0f;      // 名前の下端と、頭頂・バーの上端との間
 constexpr float kHpBarSegment = 10.0f;     // 弧を何 px ごとの線分で描くか
 const ColorRGB  kHpBarEdge(12, 12, 16);    // 縁取り
 const ColorRGB  kHpBarEmpty(40, 40, 48);   // 減った部分
@@ -778,6 +780,8 @@ const ColorRGB  kHpBarEmpty(40, 40, 48);   // 減った部分
 // 弧の a0〜a1（ラジアン）を線分でつないで描く。radius は太さの中心
 void DrawArcRange(const Vec2& center, float radius, float a0, float a1, float thickness, const ColorRGB& color)
 {
+    // 角度の向きはどちらでもよい（頭の右側のバーは角度が減る向きに伸びる）
+    if (a1 < a0) std::swap(a0, a1);
     if (a1 - a0 <= 0.0001f || radius <= 0.0f) return;
     const int segments = math::MaxI(2, static_cast<int>(std::ceil(radius * (a1 - a0) / kHpBarSegment)));
     // 線分のつなぎ目に隙間が出ないよう、各線分を少しだけ伸ばす
@@ -860,25 +864,41 @@ bool Boss::HpBarLayout(const Camera& camera, std::vector<BossHpArc>& arcs, Vec2&
     const float screenH = static_cast<float>(config::kScreenHeight);
     if (head.x < 0.0f || head.x > screenW || head.y < 0.0f || head.y > screenH) return false;
 
-    // 頭を中心に同心の弧を重ねる。いちばん内側が頭の輪郭のすぐ外、外へ行くほど先に減るバー
+    // 頭の後ろ側（向いている方の反対）の側面に、ゆるく湾曲したバーを外へ向かって重ねる。
+    //   弧の中心は頭より内側に置き、頭より大きな円の一部にして湾曲を軽くする。
+    //   いちばん内側のバーの中央が頭の輪郭のすぐ外に来る。外のバーほど先に減る。
+    //   振り向くと、バーは頭の上を回って反対側へ移る。
     const int count = HpBarCount();
     const float pitch = kHpBarThickness + kHpBarGap;
-    const float inner = math::MaxF(kHpBarMinRadius, headRadius + kHpBarHeadGap + kHpBarThickness * 0.5f);
+    const float swing = math::Clamp((headSide_ + 1.0f) * 0.5f, 0.0f, 1.0f);   // 0: 頭の右側 / 1: 左側
+    const float mid = -math::kPi * swing;   // バーの中央の向き（0 = 右、-π/2 = 上、-π = 左）
+    const Vec2 dir(std::cos(mid), std::sin(mid));
+    const float innerReach = headRadius + kHpBarHeadGap + kHpBarThickness * 0.5f;
+    const float innerRadius = math::MaxF(innerReach, headRadius * kHpBarCurveRate + kHpBarCurveAdd);
+    const Vec2 center(head.x - dir.x * (innerRadius - innerReach), head.y - dir.y * (innerRadius - innerReach));
     const float halfSpan = math::DegToRad(kHpBarSpanDeg) * 0.5f;
-    const float up = -math::kPi * 0.5f;
+    float a0 = mid + halfSpan;
+    float a1 = mid - halfSpan;
+    // 下の端から上の端へ伸びるようにそろえる（t = 0 が下端）
+    if (std::sin(a1) > std::sin(a0)) std::swap(a0, a1);
     for (int i = 0; i < count; ++i) {
         BossHpArc arc;
-        arc.center = head;
-        arc.radius = inner + pitch * static_cast<float>(count - 1 - i);
-        arc.startAngle = up - halfSpan;
-        arc.endAngle = up + halfSpan;
+        arc.center = center;
+        arc.radius = innerRadius + pitch * static_cast<float>(count - 1 - i);
+        arc.startAngle = a0;
+        arc.endAngle = a1;
         arc.thickness = kHpBarThickness;
         arcs.push_back(arc);
     }
 
-    // 名前はいちばん外側の弧の頂点の上（頭の真上）
-    const Vec2 apex = arcs.front().Apex();
-    namePos = Vec2(apex.x, apex.y - kHpBarThickness * 0.5f - kHpBarNameGap);
+    // 名前は頭上。バーの上端が頭頂より高いときは、それよりさらに上に出す
+    float top = head.y - headRadius;
+    for (const BossHpArc& arc : arcs) {
+        for (int k = 0; k <= 8; ++k) {
+            top = math::MinF(top, arc.PointAt(static_cast<float>(k) / 8.0f).y - arc.thickness * 0.5f - 1.5f);
+        }
+    }
+    namePos = Vec2(head.x, top - kHpBarNameGap - static_cast<float>(draw::TextHeight(FontSize::Small)));
     return true;
 }
 
@@ -887,7 +907,7 @@ void Boss::DrawHpBars(const Camera& camera) const
     std::vector<BossHpArc> arcs;
     Vec2 namePos;
     if (!HpBarLayout(camera, arcs, namePos)) return;
-    // 登場演出では、空のバーが内側から順に溜まっていく
+    // 登場演出では、空のバーが内側から順に溜まっていく（1 本ごとに下から上へ）
     const float reveal = barReveal_;
 
     // 名前（雑魚敵と同じく影つきで、頭の真上の中央に）
@@ -906,9 +926,9 @@ void Boss::DrawHpBars(const Camera& camera) const
 
         // 縁取り（端も少し包むように角度を広げる）
         const float cap = 1.5f / arc.radius;
-        DrawArcRange(arc.center, arc.radius, arc.startAngle - cap, arc.endAngle + cap, arc.thickness + 3.0f,
-                     kHpBarEdge);
-        // 減った部分 → 減少の残像 → 残量（左端から）
+        DrawArcRange(arc.center, arc.radius, math::MinF(arc.startAngle, arc.endAngle) - cap,
+                     math::MaxF(arc.startAngle, arc.endAngle) + cap, arc.thickness + 3.0f, kHpBarEdge);
+        // 減った部分 → 減少の残像 → 残量（下端から）
         if (fill < 1.0f) DrawArcPart(arc, fill, 1.0f, arc.thickness, kHpBarEmpty);
         if (lag > fill) DrawArcPart(arc, fill, lag, arc.thickness, palette::kHpLoss);
         if (fill > 0.0f) DrawArcPart(arc, 0.0f, fill, arc.thickness, color);
