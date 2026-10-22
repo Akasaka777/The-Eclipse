@@ -81,26 +81,6 @@ enum class BossState
 };
 
 //------------------------------------------------------------------------------
-// ボスの HP バー 1 本ぶんの弧（画面座標）
-//   頭の側面に沿わせた、ゆるく湾曲したバー。角度はラジアンで、0 が右・-π/2 が真上
-//   （画面は下向きが +Y）。下端（startAngle）から上端（endAngle）へ向かって残量が伸び、
-//   上端から減っていく。
-//------------------------------------------------------------------------------
-struct BossHpArc
-{
-    Vec2  center;
-    float radius = 0.0f;      // 太さの中心までの半径
-    float startAngle = 0.0f;  // 下端
-    float endAngle = 0.0f;    // 上端
-    float thickness = 0.0f;
-
-    // t = 0 で下端、1 で上端（太さの中心の点）
-    Vec2 PointAt(float t) const;
-    // バーの中央（頭の側面のいちばん近いところ）
-    Vec2 Middle() const { return PointAt(0.5f); }
-};
-
-//------------------------------------------------------------------------------
 // HP バーの本数（クエストの強さで決まる。QuestDatabase::BossHpBarCount を参照）
 //------------------------------------------------------------------------------
 constexpr int kMinBossHpBars = 3;
@@ -155,17 +135,13 @@ public:
         return state_ == BossState::Windup || state_ == BossState::Attack;
     }
 
-    // --- HP バー（頭の側面に沿わせたゆるい弧を本数ぶん重ね、頭上に名前）---------
+    // --- HP バー（雑魚敵と同じ見た目。頭の真上に本数ぶん重ね、その上に名前）-------
     int   HpBarCount() const { return hpBars_; }
-    // HP の割合 ratio のとき、index 本目（0 始まり。0 が最初に減るバー）がどれだけ残っているか
+    // HP の割合 ratio のとき、上から index 本目（0 始まり）のバーがどれだけ残っているか
     static float HpBarFill(float ratio, int index, int bars);
     // HP バーと名前の位置（画面座標。namePos は名前の中央上端）。
-    //   arcs[0] がいちばん外側（最初に減るバー）、最後がいちばん内側（頭に近いバー）。
-    //   頭が画面外にあるときや撃破後は false（描かない）
-    bool  HpBarLayout(const Camera& camera, std::vector<BossHpArc>& arcs, Vec2& namePos) const;
-    // 頭の中心と大きさ（ワールド座標）。HP バーはこの円の側面に沿わせる。
-    //   竜や獣は頭が体の前にあるので、向いている側へずらす（振り向くとなめらかに移る）
-    void  HeadCircle(Vec2& center, float& radius) const;
+    // 頭が画面外にあるときや撃破後は false（描かない）
+    bool  HpBarLayout(const Camera& camera, std::vector<Rect>& bars, Vec2& namePos) const;
 
 private:
     void ChoosePattern(float distance);
@@ -201,8 +177,6 @@ private:
     float hpDisplay_ = 1.0f;
     float moveTarget_ = 0.0f;
     int   lastPatternIndex_ = -1;
-    // 頭の位置を向きに合わせてずらす量（-1〜1。振り向くとなめらかに入れ替わる）
-    float headSide_ = -1.0f;
 
     // 登場演出
     bool  introHeld_ = false;
