@@ -135,14 +135,17 @@ public:
         return state_ == BossState::Windup || state_ == BossState::Attack;
     }
 
-    // --- HP バー（名前は頭の真上、バーは名前の右側＝頭の右上から下へ重ねる）---------
+    // --- HP バー（顔の右横に小さく重ね、名前はその左＝頭の上に出す）-----------------
     int   HpBarCount() const { return hpBars_; }
     // HP の割合 ratio のとき、上から index 本目（0 始まり）のバーがどれだけ残っているか
     static float HpBarFill(float ratio, int index, int bars);
     // HP バーと名前の位置（画面座標。namePos は名前の中央上端）。
-    //   bars は各バーのまっすぐな部分の矩形（右端の反り返りはその外へはみ出して描く）。
+    //   bars は上のバーから順に並ぶ（いちばん下のバーが顔の高さ）。
     //   頭が画面外にあるときや撃破後は false（描かない）
     bool  HpBarLayout(const Camera& camera, std::vector<Rect>& bars, Vec2& namePos) const;
+    // 顔（頭）の中心と大きさ（ワールド座標）。HP バーはこの横に置く。
+    //   竜や獣は頭が体の前にあるので、向いている側へずらす（振り向くとなめらかに移る）
+    void  HeadCircle(Vec2& center, float& radius) const;
 
 private:
     void ChoosePattern(float distance);
@@ -178,6 +181,8 @@ private:
     float hpDisplay_ = 1.0f;
     float moveTarget_ = 0.0f;
     int   lastPatternIndex_ = -1;
+    // 頭の位置を向きに合わせてずらす量（-1〜1。振り向くとなめらかに入れ替わる）
+    float headSide_ = -1.0f;
 
     // 登場演出
     bool  introHeld_ = false;

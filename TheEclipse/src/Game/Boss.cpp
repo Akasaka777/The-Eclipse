@@ -216,6 +216,7 @@ void Boss::Setup(const BossDef& def, const Vec2& position, float powerScale, int
     damageBoost_ = 1.0f;
     speedBoost_ = 1.0f;
     facing = -1;
+    headSide_ = -1.0f;
     actionName_.clear();
 }
 
@@ -555,6 +556,7 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
     stateTimer_ += dt;
     hpDisplay_ = math::Approach(hpDisplay_, HpRatio(), dt * 0.55f);
     roarTimer_ += dt;
+    headSide_ = math::Approach(headSide_, static_cast<float>(facing), dt * 5.0f);
     // 登場演出の見せ場（または演出の終わり）から、空の HP バーを満タンまで溜める
     if (!introHeld_ || barsRevealing_) barReveal_ = math::Approach(barReveal_, 1.0f, dt / 0.9f);
 
@@ -761,142 +763,24 @@ void Boss::Draw(const Camera& camera) const
 
 //------------------------------------------------------------------------------
 // HP バー
-//   ボスの名前を頭の真上に出し、その上に赤いひし形の目印を置く。
-//   HP バーは名前の右側（頭の右上）から下へ 1 本ずつ重ねる。
-//   1 本のバーは、左端を斜めに切り、右端が上へ反り返った形。右端（反り返り）から減っていく。
+//   ボスの顔の右横に、小さなまっすぐのバーを 1 本ずつ離して重ねる（いちばん下のバーが顔の高さ）。
+//   名前はバーの左（頭の上）に、右端をバーの手前でそろえて出し、その上に赤いひし形の目印を置く。
+//   上のバーから、右端から左へ減っていく。
 //------------------------------------------------------------------------------
 namespace {
-constexpr float kHpBarBodyWidth = 120.0f;  // まっすぐな部分の長さ
-constexpr float kHpBarHeight = 10.0f;      // バーの太さ
-constexpr float kHpBarGap = 13.0f;         // バー同士の間隔（反り返りが上のバーに届かないだけ離す）
-constexpr float kHpBarSlant = 7.0f;        // 左端の斜めの切り口
-constexpr float kHpBarHookRun = 22.0f;     // 右端の反り返り：横へ伸びる量
-constexpr float kHpBarHookRise = 14.0f;    //                  上へ反る量
-constexpr float kHpBarHookTaper = 0.65f;   //                  先端の太さ（根元に対する割合）
-constexpr int   kHpBarHookSteps = 5;       // 反り返りを何節で描くか
+constexpr float kHpBarWidth = 72.0f;       // バーの長さ
+constexpr float kHpBarHeight = 7.0f;       // バーの太さ
+constexpr float kHpBarGap = 7.0f;          // バー同士の間隔（縁取りを除いても 1 本ずつ離れて見えるように）
 constexpr float kHpBarStagger = 2.0f;      // 下のバーほど左へずらす量（段々に見せる）
-constexpr float kHpBarHeadGap = 14.0f;     // 頭頂と名前の下端の間
-constexpr float kHpBarNameGap = 14.0f;     // 名前の右端とバーの左端の間
-constexpr float kHpBarMinOffset = 56.0f;   // バーの左端は頭の中心から少なくともこれだけ右
+constexpr float kHpBarFaceGap = 12.0f;     // 顔の輪郭とバーの左端の間
+constexpr float kHpBarNameGap = 12.0f;     // 名前の右端とバーの左端の間
+constexpr float kHpBarHeadGap = 10.0f;     // 頭頂と名前の下端の間
 constexpr float kMarkerWidth = 14.0f;      // 名前の上の目印（赤いひし形）
 constexpr float kMarkerHeight = 22.0f;
 constexpr float kMarkerGap = 4.0f;         // 目印と名前の間
 const ColorRGB  kHpBarEdge(10, 10, 14);    // 縁取り
 const ColorRGB  kHpBarEmpty(40, 40, 48);   // 減った部分
 const ColorRGB  kMarkerColor(236, 64, 72);
-
-// バーの芯（太さの中心を通る線）。左端からまっすぐ右へ伸び、右端で上へ反り返る
-struct BarSpine
-{
-    std::vector<Vec2>  points;
-    std::vector<float> half;     // その点での太さの半分
-    std::vector<float> length;   // 左端からの道のり
-    float total = 0.0f;
-};
-
-BarSpine MakeSpine(const Rect& body)
-{
-    BarSpine spine;
-    const float h = body.Height() * 0.5f;
-    const float midY = body.top + h;
-    spine.points.push_back(Vec2(body.left, midY));
-    spine.half.push_back(h);
-    // 反り返り（2 次ベジェ：根元から横へ伸び、先で上へ曲がる）
-    const Vec2 p0(body.right, midY);
-    const Vec2 p1(body.right + kHpBarHookRun * 0.75f, midY);
-    const Vec2 p2(body.right + kHpBarHookRun, midY - kHpBarHookRise);
-    for (int k = 0; k <= kHpBarHookSteps; ++k) {
-        const float t = static_cast<float>(k) / static_cast<float>(kHpBarHookSteps);
-        const float u = 1.0f - t;
-        spine.points.push_back(Vec2(u * u * p0.x + 2.0f * u * t * p1.x + t * t * p2.x,
-                                    u * u * p0.y + 2.0f * u * t * p1.y + t * t * p2.y));
-        spine.half.push_back(h * math::Lerp(1.0f, kHpBarHookTaper, t));
-    }
-    spine.length.push_back(0.0f);
-    for (size_t i = 1; i < spine.points.size(); ++i) {
-        const Vec2 d = spine.points[i] - spine.points[i - 1];
-        spine.length.push_back(spine.length.back() + std::sqrt(d.x * d.x + d.y * d.y));
-    }
-    spine.total = spine.length.back();
-    return spine;
-}
-
-// 芯の i 番目の点での、上側を向いた法線
-Vec2 SpineNormal(const BarSpine& spine, size_t i)
-{
-    const size_t a = (i == 0) ? 0 : i - 1;
-    const size_t b = (i + 1 < spine.points.size()) ? i + 1 : i;
-    Vec2 d = spine.points[b] - spine.points[a];
-    const float len = std::sqrt(d.x * d.x + d.y * d.y);
-    if (len < 0.0001f) return Vec2(0.0f, -1.0f);
-    d = Vec2(d.x / len, d.y / len);
-    return Vec2(d.y, -d.x);
-}
-
-// 道のり dist の位置の点・法線・太さ
-void SpineAt(const BarSpine& spine, float dist, Vec2& point, Vec2& normal, float& half)
-{
-    dist = math::Clamp(dist, 0.0f, spine.total);
-    size_t i = 1;
-    while (i + 1 < spine.points.size() && spine.length[i] < dist) ++i;
-    const float span = math::MaxF(0.0001f, spine.length[i] - spine.length[i - 1]);
-    const float t = math::Clamp((dist - spine.length[i - 1]) / span, 0.0f, 1.0f);
-    point = spine.points[i - 1] + (spine.points[i] - spine.points[i - 1]) * t;
-    const Vec2 n0 = SpineNormal(spine, i - 1);
-    const Vec2 n1 = SpineNormal(spine, i);
-    normal = n0 + (n1 - n0) * t;
-    half = math::Lerp(spine.half[i - 1], spine.half[i], t);
-}
-
-// バーの t0〜t1（0 = 左端 / 1 = 反り返りの先）を塗る。
-//   offset : 太さの中心から上側へずらす割合 / scale : 太さの割合 / grow : 太さに足す量（縁取り用）
-//   passes : 2 にすると同じ形を 2 回重ね、三角形の継ぎ目を目立たなくする
-void FillSpine(const BarSpine& spine, float t0, float t1, const ColorRGB& color, float offset = 0.0f,
-               float scale = 1.0f, float grow = 0.0f, int passes = 1, int alpha = 255)
-{
-    t0 = math::Clamp(t0, 0.0f, 1.0f);
-    t1 = math::Clamp(t1, 0.0f, 1.0f);
-    if (t1 - t0 <= 0.001f) return;
-
-    // 塗る範囲の端と、間にある芯の点を順に並べる
-    std::vector<float> stops;
-    stops.push_back(t0 * spine.total);
-    for (float len : spine.length) {
-        if (len > stops.front() + 0.01f && len < t1 * spine.total - 0.01f) stops.push_back(len);
-    }
-    stops.push_back(t1 * spine.total);
-
-    auto edge = [&](float dist, Vec2& upper, Vec2& lower) {
-        Vec2 p;
-        Vec2 n;
-        float h = 0.0f;
-        SpineAt(spine, dist, p, n, h);
-        const Vec2 c = p + n * (h * offset);
-        const float w = h * scale + grow;
-        upper = c + n * w;
-        lower = c - n * w;
-        // 左端は斜めに切る（上側を右へ、下側を左へずらして「/」の切り口にする）
-        if (dist <= 0.001f) {
-            const Vec2 along(-n.y, n.x);
-            const float cut = kHpBarSlant * 0.5f * (w / math::MaxF(0.001f, h));
-            upper = upper + along * cut;
-            lower = lower - along * cut;
-        }
-    };
-
-    for (int pass = 0; pass < passes; ++pass) {
-        Vec2 u0, l0;
-        edge(stops.front(), u0, l0);
-        for (size_t i = 1; i < stops.size(); ++i) {
-            Vec2 u1, l1;
-            edge(stops[i], u1, l1);
-            draw::Triangle(u0, u1, l1, color, true, alpha);
-            draw::Triangle(u0, l1, l0, color, true, alpha);
-            u0 = u1;
-            l0 = l1;
-        }
-    }
-}
 
 // 名前の上の目印（縦長の赤いひし形。左上の面を明るくして宝石のように見せる）
 void DrawMarker(const Vec2& center)
@@ -924,33 +808,69 @@ float Boss::HpBarFill(float ratio, int index, int bars)
     return math::Clamp((ratio - low) / share, 0.0f, 1.0f);
 }
 
+void Boss::HeadCircle(Vec2& center, float& radius) const
+{
+    // 図形で描くモデル（CharacterArt.cpp）の頭の位置に合わせてある
+    const float scale = DepthScale();
+    const float w = halfWidth * 2.0f * scale;
+    const float h = height * scale;
+    const float side = headSide_;
+    switch (art.style) {
+    case ArtStyle::Dragon:   // 長い首の先、体の前に突き出た頭
+        center = Vec2(pos.x + side * (w * 0.44f + h * 0.09f), pos.y - h * 0.82f);
+        radius = h * 0.14f;
+        break;
+    case ArtStyle::Beast:    // 胴の前の頭（たてがみの先）
+        center = Vec2(pos.x + side * w * 0.50f, pos.y - h * 0.82f);
+        radius = h * 0.13f;
+        break;
+    case ArtStyle::Golem:    // 肩に埋まった小さな頭
+        center = Vec2(pos.x + side * w * 0.06f, pos.y - h * 0.78f);
+        radius = w * 0.14f;
+        break;
+    case ArtStyle::Wisp:
+        center = Vec2(pos.x, pos.y - h * 0.62f);
+        radius = w * 0.30f;
+        break;
+    default:                 // 人型・騎士
+        center = Vec2(pos.x + side * w * 0.04f, pos.y - h * 0.88f);
+        radius = h * 0.105f;
+        break;
+    }
+}
+
 bool Boss::HpBarLayout(const Camera& camera, std::vector<Rect>& bars, Vec2& namePos) const
 {
     bars.clear();
     // 撃破後と、登場演出で出すまでの間は描かない
     if (!def_ || !alive || (introHeld_ && !barsRevealing_)) return false;
 
-    // 頭が画面に入っているときだけ出す（画面外のボスのバーは出さない）
-    const Vec2 head = camera.WorldToScreen(Vec2(pos.x, pos.y - height * DepthScale()));
+    // 顔が画面に入っているときだけ出す（画面外のボスのバーは出さない）
+    Vec2 faceWorld;
+    float faceRadius = 0.0f;
+    HeadCircle(faceWorld, faceRadius);
+    const Vec2 face = camera.WorldToScreen(faceWorld);
     const float screenW = static_cast<float>(config::kScreenWidth);
     const float screenH = static_cast<float>(config::kScreenHeight);
-    if (head.x < 0.0f || head.x > screenW || head.y < 0.0f || head.y > screenH) return false;
+    if (face.x < 0.0f || face.x > screenW || face.y < 0.0f || face.y > screenH) return false;
 
-    // 名前は頭の真上の中央
+    // バーは顔の右横。いちばん下のバーを顔の高さに置き、上へ重ねる
+    const int count = HpBarCount();
+    const float pitch = kHpBarHeight + kHpBarGap;
+    const float left = face.x + faceRadius + kHpBarFaceGap;
+    const float bottomTop = face.y - kHpBarHeight * 0.5f;   // いちばん下のバーの上端
+    for (int i = 0; i < count; ++i) {
+        const int fromBottom = count - 1 - i;
+        const float x = left + kHpBarStagger * static_cast<float>(fromBottom);
+        const float y = bottomTop - pitch * static_cast<float>(fromBottom);
+        bars.push_back(Rect(x, y, x + kHpBarWidth, y + kHpBarHeight));
+    }
+
+    // 名前は頭の上で、右端をバーの手前にそろえる（長い名前は顔の上を左へ伸びる）
     const float nameW = static_cast<float>(draw::TextWidth(FontSize::Small, def_->name));
     const float nameH = static_cast<float>(draw::TextHeight(FontSize::Small));
-    namePos = Vec2(head.x, head.y - kHpBarHeadGap - nameH);
-
-    // バーは名前の右側（頭の右上）に、目印の高さから下へ重ねる
-    const int count = HpBarCount();
-    const float left = head.x + math::MaxF(kHpBarMinOffset, nameW * 0.5f + kHpBarNameGap);
-    const float top = namePos.y - kMarkerGap - kMarkerHeight;
-    const float pitch = kHpBarHeight + kHpBarGap;
-    for (int i = 0; i < count; ++i) {
-        const float x = left - kHpBarStagger * static_cast<float>(i);
-        const float y = top + pitch * static_cast<float>(i);
-        bars.push_back(Rect(x, y, x + kHpBarBodyWidth, y + kHpBarHeight));
-    }
+    const float nameRight = math::MinF(face.x + nameW * 0.5f, left - kHpBarNameGap);
+    namePos = Vec2(nameRight - nameW * 0.5f, face.y - faceRadius - kHpBarHeadGap - nameH);
     return true;
 }
 
@@ -962,7 +882,7 @@ void Boss::DrawHpBars(const Camera& camera) const
     // 登場演出の直後は、空のバーが下から順に溜まっていく
     const float reveal = barReveal_;
 
-    // 目印と名前（影つきで、頭の真上の中央に）
+    // 目印と名前（影つき。名前の真上に目印）
     DrawMarker(Vec2(namePos.x, namePos.y - kMarkerGap - kMarkerHeight * 0.5f));
     draw::Text(FontSize::Small, namePos.x + 1.0f, namePos.y + 1.0f, palette::kBlack, def_->name,
                draw::TextAlign::Center);
@@ -973,18 +893,11 @@ void Boss::DrawHpBars(const Camera& camera) const
     const ColorRGB color = palette::HpColor(ratio);
     const int count = static_cast<int>(bars.size());
     for (int i = 0; i < count; ++i) {
-        const BarSpine spine = MakeSpine(bars[static_cast<size_t>(i)]);
-        const float fill = HpBarFill(ratio, i, count);
-        const float lag = HpBarFill(delayed, i, count);
-
-        // 縁取り → 減った部分 → 減少の残像 → 残量（左端から）と上側の明るい帯
-        FillSpine(spine, 0.0f, 1.0f, kHpBarEdge, 0.0f, 1.0f, 1.5f);
-        if (fill < 1.0f) FillSpine(spine, fill, 1.0f, kHpBarEmpty, 0.0f, 1.0f, 0.0f, 2);
-        if (lag > fill) FillSpine(spine, fill, lag, palette::kHpLoss, 0.0f, 1.0f, 0.0f, 2);
-        if (fill > 0.0f) {
-            FillSpine(spine, 0.0f, fill, color.Scaled(0.85f), 0.0f, 1.0f, 0.0f, 2);
-            FillSpine(spine, 0.0f, fill, color.Scaled(1.2f), 0.35f, 0.5f);
-        }
+        const Rect& bar = bars[static_cast<size_t>(i)];
+        // 縁取りで背景（ボスの体など）から浮かせて、ぱっと見で読めるようにする
+        draw::FillRect(bar.Expanded(1.5f), kHpBarEdge, 230);
+        draw::Bar(bar, HpBarFill(ratio, i, count), color, kHpBarEmpty, HpBarFill(delayed, i, count),
+                  palette::kHpLoss);
     }
 }
 
