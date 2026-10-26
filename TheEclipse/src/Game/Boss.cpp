@@ -764,7 +764,7 @@ void Boss::Draw(const Camera& camera) const
 //------------------------------------------------------------------------------
 // HP バー
 //   ボスの顔の右横に、小さなまっすぐのバーを 1 本ずつ離して重ねる（いちばん下のバーが顔の高さ）。
-//   名前はバーの左（頭の上）に、右端をバーの手前でそろえて出し、その上に赤いひし形の目印を置く。
+//   名前はバーの上に、バーの真ん中にそろえて小さめの文字で出し、その上に赤いひし形の目印を置く。
 //   上のバーから、右端から左へ減っていく。
 //------------------------------------------------------------------------------
 namespace {
@@ -773,8 +773,9 @@ constexpr float kHpBarHeight = 7.0f;       // バーの太さ
 constexpr float kHpBarGap = 7.0f;          // バー同士の間隔（縁取りを除いても 1 本ずつ離れて見えるように）
 constexpr float kHpBarStagger = 2.0f;      // 下のバーほど左へずらす量（段々に見せる）
 constexpr float kHpBarFaceGap = 12.0f;     // 顔の輪郭とバーの左端の間
-constexpr float kHpBarNameGap = 12.0f;     // 名前の右端とバーの左端の間
-constexpr float kHpBarHeadGap = 10.0f;     // 頭頂と名前の下端の間
+constexpr float kHpBarNameGap = 6.0f;      // いちばん上のバーと名前の下端の間
+constexpr float kHpBarNameMargin = 8.0f;   // 名前を画面の端から離す量
+constexpr FontSize kHpBarNameFont = FontSize::Tiny;   // 名前の文字（長い名前でもバーから大きくはみ出さない大きさ）
 constexpr float kMarkerWidth = 14.0f;      // 名前の上の目印（赤いひし形）
 constexpr float kMarkerHeight = 22.0f;
 constexpr float kMarkerGap = 4.0f;         // 目印と名前の間
@@ -866,11 +867,16 @@ bool Boss::HpBarLayout(const Camera& camera, std::vector<Rect>& bars, Vec2& name
         bars.push_back(Rect(x, y, x + kHpBarWidth, y + kHpBarHeight));
     }
 
-    // 名前は頭の上で、右端をバーの手前にそろえる（長い名前は顔の上を左へ伸びる）
-    const float nameW = static_cast<float>(draw::TextWidth(FontSize::Small, def_->name));
-    const float nameH = static_cast<float>(draw::TextHeight(FontSize::Small));
-    const float nameRight = math::MinF(face.x + nameW * 0.5f, left - kHpBarNameGap);
-    namePos = Vec2(nameRight - nameW * 0.5f, face.y - faceRadius - kHpBarHeadGap - nameH);
+    // 名前はいちばん上のバーの上で、バー全体の真ん中にそろえる（画面の端からははみ出さない）
+    const float barsLeft = bars.back().left;     // いちばん下のバーがいちばん左
+    const float barsRight = bars.front().right;  // いちばん上のバーがいちばん右
+    const float nameW = static_cast<float>(draw::TextWidth(kHpBarNameFont, def_->name));
+    const float nameH = static_cast<float>(draw::TextHeight(kHpBarNameFont));
+    const float halfW = nameW * 0.5f + kHpBarNameMargin;
+    const float centerX = (halfW * 2.0f < screenW)
+                        ? math::Clamp((barsLeft + barsRight) * 0.5f, halfW, screenW - halfW)
+                        : screenW * 0.5f;
+    namePos = Vec2(centerX, bars.front().top - 1.5f - kHpBarNameGap - nameH);
     return true;
 }
 
@@ -884,9 +890,9 @@ void Boss::DrawHpBars(const Camera& camera) const
 
     // 目印と名前（影つき。名前の真上に目印）
     DrawMarker(Vec2(namePos.x, namePos.y - kMarkerGap - kMarkerHeight * 0.5f));
-    draw::Text(FontSize::Small, namePos.x + 1.0f, namePos.y + 1.0f, palette::kBlack, def_->name,
+    draw::Text(kHpBarNameFont, namePos.x + 1.0f, namePos.y + 1.0f, palette::kBlack, def_->name,
                draw::TextAlign::Center);
-    draw::Text(FontSize::Small, namePos.x, namePos.y, def_->trim, def_->name, draw::TextAlign::Center);
+    draw::Text(kHpBarNameFont, namePos.x, namePos.y, def_->trim, def_->name, draw::TextAlign::Center);
 
     const float ratio = math::MinF(HpRatio(), reveal);
     const float delayed = math::MinF(hpDisplay_, reveal);
