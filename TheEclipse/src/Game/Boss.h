@@ -135,12 +135,13 @@ public:
         return state_ == BossState::Windup || state_ == BossState::Attack;
     }
 
-    // --- HP バー（雑魚敵と同じ見た目。頭の真上に本数ぶん重ね、その上に名前）-------
+    // --- HP バー（名前は頭の真上、バーは名前の右側＝頭の右上から下へ重ねる）---------
     int   HpBarCount() const { return hpBars_; }
     // HP の割合 ratio のとき、上から index 本目（0 始まり）のバーがどれだけ残っているか
     static float HpBarFill(float ratio, int index, int bars);
     // HP バーと名前の位置（画面座標。namePos は名前の中央上端）。
-    // 頭が画面外にあるときや撃破後は false（描かない）
+    //   bars は各バーのまっすぐな部分の矩形（右端の反り返りはその外へはみ出して描く）。
+    //   頭が画面外にあるときや撃破後は false（描かない）
     bool  HpBarLayout(const Camera& camera, std::vector<Rect>& bars, Vec2& namePos) const;
 
 private:
