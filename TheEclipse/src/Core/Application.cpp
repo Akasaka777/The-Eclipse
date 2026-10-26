@@ -6,8 +6,11 @@
 #include "Core/GameConfig.h"
 #include "Core/Input.h"
 #include "Core/ResourceManager.h"
+#include "Core/Version.h"
 #include "Graphics/DrawUtil.h"
 #include "Game/SaveData.h"
+
+#include <string>
 
 namespace ecl {
 
@@ -19,7 +22,9 @@ bool Application::Initialize()
     SetUseCharCodeFormat(DX_CHARCODEFORMAT_UTF8);
 #endif
     SetOutApplicationLogValidFlag(FALSE);
-    SetMainWindowText(config::kWindowTitle);
+    // ウィンドウのタイトルにバージョンを付ける（「The Eclipse Ver 0.6.0」）
+    const std::string windowTitle = std::string(config::kWindowTitle) + " " + version::kVersionLabel;
+    SetMainWindowText(windowTitle.c_str());
     ChangeWindowMode(TRUE);
     SetGraphMode(config::kScreenWidth, config::kScreenHeight, config::kColorDepth);
     // ウィンドウサイズを画面に合わせて縮小表示（1920x1080 の論理解像度は維持）

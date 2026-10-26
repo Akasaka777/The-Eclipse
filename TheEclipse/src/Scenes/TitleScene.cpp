@@ -6,6 +6,7 @@
 #include "Core/GameConfig.h"
 #include "Core/Input.h"
 #include "Core/SceneManager.h"
+#include "Core/Version.h"
 #include "Game/GameContext.h"
 #include "Game/SaveData.h"
 #include "Graphics/DrawUtil.h"
@@ -144,8 +145,11 @@ void TitleScene::Draw(GameContext& context)
     draw::Text(FontSize::Tiny, kScreenW * 0.5f, kScreenH - 60.0f, palette::kTextDim,
                "ENTER / クリックで開始   横スクロール 2D アクション RPG プロトタイプ",
                draw::TextAlign::Center);
+    // バージョン（右下）
+    draw::Text(FontSize::Small, kScreenW - 24.0f, kScreenH - 60.0f, palette::kTextDim,
+               version::kVersionLabel, draw::TextAlign::Right);
     draw::Text(FontSize::Tiny, kScreenW - 24.0f, kScreenH - 32.0f, palette::kTextDisabled,
-               "DxLib / C++17", draw::TextAlign::Right);
+               str::Format("%s 版   DxLib / C++17", version::kVersionDate), draw::TextAlign::Right);
 
     // 名前入力・武器種選択は最前面に重ねる
     namePanel_.Draw();

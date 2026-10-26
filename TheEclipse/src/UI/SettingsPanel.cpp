@@ -2,6 +2,7 @@
 
 #include "Common/StringUtil.h"
 #include "Core/GameConfig.h"
+#include "Core/Version.h"
 #include "Common/MathUtil.h"
 #include "Game/SaveData.h"
 #include "Graphics/DrawUtil.h"
@@ -316,6 +317,9 @@ void SettingsPanel::Draw(const GameContext& context) const
     keyConfigButton_.Draw();
 
     closeButton_.Draw();
+    // バージョン（左下）
+    draw::Text(FontSize::Tiny, columnLeft_, window_.bottom - 52.0f, palette::kTextDim,
+               str::Format("The Eclipse %s（%s）", version::kVersionLabel, version::kVersionDate));
 
     if (messageTimer_ > 0.0f) {
         draw::Text(FontSize::Tiny, columnLeft_, window_.top + 812.0f, palette::kAccent, message_);

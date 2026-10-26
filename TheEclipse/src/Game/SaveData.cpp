@@ -1,6 +1,7 @@
 #include "Game/SaveData.h"
 
 #include "Common/StringUtil.h"
+#include "Core/Version.h"
 #include "Game/Ability.h"
 #include "Game/Consumable.h"
 #include "Game/GameContext.h"
@@ -123,7 +124,7 @@ bool SaveSystem::Save(const GameContext& context)
     const PlayerData& player = context.player;
     const Inventory& inventory = player.GetInventory();
 
-    file << "# The Eclipse セーブデータ\n";
+    file << "# The Eclipse セーブデータ（" << version::kVersionLabel << " で保存）\n";
     file << "version " << kSaveVersion << "\n";
 
     // --- プレイヤー ---------------------------------------------------------

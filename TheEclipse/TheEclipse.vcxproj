@@ -263,6 +263,7 @@
     <ClInclude Include="src\Core\ResourceManager.h" />
     <ClInclude Include="src\Core\Scene.h" />
     <ClInclude Include="src\Core\SceneManager.h" />
+    <ClInclude Include="src\Core\Version.h" />
     <ClInclude Include="src\Game\Ability.h" />
     <ClInclude Include="src\Game\Actor.h" />
     <ClInclude Include="src\Game\ActorAssets.h" />

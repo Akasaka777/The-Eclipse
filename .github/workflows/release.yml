@@ -1,0 +1,137 @@
+# リリース：CHANGELOG.md に書かれたバージョンのうち、まだ Releases に無いものを
+# Windows でビルドし、zip を GitHub の Releases に載せる（過去のバージョンもさかのぼって載せる）。
+#
+#   新しい版を出すとき : Version.h の番号と CHANGELOG.md の見出し「## v0.7.0（日付）」を
+#                        そろえて push する（README の「7. バージョン」を参照）
+#   公開済みの版       : 何もしない（作り直したいときは、その Release とタグを消してから再実行）
+#
+# DXライブラリはリポジトリに含めないため、ビルドのたびに公式サイトから取得する。
+# 取得できないときは、リポジトリの変数（Settings → Secrets and variables → Actions → Variables）
+# DXLIB_URL に VC 用パッケージの zip の URL を設定する。
+name: リリース
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'CHANGELOG.md'
+      - 'TheEclipse/src/Core/Version.h'
+      - '.github/workflows/release.yml'
+      - '.github/scripts/release.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 同じ版を 2 回作らないよう、リリースは 1 つずつ走らせる
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: 公開するバージョンを調べる
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # 版ごとのコミットを探すので履歴をすべて取る
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/release.py plan >> "$GITHUB_OUTPUT"
+
+  build:
+    name: v${{ matrix.version }} をビルド
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: windows-2022   # Visual Studio 2022（v143）
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - name: スクリプトを取得
+        uses: actions/checkout@v5
+        with:
+          path: tools
+          sparse-checkout: .github/scripts
+      - name: v${{ matrix.version }} のソースを取得
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ matrix.commit }}
+          path: game
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: DXライブラリの場所を調べる
+        id: dxlib
+        env:
+          DXLIB_URL: ${{ vars.DXLIB_URL }}
+        run: python tools/.github/scripts/release.py dxlib-url >> $env:GITHUB_OUTPUT
+      - name: DXライブラリのキャッシュ
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: dxlib
+          key: dxlib-${{ steps.dxlib.outputs.url }}
+      - name: DXライブラリを取得
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: python tools/.github/scripts/release.py dxlib dxlib --url "${{ steps.dxlib.outputs.url }}"
+      - name: DXライブラリを配置
+        shell: pwsh
+        run: |
+          # DxLib.props はリポジトリ直下の external\DxLib を見る。
+          # ライブラリの置き場所（直下 / x64\）が版によって違っても通るよう、両方に置く
+          New-Item -ItemType Directory -Force game/external/DxLib/x64 | Out-Null
+          Get-ChildItem dxlib -File | Copy-Item -Destination game/external/DxLib
+          Get-ChildItem dxlib -File -Filter *.lib | Copy-Item -Destination game/external/DxLib/x64
+
+      - name: ビルド（Release / x64）
+        working-directory: game
+        run: msbuild TheEclipse.sln -m -nologo -v:minimal -p:Configuration=Release -p:Platform=x64
+
+      - name: zip にまとめる
+        run: >
+          python tools/.github/scripts/release.py package
+          --version ${{ matrix.version }} --date ${{ matrix.date }} --commit ${{ matrix.commit }}
+          --game game --bin game/bin/x64/Release --licenses dxlib/licenses
+          --out dist/TheEclipse-v${{ matrix.version }}-win64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v${{ matrix.version }}
+          path: dist/TheEclipse-v${{ matrix.version }}-win64.zip
+          if-no-files-found: error
+
+  publish:
+    name: v${{ matrix.version }} を公開
+    needs: [plan, build]
+    # ビルドに失敗した版があっても、ほかの版は公開する
+    if: ${{ !cancelled() && needs.plan.outputs.count != '0' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1   # 古い版から順に作る
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: v${{ matrix.version }}
+          path: dist
+      - name: Releases に載せる
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 .github/scripts/release.py notes "${{ matrix.version }}" --commit "${{ matrix.commit }}" > notes.md
+          gh release create "${{ matrix.tag }}" "dist/TheEclipse-v${{ matrix.version }}-win64.zip" \
+            --target "${{ matrix.commit }}" \
+            --title "The Eclipse v${{ matrix.version }}（${{ matrix.date }}）" \
+            --notes-file notes.md \
+            --latest=${{ matrix.latest }}
