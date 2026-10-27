@@ -14,6 +14,7 @@
 #include "Game/Stage.h"
 #include "UI/BattleHud.h"
 #include "UI/BattleMenu.h"
+#include "UI/UIWidgets.h"
 
 #include <memory>
 #include <vector>
@@ -86,6 +87,15 @@ private:
     // --- デバッグモード -------------------------------------------------------
     void UpdateDebug(const Input& input, GameContext& context);
     void DrawDebugOverlay(const GameContext& context) const;
+    // フロア移動のボタン（◀ / 1F〜 / ボス / ▶）を情報パネルの中に並べる（フロア数はクエストで変わる）
+    void LayoutDebugFloorButtons();
+    void UpdateDebugFloorButtons(const Input& input, float dt);
+    // いまフロアを移動できるか（暗転中・撃破後・戦闘不能のあとは移動しない）
+    bool DebugFloorMoveAllowed() const;
+    // 暗転してから index のフロアを読み込む
+    void DebugMoveToFloor(int index);
+    // 「2F」「ボスフロア」などの呼び名
+    std::string DebugFloorName(int index) const;
 
     const QuestDef* quest_ = nullptr;
     Stage  stage_;
@@ -108,6 +118,7 @@ private:
     bool  transitioning_ = false;
     float transitionAlpha_ = 0.0f;
     int   pendingFloor_ = 0;
+    std::string transitionText_;   // 暗転中に出す文字
 
     // ボスの登場演出
     float bossIntroTimer_ = 0.0f;
@@ -144,6 +155,11 @@ private:
     bool  debugShowHitBoxes_ = false;
     std::string debugMessage_;
     float debugMessageTimer_ = 0.0f;
+    // フロア移動のボタン
+    ui::Button debugPrevFloorButton_;
+    ui::Button debugNextFloorButton_;
+    std::vector<ui::Button> debugFloorButtons_;
+    bool  debugClickConsumed_ = false;   // ボタンを押したフレームは、同じクリックで攻撃しない
 };
 
 } // namespace ecl

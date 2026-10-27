@@ -51,6 +51,24 @@ constexpr float kBossIntroEnd = 5.4f;
 constexpr float kBossIntroSkipAfter = 0.4f; // これより前の入力は飛ばしに使わない
 constexpr float kLetterboxHeight = 120.0f;
 
+//------------------------------------------------------------------------------
+// デバッグモードの情報パネル（左上の HUD の下）。下の段にフロア移動のボタンを並べる
+//------------------------------------------------------------------------------
+constexpr float kDebugPanelX = 28.0f;
+constexpr float kDebugPanelY = 254.0f;
+constexpr float kDebugPanelW = 420.0f;
+constexpr float kDebugPanelH = 230.0f;
+constexpr float kDebugFloorTextY = 158.0f;   // パネル上端から「フロア移動」の見出しまで
+constexpr float kDebugFloorRowY = 182.0f;    // パネル上端からボタンの段まで
+constexpr float kDebugFloorButtonH = 34.0f;
+constexpr float kDebugArrowW = 44.0f;        // ◀ / ▶ の幅
+constexpr float kDebugButtonGap = 6.0f;
+
+Rect DebugPanelRect()
+{
+    return Rect::FromXYWH(kDebugPanelX, kDebugPanelY, kDebugPanelW, kDebugPanelH);
+}
+
 float EaseInOut(float t)
 {
     t = math::Clamp(t, 0.0f, 1.0f);
@@ -65,6 +83,7 @@ void QuestScene::OnEnter(GameContext& context)
 {
     quest_ = QuestDatabase::Instance().Find(context.selectedQuestId);
     if (!quest_) quest_ = QuestDatabase::Instance().Find(1);
+    LayoutDebugFloorButtons();
 
     player_.Setup(context.player);
     player_.FullHeal();
@@ -89,6 +108,8 @@ void QuestScene::OnEnter(GameContext& context)
     hitStop_ = 0.0f;
     transitioning_ = false;
     transitionAlpha_ = 0.0f;
+    transitionText_.clear();
+    debugClickConsumed_ = false;
     bossRewardGranted_ = false;
 
     camera_.SetShakeEnabled(context.settings.screenShake);
@@ -382,6 +403,7 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
     }
 
     UpdateDebug(input, context);
+    if (context.settings.debugMode) UpdateDebugFloorButtons(input, dt);
     debugMessageTimer_ = math::MaxF(0.0f, debugMessageTimer_ - dt);
 
     phaseTimer_ += dt;
@@ -446,6 +468,7 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
             transitioning_ = true;
             transitionAlpha_ = 0.0f;
             pendingFloor_ = floorIndex_ + 1;
+            transitionText_ = "次のフロアへ...";
         }
         break;
 
@@ -500,6 +523,7 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
 
 void QuestScene::UpdateDebug(const Input& input, GameContext& context)
 {
+    debugClickConsumed_ = false;
     if (!context.settings.debugMode) {
         debugInvincible_ = false;
         debugShowHitBoxes_ = false;
@@ -561,6 +585,100 @@ void QuestScene::UpdateDebug(const Input& input, GameContext& context)
     }
 }
 
+void QuestScene::LayoutDebugFloorButtons()
+{
+    debugFloorButtons_.clear();
+    const int count = quest_ ? quest_->FloorCount() : 1;
+    const Rect panel = DebugPanelRect();
+    const float left = panel.left + 12.0f;
+    const float width = panel.Width() - 24.0f;
+    const float y = panel.top + kDebugFloorRowY;
+    // ◀ と ▶ の間に、フロアの数だけ同じ幅で並べる
+    const float floorW = (width - kDebugArrowW * 2.0f - kDebugButtonGap * static_cast<float>(count + 1))
+                       / static_cast<float>(math::MaxI(1, count));
+
+    debugPrevFloorButton_ = ui::Button(Rect::FromXYWH(left, y, kDebugArrowW, kDebugFloorButtonH), "◀",
+                                       FontSize::Small);
+    float x = left + kDebugArrowW + kDebugButtonGap;
+    for (int i = 0; i < count; ++i) {
+        const bool bossFloor = quest_ && quest_->floors[static_cast<size_t>(i)].bossId >= 0;
+        debugFloorButtons_.push_back(ui::Button(Rect::FromXYWH(x, y, floorW, kDebugFloorButtonH),
+                                                bossFloor ? std::string("ボス") : str::Format("%dF", i + 1),
+                                                FontSize::Tiny));
+        x += floorW + kDebugButtonGap;
+    }
+    debugNextFloorButton_ = ui::Button(Rect::FromXYWH(x, y, kDebugArrowW, kDebugFloorButtonH), "▶",
+                                       FontSize::Small);
+
+    debugPrevFloorButton_.SetAccent(palette::kAccentWarm);
+    debugNextFloorButton_.SetAccent(palette::kAccentWarm);
+    for (ui::Button& button : debugFloorButtons_) button.SetAccent(palette::kAccentWarm);
+}
+
+void QuestScene::UpdateDebugFloorButtons(const Input& input, float dt)
+{
+    if (!quest_) return;
+    const int count = quest_->FloorCount();
+    const bool allowed = DebugFloorMoveAllowed();
+
+    int target = -1;
+    debugPrevFloorButton_.SetEnabled(allowed && floorIndex_ > 0);
+    debugNextFloorButton_.SetEnabled(allowed && floorIndex_ < count - 1);
+    if (debugPrevFloorButton_.Update(input, dt)) target = floorIndex_ - 1;
+    if (debugNextFloorButton_.Update(input, dt)) target = floorIndex_ + 1;
+    for (int i = 0; i < static_cast<int>(debugFloorButtons_.size()); ++i) {
+        ui::Button& button = debugFloorButtons_[static_cast<size_t>(i)];
+        // いまいるフロアは印を付けて、押せないようにする
+        button.SetSelected(i == floorIndex_);
+        button.SetEnabled(allowed && i != floorIndex_);
+        if (button.Update(input, dt)) target = i;
+    }
+
+    // ボタンの段をクリックしたフレームは、同じクリックで攻撃しない（押せないボタンの上でも）
+    if (input.MouseClicked(MouseButton::Left)) {
+        const Rect row(debugPrevFloorButton_.GetRect().left, debugPrevFloorButton_.GetRect().top,
+                       debugNextFloorButton_.GetRect().right, debugNextFloorButton_.GetRect().bottom);
+        if (row.Expanded(4.0f).Contains(static_cast<float>(input.MouseX()), static_cast<float>(input.MouseY()))) {
+            debugClickConsumed_ = true;
+        }
+    }
+
+    if (target >= 0) DebugMoveToFloor(target);
+}
+
+bool QuestScene::DebugFloorMoveAllowed() const
+{
+    if (!quest_ || transitioning_) return false;
+    // ボスを倒したあと（リザルトへ向かう間）と戦闘不能のあとは動かさない
+    return phase_ == Phase::FloorIntro || phase_ == Phase::BossIntro || phase_ == Phase::Battle
+        || phase_ == Phase::FloorClear;
+}
+
+void QuestScene::DebugMoveToFloor(int index)
+{
+    if (!DebugFloorMoveAllowed()) return;
+    if (index < 0 || index >= quest_->FloorCount() || index == floorIndex_) return;
+
+    // ゲートを通ったときと同じく、暗転してからフロアを読み込む（敵は出し直し、HP / MP はそのまま）
+    transitioning_ = true;
+    transitionAlpha_ = 0.0f;
+    pendingFloor_ = index;
+    transitionText_ = DebugFloorName(index) + " へ移動...";
+    bannerTimer_ = 0.0f;
+    debugMessage_ = str::Format("%s「%s」へ移動しました", DebugFloorName(index).c_str(),
+                                quest_->floors[static_cast<size_t>(index)].name.c_str());
+    debugMessageTimer_ = 2.5f;
+}
+
+std::string QuestScene::DebugFloorName(int index) const
+{
+    if (quest_ && index >= 0 && index < quest_->FloorCount()
+        && quest_->floors[static_cast<size_t>(index)].bossId >= 0) {
+        return "ボスフロア";
+    }
+    return str::Format("%dF", index + 1);
+}
+
 void QuestScene::DrawDebugOverlay(const GameContext& context) const
 {
     if (!context.settings.debugMode) return;
@@ -581,7 +699,7 @@ void QuestScene::DrawDebugOverlay(const GameContext& context) const
     }
 
     // --- 情報パネル ---------------------------------------------------------
-    const Rect panel = Rect::FromXYWH(28.0f, 254.0f, 420.0f, 196.0f);
+    const Rect panel = DebugPanelRect();
     draw::FillRect(panel, palette::kBlack, 170);
     draw::StrokeRect(panel, palette::kAccentWarm, 1.0f, 200);
     draw::Text(FontSize::Small, panel.left + 12.0f, panel.top + 8.0f, palette::kAccentWarm,
@@ -607,6 +725,17 @@ void QuestScene::DrawDebugOverlay(const GameContext& context) const
     draw::Text(FontSize::Tiny, panel.left + 12.0f, y, palette::kTextDim,
                "F4 判定表示 / F5 col・SP / F6 ユニーク解放");
 
+    // --- フロア移動 ---------------------------------------------------------
+    draw::Line(panel.left + 12.0f, panel.top + kDebugFloorTextY - 6.0f, panel.right - 12.0f,
+               panel.top + kDebugFloorTextY - 6.0f, palette::kAccentWarm, 1.0f, 90);
+    const int floorCount = quest_ ? quest_->FloorCount() : 1;
+    draw::Text(FontSize::Tiny, panel.left + 12.0f, panel.top + kDebugFloorTextY, palette::kText,
+               str::Format("フロア移動（いま %s / 全 %d フロア）", DebugFloorName(floorIndex_).c_str(),
+                           floorCount));
+    debugPrevFloorButton_.Draw();
+    for (const ui::Button& button : debugFloorButtons_) button.Draw();
+    debugNextFloorButton_.Draw();
+
     if (debugMessageTimer_ > 0.0f) {
         draw::Text(FontSize::Small, panel.left + 12.0f, panel.bottom + 8.0f, palette::kAccentWarm,
                    debugMessage_);
@@ -619,9 +748,9 @@ void QuestScene::UpdateActors(float dt, GameContext& context)
     const bool controlEnabled = (phase_ == Phase::Battle || phase_ == Phase::FloorClear
                                  || phase_ == Phase::FloorIntro);
 
-    // アイテムカードをクリックしたフレームは、同じクリックで攻撃を出さない
+    // アイテムカード・デバッグのボタンをクリックしたフレームは、同じクリックで攻撃を出さない
     player_.Update(dt, stage_, combat_, input,
-                   controlEnabled && !menu_.IsOpen() && !hud_.ItemClickConsumed());
+                   controlEnabled && !menu_.IsOpen() && !hud_.ItemClickConsumed() && !debugClickConsumed_);
 
     for (std::unique_ptr<Enemy>& enemy : enemies_) {
         enemy->Update(dt, stage_, combat_, player_.pos, player_.alive, player_.z);
@@ -1064,8 +1193,8 @@ void QuestScene::Draw(GameContext& context)
         draw::FillRect(Rect(0.0f, 0.0f, kScreenW, kScreenH), palette::kBlack,
                        static_cast<int>(transitionAlpha_ * 255.0f));
         draw::TextAlpha(FontSize::Medium, kScreenW * 0.5f, kScreenH * 0.5f, palette::kText,
-                        "次のフロアへ...", static_cast<int>(transitionAlpha_ * 255.0f),
-                        draw::TextAlign::Center);
+                        transitionText_.empty() ? std::string("次のフロアへ...") : transitionText_,
+                        static_cast<int>(transitionAlpha_ * 255.0f), draw::TextAlign::Center);
     }
 }
 
