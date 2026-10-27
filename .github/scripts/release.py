@@ -120,8 +120,10 @@ def resolve_commit(entry):
             commit = bump if later_is_bump else heading
     in_source = version_in_commit(commit)
     if in_source is not None:
-        expected = (version, entry["date"], f"Ver {version}")
-        if in_source != expected:
+        expected = (version, entry["date"], f"Ver. {version}")
+        # v0.6.0 までは「Ver 0.6.0」（ピリオド無し）の表記だった
+        legacy = (version, entry["date"], f"Ver {version}")
+        if in_source not in (expected, legacy):
             fail(f"v{version} : コミット {commit[:7]} の Version.h（番号 {in_source[0]} / 日付 {in_source[1]} / "
                  f"表記 {in_source[2]}）が CHANGELOG.md（{expected[0]} / {expected[1]} / {expected[2]}）と合いません")
     return commit

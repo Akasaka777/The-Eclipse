@@ -22,7 +22,7 @@ bool Application::Initialize()
     SetUseCharCodeFormat(DX_CHARCODEFORMAT_UTF8);
 #endif
     SetOutApplicationLogValidFlag(FALSE);
-    // ウィンドウのタイトルにバージョンを付ける（「The Eclipse Ver 0.6.0」）
+    // ウィンドウのタイトルにバージョンを付ける（「The Eclipse Ver. 0.7.0」）
     const std::string windowTitle = std::string(config::kWindowTitle) + " " + version::kVersionLabel;
     SetMainWindowText(windowTitle.c_str());
     ChangeWindowMode(TRUE);
