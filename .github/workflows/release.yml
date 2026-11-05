@@ -5,9 +5,12 @@
 #                        そろえて push する（README の「7. バージョン」を参照）
 #   公開済みの版       : 何もしない（作り直したいときは、その Release とタグを消してから再実行）
 #
-# DXライブラリはリポジトリに含めないため、ビルドのたびに公式サイトから取得する。
-# 取得できないときは、リポジトリの変数（Settings → Secrets and variables → Actions → Variables）
-# DXLIB_URL に VC 用パッケージの zip の URL を設定する。
+# DXライブラリはリポジトリに含めないため、公式サイトで最新の VC 用パッケージを調べ、
+# 取得したものはキャッシュに保存して次からはそれを使う。
+# 公式サイトにつながらないとき（時間切れなど）は、前回保存したキャッシュでビルドを続ける
+# （キャッシュも無いときだけ止まる）。
+# 公式サイトのページから URL を見つけられないときは、リポジトリの変数
+# （Settings → Secrets and variables → Actions → Variables）DXLIB_URL に zip の URL を設定する。
 name: リリース
 
 on:
@@ -69,6 +72,7 @@ jobs:
           python-version: '3.12'
       - uses: microsoft/setup-msbuild@v2
 
+      # 公式サイトにつながらないときは url が空になる（下で前回のキャッシュを使う）
       - name: DXライブラリの場所を調べる
         id: dxlib
         env:
@@ -76,12 +80,22 @@ jobs:
         run: python tools/.github/scripts/release.py dxlib-url >> $env:GITHUB_OUTPUT
       - name: DXライブラリのキャッシュ
         id: cache
+        if: steps.dxlib.outputs.url != ''
         uses: actions/cache@v4
         with:
           path: dxlib
           key: dxlib-${{ steps.dxlib.outputs.url }}
+      - name: 公式サイトにつながらないときは前回のキャッシュを使う
+        if: steps.dxlib.outputs.url == ''
+        uses: actions/cache/restore@v4
+        with:
+          path: dxlib
+          # この名前のキャッシュは無いので、restore-keys で最後に保存した DXライブラリが選ばれる
+          key: dxlib-offline-${{ github.run_id }}
+          restore-keys: dxlib-http
+          fail-on-cache-miss: true
       - name: DXライブラリを取得
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.dxlib.outputs.url != '' && steps.cache.outputs.cache-hit != 'true'
         run: python tools/.github/scripts/release.py dxlib dxlib --url "${{ steps.dxlib.outputs.url }}"
       - name: DXライブラリを配置
         shell: pwsh

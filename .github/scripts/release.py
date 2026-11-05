@@ -4,6 +4,7 @@
 
   plan     CHANGELOG.md に書かれたバージョンのうち、まだ Releases に無いものを JSON で出す
   notes    CHANGELOG.md から 1 つのバージョンの変更点を取り出し、リリースノートにする
+  dxlib-url  DXライブラリ（VC 用パッケージ）の URL を公式サイトで調べる（つながらなければ空にする）
   dxlib    DXライブラリ（VC 用パッケージ）をダウンロードして展開する
   package  ビルドした exe と assets を配布用の zip にまとめる
 
@@ -22,6 +23,8 @@ import re
 import shutil
 import subprocess
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
@@ -199,14 +202,35 @@ def cmd_notes(args):
 # --- DXライブラリ ------------------------------------------------------------------
 
 DXLIB_PAGE = "https://dxlib.xsrv.jp/dxdload.html"
+DXLIB_PAGE_TRIES = 3          # 公式サイトを読みに行く回数
+DXLIB_PAGE_TIMEOUT = 30       # 1 回あたりの待ち時間（秒）
+DXLIB_PAGE_RETRY_WAIT = 10    # 読み直すまでの間（秒）
+
+
+class DxlibPageUnreachable(Exception):
+    """公式サイトにつながらない（時間切れ・接続できない・サーバーのエラー）"""
+
+
+def read_dxlib_page():
+    """公式サイトのダウンロードのページを読む。何度か読み直してもだめなら DxlibPageUnreachable"""
+    last_error = None
+    for attempt in range(1, DXLIB_PAGE_TRIES + 1):
+        try:
+            with urllib.request.urlopen(DXLIB_PAGE, timeout=DXLIB_PAGE_TIMEOUT) as response:
+                return response.read()
+        except (urllib.error.URLError, TimeoutError, OSError) as error:   # HTTPError も URLError の仲間
+            last_error = error
+            print(f"{DXLIB_PAGE} を読めません（{attempt}/{DXLIB_PAGE_TRIES} 回目）: {error}", file=sys.stderr)
+            if attempt < DXLIB_PAGE_TRIES:
+                time.sleep(DXLIB_PAGE_RETRY_WAIT)
+    raise DxlibPageUnreachable(str(last_error))
 
 
 def dxlib_url():
     url = os.environ.get("DXLIB_URL", "").strip()
     if url:
         return url
-    with urllib.request.urlopen(DXLIB_PAGE, timeout=60) as response:
-        raw = response.read()
+    raw = read_dxlib_page()
     for encoding in ("utf-8", "cp932"):
         try:
             html = raw.decode(encoding)
@@ -223,12 +247,23 @@ def dxlib_url():
 
 
 def cmd_dxlib_url(args):
-    print(f"url={dxlib_url()}")
+    """url=<VC 用パッケージの URL> を出す。
+    公式サイトにつながらないときは止めずに url= （空）を出す。ワークフローは前回のキャッシュを使う"""
+    try:
+        url = dxlib_url()
+    except DxlibPageUnreachable as error:
+        print(f"::warning::DXライブラリの公式サイト（{DXLIB_PAGE}）につながらないため、"
+              f"前回のキャッシュを使います（{error}）", file=sys.stderr)
+        url = ""
+    print(f"url={url}")
 
 
 def cmd_dxlib(args):
     """VC 用パッケージを展開し、DxLib.h のあるフォルダを dest にコピーする"""
-    url = args.url or dxlib_url()
+    try:
+        url = args.url or dxlib_url()
+    except DxlibPageUnreachable as error:
+        fail(f"DXライブラリの公式サイト（{DXLIB_PAGE}）につながりません（{error}）")
     os.makedirs(args.dest, exist_ok=True)
     print(f"DXライブラリ : {url}", file=sys.stderr)
     request = urllib.request.Request(url, headers={"User-Agent": "TheEclipse-release"})

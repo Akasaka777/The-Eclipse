@@ -927,9 +927,14 @@ push すると GitHub Actions の「リリース」（`.github/workflows/release
   見出しを「## v0.8.0（日付）」に書き換え、Version.h の番号を上げて push します。
 - 公開済みの版は作り直しません。作り直したいときは、その Release とタグを GitHub で消してから、
   「Actions」→「リリース」→「Run workflow」で再実行してください（既定のブランチにあるときに使えます）。
-- DXライブラリはリポジトリに含めず、ビルドのたびに公式サイト（https://dxlib.xsrv.jp/）から
-  VC 用パッケージを取得します。取得できないときは、リポジトリの
-  Settings → Secrets and variables → Actions → Variables に `DXLIB_URL`（zip の URL）を設定してください。
+- DXライブラリはリポジトリに含めず、公式サイト（https://dxlib.xsrv.jp/）で最新の VC 用パッケージを調べて
+  取得します。取得したものは GitHub Actions のキャッシュに保存し、次からはそれを使います。
+  - **公式サイトにつながらないとき**（時間切れなど）は 3 回まで読み直し、それでもだめなら
+    **前回保存したキャッシュでビルドを続けます**（「Actions」の実行結果に警告が出ます）。
+    キャッシュも無いときだけ止まります。キャッシュは 7 日間使われないと GitHub に消され、
+    作ったブランチ（と既定のブランチ）の実行からしか使えません。
+  - 公式サイトのページから zip のリンクを見つけられないときは、リポジトリの
+    Settings → Secrets and variables → Actions → Variables に `DXLIB_URL`（zip の URL）を設定してください。
 - 配布する zip には `README.txt`（遊び方・セーブデータの場所）を同梱します。DXライブラリのパッケージに
   使用条件などの文書があれば `licenses` フォルダに入れます。**一般に公開する前に、DXライブラリの
   使用条件（内部で使われているライブラリの著作権表示）を確認してください。**
