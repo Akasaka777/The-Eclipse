@@ -764,6 +764,7 @@ The-Eclipse/
 ├── TheEclipse.sln
 ├── CHANGELOG.md                 更新履歴（バージョンごとの変更点）
 ├── CLAUDE.md                    Claude Code 向けの決まりごと（バージョンの命名規定と公開の手順）
+├── HANDOFF.md                   作業の引き継ぎメモ（完了したこと・決めたこと・未解決の問題・次にやること）
 ├── .github/
 │   ├── workflows/release.yml    バージョンを Releases に載せる（GitHub Actions）
 │   └── scripts/release.py       その補助（版の判定・DXライブラリの取得・zip 作成）
