@@ -56,8 +56,6 @@ constexpr float kGuardBadgeMaxLeft = 414.0f;   // 名前が 12 文字（いち�
 constexpr float kHitFlashTime = 0.35f;    // 被弾の光が消えるまで
 constexpr float kHealFlashTime = 0.6f;    // 回復の光が消えるまで
 constexpr float kCriticalHpRatio = 0.25f; // これ以下で瀕死の赤い明滅
-constexpr float kShimmerPeriod = 3.6f;    // バーの上を光が流れる間隔
-constexpr float kShimmerSweep = 1.1f;     // 光が端から端まで流れる時間
 
 const ColorRGB kPlateColor(10, 14, 24);
 
@@ -140,7 +138,6 @@ struct GaugeLook
     float       healFrom = -1.0f;     // 回復した分（healFrom〜ratio）を光らせる
     float       healFlash = 0.0f;     // 1 → 0
     float       hitFlash = 0.0f;      // 1 → 0（被弾で縁と中身が白く光る）
-    float       shimmer = -1.0f;      // 流れる光の位置 0..1（負なら流さない）
     float       danger = 0.0f;        // 瀕死の赤い明滅 0..1
     int         ticks = 10;           // 目盛りで区切る数
     const char* label = "";
@@ -183,19 +180,6 @@ void DrawGauge(const Rect& bar, const GaugeLook& look)
         // 回復した分を光らせる
         if (look.healFlash > 0.0f && look.healFrom >= 0.0f && look.healFrom < ratio) {
             AddRect(span(look.healFrom, ratio), ColorRGB(190, 255, 210), static_cast<int>(look.healFlash * 110.0f));
-        }
-
-        // 左から右へ流れる光（山なりに 6 段）
-        if (look.shimmer >= 0.0f) {
-            constexpr float kWidth = 64.0f;
-            const float center = fill.left - kWidth + (fill.Width() + kWidth * 2.0f) * look.shimmer;
-            for (int i = 0; i < 6; ++i) {
-                const float x0 = center - kWidth * 0.5f + kWidth * static_cast<float>(i) / 6.0f;
-                const float x1 = x0 + kWidth / 6.0f;
-                const float peak = 1.0f - std::fabs((static_cast<float>(i) + 0.5f) / 3.0f - 1.0f);
-                const Rect band(math::MaxF(x0, fill.left), fill.top, math::MinF(x1, fill.right), fill.bottom);
-                AddRect(band, palette::kWhite, static_cast<int>(peak * 46.0f));
-            }
         }
 
         // 先端の光（満タンでないとき）
@@ -432,8 +416,6 @@ void BattleHud::DrawPlayerStatus(const Player& player, const PlayerData& data) c
     hp.healFrom = healFrom_;
     hp.healFlash = healFlash_;
     hp.hitFlash = hitFlash_;
-    const float hpSweep = std::fmod(time_, kShimmerPeriod) / kShimmerSweep;
-    hp.shimmer = (!dead && hpSweep <= 1.0f) ? hpSweep : -1.0f;
     hp.danger = critical ? 0.35f + 0.65f * pulse : 0.0f;
     hp.ticks = 10;
     hp.label = "HP";
@@ -443,8 +425,6 @@ void BattleHud::DrawPlayerStatus(const Player& player, const PlayerData& data) c
     GaugeLook mp;
     mp.color = palette::kMp;
     mp.ratio = player.MpRatio();
-    const float mpSweep = std::fmod(time_ + kShimmerPeriod * 0.5f, kShimmerPeriod) / kShimmerSweep;
-    mp.shimmer = (!dead && mpSweep <= 1.0f) ? mpSweep : -1.0f;
     mp.ticks = 4;
     mp.label = "MP";
     DrawGauge(layout.mpBar, mp);
