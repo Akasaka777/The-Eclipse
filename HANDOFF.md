@@ -7,6 +7,7 @@
 - リポジトリ：`Akasaka777/The-Eclipse`（https://github.com/Akasaka777/The-Eclipse）
 - 作業ブランチ：`claude/cool-clarke-2e2wss`（`main` は「Initial commit」だけで、作業はすべてこのブランチ）
 - 公開済みの最新版：v0.7.0（コミット `bdfe659`）。このファイルは v0.7.1 として push（下の「0.」を参照）
+- 2026-11-05 追記：v0.7.1 の公開を確認。続けて「左上のプレイヤーステータスのグラフィック向上」を v0.8.0 として push（下の「2.」の表）
 
 ---
 
@@ -63,6 +64,7 @@ DxLib / C++17 / Visual Studio 2022 / 1920x1080 の横スクロール 2D アク�
 | `0aec2fc`（v0.6.0） | ゲームのバージョンを追加・過去のバージョンを GitHub からダウンロード可能に | `Version.h`・`CHANGELOG.md`・リリース用ワークフロー。v0.1.0〜v0.6.0 を公開 |
 | `770272a` | クエストのデバッグモードにフロア移動ボタン | ◀ / 1F〜 / ボス / ▶ |
 | `bdfe659`（v0.7.0） | 今後は命名規定に従って GitHub に投稿 | 規定を README・Version.h・CLAUDE.md に記載。表記を `Ver. X.Y.Z` に。v0.7.0 を公開 |
+| v0.8.0 | 画面左上のプレイヤーステータス（アイコン・HP・MP）のグラフィックを向上 | `UI/BattleHud.*` の `DrawPlayerStatus` / `DrawPortrait` を作り直し（丸いメダル・レベルの札・薄れる板・目盛りとつやのあるバー・被弾 / 回復の光・瀕死の赤い脈動）。配置は `BattleHud::StatusLayout()`、定数は `BattleHud.cpp` 冒頭 |
 
 過去の版とコミットの対応（`CHANGELOG.md` に書いてある）：
 v0.1.0=`27072c7`、v0.2.0=`fcc879d`、v0.3.0=`9c6c725`、v0.4.0=`dd109be`、v0.5.0=`d81fcf4`、
@@ -226,6 +228,8 @@ v0.6.0=`0aec2fc`、v0.7.0=`bdfe659`。v0.5.0 以前はバージョンの仕組�
   `MoveMouse`、`HasText` / `FindText`、`CHECK` マクロ、`Finish`。
 - テスト（最終結果はすべて fail=0）：boss_intro 205、boss_phase 2499、debug_floor 169、dual_wield 108、keyconfig 700、
   result_announce 50、shop_qty 68、smoke 61、version 20。
+- 2026-11-05 のセッションで dxstub・build_lib.sh・harness.h を作り直し、status_hud（88 件、fail=0）と
+  shots_status（左上の撮影）を足した。これらもリポジトリには入っていない。
 - `tests/shots.cpp` ＋ FreeType（IPAGothic）：スクリーンショット。
 - `regen_vcxproj.py`：`src` 以下の .cpp / .h から vcxproj と .filters の一覧を作り直す（ファイルを足したら必要）。
 
