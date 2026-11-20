@@ -318,6 +318,12 @@ void ResultScene::DrawRewards(const GameContext& context) const
                str::Comma(result.expGained), draw::TextAlign::Right);
     y += 42.0f;
 
+    // LUK で増えたときは、獲得 EXP の下に倍率を出す
+    if (result.expRate > 1.0001f) {
+        draw::Text(FontSize::Tiny, panel.right - 32.0f, y + 2.0f, palette::kTextDim,
+                   str::Format("LUK 補正 ×%.2f 込み", result.expRate), draw::TextAlign::Right);
+    }
+
     draw::Text(FontSize::Small, panel.left + 32.0f, y, palette::kTextDim,
                str::Format("強化結晶  +%d", result.materialGained));
     if (result.skillPointsGained > 0) {

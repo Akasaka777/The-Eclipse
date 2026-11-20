@@ -31,7 +31,8 @@ struct QuestResult
     int         parryCount = 0;
     int         totalDamage = 0;
     int         damageTaken = 0;
-    int         expGained = 0;
+    int         expGained = 0;      // LUK の倍率を掛けたあとの値
+    float       expRate = 1.0f;     // 獲得経験値に掛けた倍率（LUK）
     int         colGained = 0;
     int         materialGained = 0;
     int         levelsGained = 0;

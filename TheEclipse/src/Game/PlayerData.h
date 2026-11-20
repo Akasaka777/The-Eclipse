@@ -51,6 +51,8 @@ public:
     void AddAbilityPoints(int amount);
     // ドロップ率の倍率（LUK で上がる）
     float DropRateMultiplier() const { return AbilityDropRate(abilities_); }
+    // 獲得経験値の倍率（LUK で上がる）
+    float ExpRateMultiplier() const { return AbilityExpRate(abilities_); }
 
     Inventory&       GetInventory() { return inventory_; }
     const Inventory& GetInventory() const { return inventory_; }

@@ -10,6 +10,29 @@ const float kHalfW = static_cast<float>(config::kScreenWidth) * 0.5f;
 const float kHalfH = static_cast<float>(config::kScreenHeight) * 0.5f;
 } // namespace
 
+float EaseIntoRange(float value, float lo, float hi, float ease)
+{
+    if (hi < lo) {
+        const float tmp = lo;
+        lo = hi;
+        hi = tmp;
+    }
+    // ワールドが狭いときは左右の寄せる範囲が重ならないよう、半分までに縮める
+    const float w = math::MinF(ease, (hi - lo) * 0.5f);
+    if (w <= 0.0f) return math::Clamp(value, lo, hi);
+
+    // e : 寄せ始めてから進んだ距離（0〜2w）。動く割合 1 - e / 2w が 1 → 0 へ下がり、2w で端に着く
+    auto soft = [w](float e) {
+        if (e >= 2.0f * w) return w;
+        return e - e * e / (4.0f * w);
+    };
+    const float startHi = hi - w;
+    const float startLo = lo + w;
+    if (value > startHi) return startHi + soft(value - startHi);
+    if (value < startLo) return startLo - soft(startLo - value);
+    return value;
+}
+
 void Camera::Reset()
 {
     position_ = Vec2(kHalfW, kHalfH);
@@ -28,9 +51,21 @@ void Camera::SetWorldBounds(float minX, float maxX, float minY, float maxY)
     maxY_ = maxY;
 }
 
-void Camera::SnapToTarget()
+Vec2 Camera::FollowGoal() const
 {
-    position_ = target_;
+    // 寄せない設定なら、今までどおり目標そのものを追う（位置だけを端で切り詰めるので、端でぴたりと止まる）
+    if (edgeEase_ <= 0.0f) return target_;
+    const float left = math::MinF(minX_ + kHalfW, maxX_ - kHalfW);
+    const float right = math::MaxF(minX_ + kHalfW, maxX_ - kHalfW);
+    const float top = math::MinF(minY_ + kHalfH, maxY_ - kHalfH);
+    const float bottom = math::MaxF(minY_ + kHalfH, maxY_ - kHalfH);
+    return Vec2(EaseIntoRange(target_.x, left, right, edgeEase_),
+                EaseIntoRange(target_.y, top, bottom, edgeEase_));
+}
+
+void Camera::SnapToTarget(bool eased)
+{
+    position_ = eased ? FollowGoal() : target_;
     // 境界クランプ
     const float left = math::MinF(minX_ + kHalfW, maxX_ - kHalfW);
     const float right = math::MaxF(minX_ + kHalfW, maxX_ - kHalfW);
@@ -40,11 +75,15 @@ void Camera::SnapToTarget()
     position_.y = math::Clamp(position_.y, top, bottom);
 }
 
-void Camera::Update(float dt)
+void Camera::Update(float dt, bool follow)
 {
-    const float t = math::DampFactor(followSpeed_, dt);
-    position_.x += (target_.x - position_.x) * t;
-    position_.y += (target_.y - position_.y) * t;
+    if (follow) {
+        // 端の手前で寄せた目標を追う（端でいきなり止まらず、だんだん遅くなって止まる）
+        const Vec2 goal = FollowGoal();
+        const float t = math::DampFactor(followSpeed_, dt);
+        position_.x += (goal.x - position_.x) * t;
+        position_.y += (goal.y - position_.y) * t;
+    }
 
     const float left = math::MinF(minX_ + kHalfW, maxX_ - kHalfW);
     const float right = math::MaxF(minX_ + kHalfW, maxX_ - kHalfW);

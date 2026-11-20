@@ -64,7 +64,7 @@ const char* AbilityShortEffect(Ability ability)
     case Ability::Agi: return "移動速度・攻撃速度";
     case Ability::Vit: return "最大HP・防御力";
     case Ability::Int: return "クリティカル率・倍率";
-    case Ability::Luk: return "ドロップ率";
+    case Ability::Luk: return "ドロップ率・経験値";
     default: break;
     }
     return "";
@@ -85,7 +85,8 @@ std::string AbilityEffectText(Ability ability)
         return str::Format("クリティカル率 +%.1f%% ／ クリティカル倍率 +%.1f%%",
                            kIntCritRatePerPoint * 100.0f, kIntCritDamagePerPoint * 100.0f);
     case Ability::Luk:
-        return str::Format("ドロップ率 +%.1f%%", kLukDropRatePerPoint * 100.0f);
+        return str::Format("ドロップ率 +%.1f%% ／ 獲得経験値 +%.1f%%",
+                           kLukDropRatePerPoint * 100.0f, kLukExpRatePerPoint * 100.0f);
     default:
         break;
     }
@@ -119,6 +120,13 @@ float AbilityDropRate(const AbilityScores& scores)
 {
     const float luk = static_cast<float>(scores.Get(Ability::Luk) - kAbilityInitialValue);
     return math::MaxF(0.0f, 1.0f + kLukDropRatePerPoint * luk);
+}
+
+float AbilityExpRate(const AbilityScores& scores)
+{
+    // ドロップ率と同じく、初期値からの伸びぶんだけが効果になる
+    const float luk = static_cast<float>(scores.Get(Ability::Luk) - kAbilityInitialValue);
+    return math::MaxF(0.0f, 1.0f + kLukExpRatePerPoint * luk);
 }
 
 } // namespace ecl

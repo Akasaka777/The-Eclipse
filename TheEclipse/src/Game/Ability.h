@@ -17,7 +17,7 @@ enum class Ability
     Agi,   // 移動速度と武器を振る速さ
     Vit,   // 最大 HP と防御力
     Int,   // クリティカル率とクリティカル倍率
-    Luk,   // ドロップ率
+    Luk,   // ドロップ率と獲得経験値
     Count
 };
 
@@ -34,6 +34,7 @@ constexpr float kVitDefensePerPoint    = 0.015f;  // 防御力 +1.5%
 constexpr float kIntCritRatePerPoint   = 0.004f;  // クリティカル率 +0.4%（加算）
 constexpr float kIntCritDamagePerPoint = 0.010f;  // クリティカル倍率 +1.0%（加算）
 constexpr float kLukDropRatePerPoint   = 0.020f;  // ドロップ率 +2.0%
+constexpr float kLukExpRatePerPoint    = 0.010f;  // 獲得経験値 +1.0%
 
 // 初期値とレベルアップで貰えるポイント
 constexpr int kAbilityInitialValue = 5;
@@ -67,5 +68,7 @@ Stats ApplyAbilities(const Stats& base, const AbilityScores& scores);
 
 // ドロップ率の倍率（LUK）
 float AbilityDropRate(const AbilityScores& scores);
+// 獲得経験値の倍率（LUK）
+float AbilityExpRate(const AbilityScores& scores);
 
 } // namespace ecl

@@ -213,7 +213,7 @@ void StatusPanel::DrawDerivedStats(const GameContext& context) const
                      next.attackSpeed, true);
     y += 34.0f;
 
-    // MP 回復とドロップ率は Stats の表示行に乗らないので個別に出す
+    // MP 回復・ドロップ率・獲得経験値は Stats の表示行に乗らないので個別に出す
     draw::Text(FontSize::Small, detailArea_.left + 24.0f, y, palette::kTextDim, "MP 回復");
     draw::Text(FontSize::Small, detailArea_.left + 360.0f, y, palette::kText,
                str::Format("%.0f 秒に 1", (current.mpRegen > 0.0f) ? 1.0f / current.mpRegen : 0.0f),
@@ -227,6 +227,23 @@ void StatusPanel::DrawDerivedStats(const GameContext& context) const
         const float nextRate = AbilityDropRate(lukPreview);
 
         draw::Text(FontSize::Small, detailArea_.left + 24.0f, y, palette::kTextDim, "ドロップ率");
+        draw::Text(FontSize::Small, detailArea_.left + 360.0f, y, palette::kText,
+                   str::Format("%.0f%%", rate * 100.0f), draw::TextAlign::Right);
+        if (nextRate > rate + 0.0001f) {
+            draw::Text(FontSize::Small, detailArea_.left + 392.0f, y, palette::kTextDim, "→");
+            draw::Text(FontSize::Small, detailArea_.left + 540.0f, y, palette::kHp,
+                       str::Format("%.0f%%", nextRate * 100.0f), draw::TextAlign::Right);
+        }
+        y += 34.0f;
+    }
+
+    {
+        const float rate = player.ExpRateMultiplier();
+        AbilityScores lukPreview = player.Abilities();
+        if (canPreview) lukPreview.Add(static_cast<Ability>(selected_), 1);
+        const float nextRate = AbilityExpRate(lukPreview);
+
+        draw::Text(FontSize::Small, detailArea_.left + 24.0f, y, palette::kTextDim, "獲得経験値");
         draw::Text(FontSize::Small, detailArea_.left + 360.0f, y, palette::kText,
                    str::Format("%.0f%%", rate * 100.0f), draw::TextAlign::Right);
         if (nextRate > rate + 0.0001f) {

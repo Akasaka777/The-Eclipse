@@ -506,10 +506,10 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
 
     // --- カメラ -------------------------------------------------------------
     if (phase_ == Phase::BossIntro) {
-        // 登場演出：決めた動きのとおりに動かす（追従の遅れを入れない）
+        // 登場演出：決めた動きのとおりに動かす（追従の遅れも、端の手前の減速も入れない）
         camera_.SetTarget(Vec2(BossIntroCameraX(), kScreenH * 0.5f));
-        camera_.SnapToTarget();
-        camera_.Update(dt);
+        camera_.SnapToTarget(false);
+        camera_.Update(dt, false);
         return;
     }
     float targetX = player_.pos.x + static_cast<float>(player_.facing) * 140.0f;
@@ -1106,6 +1106,10 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
         result.materials = QuestDatabase::Instance().RollMaterials(
             *quest_, cleared, enemiesDefeated_, context.player.DropRateMultiplier());
     }
+
+    // LUK で獲得経験値が増える（撃破ぶん＋クリア報酬の合計に掛ける。未クリアの半減のあと）
+    result.expRate = context.player.ExpRateMultiplier();
+    exp = static_cast<int>(std::lround(static_cast<double>(exp) * static_cast<double>(result.expRate)));
 
     result.expGained = exp;
     result.colGained = col;
