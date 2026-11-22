@@ -71,7 +71,7 @@ struct Projectile
     float    life = 3.0f;
     bool     useGravity = false;
     bool     active = true;
-    int      kind = 0; // 0:球 1:衝撃波 2:刃
+    int      kind = 0; // 0:球 1:衝撃波 2:刃 3:金剛杵 4:光輪
     ColorRGB color = ColorRGB(255, 140, 90);
 };
 
@@ -124,6 +124,18 @@ struct RingEffect
     ColorRGB color = ColorRGB(255, 200, 120);
 };
 
+// 雷（上から下へ走る稲妻）
+struct BoltEffect
+{
+    float    x = 0.0f;
+    float    topY = 0.0f;
+    float    bottomY = 0.0f;
+    float    life = 0.0f;
+    float    maxLife = 0.35f;
+    int      seed = 0;
+    ColorRGB color = ColorRGB(255, 220, 140);
+};
+
 struct PopupText
 {
     Vec2        pos;
@@ -155,6 +167,9 @@ public:
     void AddDust(const Vec2& pos, int facing, int count = 6);
     void AddRing(const Vec2& pos, float maxRadius, const ColorRGB& color, float duration = 0.4f);
     void AddPopup(const Vec2& pos, const std::string& text, const ColorRGB& color, bool large = false);
+    // 雷（ワールド座標の x に、topY から bottomY まで）
+    void AddBolt(float x, float topY, float bottomY, const ColorRGB& color, float duration = 0.35f);
+    size_t BoltCount() const { return bolts_.size(); }
 
     // --- アクセス -----------------------------------------------------------
     std::vector<HitBox>&     HitBoxes() { return hitBoxes_; }
@@ -175,6 +190,7 @@ private:
     std::vector<SlashEffect>  slashes_;
     std::vector<RingEffect>   rings_;
     std::vector<PopupText>    popups_;
+    std::vector<BoltEffect>   bolts_;
 };
 
 } // namespace ecl

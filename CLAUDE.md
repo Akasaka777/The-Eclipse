@@ -1,4 +1,4 @@
-# The Eclipse（Claude Code 向けの決まりごと）
+# Ars Gladii（旧名 The Eclipse。Claude Code 向けの決まりごと）
 
 DxLib / C++17 / Visual Studio 2022 の横スクロール 2D アクション RPG。
 やり取り・コメント・UI の文字・コミットメッセージ・README は日本語で書く。

@@ -48,7 +48,8 @@ enum class StageTheme
     Ruins,  // 石牢の回廊
     Altar,   // 蝕の祭壇
     Volcano, // 竜王の火山
-    Home     // 拠点
+    Home,    // 拠点
+    Sanctum  // 金剛の伽藍（竜王の火山の隠しフロア）
 };
 
 //------------------------------------------------------------------------------
@@ -64,6 +65,8 @@ struct FloorDef
     std::vector<Platform>   platforms;
     std::vector<EnemySpawn> spawns;
     int         bossId = -1; // ボスフロアなら 0 以上
+    // ボスの HP バーの本数（3〜10）。0 ならクエストの設定（推奨戦力から自動）
+    int         bossHpBars = 0;
 };
 
 //------------------------------------------------------------------------------
@@ -93,6 +96,9 @@ public:
     // --- ゲート -------------------------------------------------------------
     void  SetGateOpen(bool open);
     bool  GateOpen() const { return gateOpen_; }
+    // 開いたゲートの上に出す案内（既定は「▶ 次のフロアへ」。フロアを読み込むと戻る）
+    void  SetGateLabel(const std::string& label) { gateLabel_ = label; }
+    const std::string& GateLabel() const { return gateLabel_; }
     float GateX() const { return def_.width - 180.0f; }
     // ゲートに到達したか
     bool  ReachedGate(float x) const;
@@ -113,6 +119,7 @@ private:
     FloorDef def_;
     bool  gateOpen_ = false;
     float gateAnim_ = 0.0f;
+    std::string gateLabel_ = "▶ 次のフロアへ";
     float time_ = 0.0f;
 };
 

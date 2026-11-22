@@ -3,6 +3,7 @@
 #include "Common/MathUtil.h"
 #include "Common/StringUtil.h"
 #include "Game/ItemDatabase.h"
+#include "Game/QuestDatabase.h"
 
 #include <algorithm>
 #include <cmath>
@@ -490,6 +491,61 @@ bool PlayerData::IsQuestCleared(int questId) const
 void PlayerData::MarkQuestCleared(int questId)
 {
     if (!IsQuestCleared(questId)) clearedQuests_.push_back(questId);
+}
+
+HiddenFloorProgress& PlayerData::HiddenFloorEntry(int questId)
+{
+    for (HiddenFloorProgress& entry : hiddenFloors_) {
+        if (entry.questId == questId) return entry;
+    }
+    HiddenFloorProgress entry;
+    entry.questId = questId;
+    hiddenFloors_.push_back(entry);
+    return hiddenFloors_.back();
+}
+
+const HiddenFloorProgress* PlayerData::HiddenFloor(int questId) const
+{
+    for (const HiddenFloorProgress& entry : hiddenFloors_) {
+        if (entry.questId == questId) return &entry;
+    }
+    return nullptr;
+}
+
+HiddenFloorDraw PlayerData::BeginHiddenFloorAttempt(int questId)
+{
+    HiddenFloorProgress& entry = HiddenFloorEntry(questId);
+    // 次に抽選する回をまだ決めていなければ決める（10〜30 回目）
+    if (entry.threshold < kHiddenFloorMinAttempts || entry.threshold > kHiddenFloorMaxAttempts) {
+        entry.threshold = math::RandInt(kHiddenFloorMinAttempts, kHiddenFloorMaxAttempts);
+    }
+    entry.attempts = math::ClampInt(entry.attempts + 1, 1, kHiddenFloorMaxAttempts);
+
+    HiddenFloorDraw draw;
+    if (entry.attempts >= entry.threshold) {
+        entry.lotteryHeld = true;
+        draw.held = true;
+        draw.won = math::RandChance(kHiddenFloorChance);
+    }
+    return draw;
+}
+
+void PlayerData::EndHiddenFloorAttempt(int questId)
+{
+    HiddenFloorProgress& entry = HiddenFloorEntry(questId);
+    if (!entry.lotteryHeld) return;
+    // 抽選した回のクエストが終わったら、①（数え直し）に戻る
+    entry.lotteryHeld = false;
+    entry.attempts = 0;
+    entry.threshold = math::RandInt(kHiddenFloorMinAttempts, kHiddenFloorMaxAttempts);
+}
+
+void PlayerData::RestoreHiddenFloor(int questId, int attempts, int threshold)
+{
+    HiddenFloorProgress& entry = HiddenFloorEntry(questId);
+    entry.attempts = math::ClampInt(attempts, 0, kHiddenFloorMaxAttempts);
+    entry.threshold = (threshold >= kHiddenFloorMinAttempts && threshold <= kHiddenFloorMaxAttempts) ? threshold : 0;
+    entry.lotteryHeld = false;
 }
 
 void PlayerData::RestoreProgress(int level, int exp, int skillPoints,

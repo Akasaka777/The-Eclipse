@@ -39,6 +39,8 @@ struct QuestResult
     int         skillPointsGained = 0;
     int         abilityPointsGained = 0;   // 振り分けステータス用
     bool        firstClear = false;
+    bool        hiddenFloorReached = false;   // 隠しフロアに入ったか
+    bool        hiddenBossDefeated = false;   // 隠しボスを倒したか
     std::vector<EquipmentItem> drops;
     // 持ち帰った素材（武器・防具の作成用）
     std::vector<ItemStack> materials;

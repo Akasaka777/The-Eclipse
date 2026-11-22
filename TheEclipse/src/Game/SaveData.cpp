@@ -1,6 +1,7 @@
 #include "Game/SaveData.h"
 
 #include "Common/StringUtil.h"
+#include "Core/GameConfig.h"
 #include "Core/Version.h"
 #include "Game/Ability.h"
 #include "Game/Consumable.h"
@@ -11,6 +12,7 @@
 #include "Game/SwordSkill.h"
 #include "Game/UniqueSkill.h"
 
+#include <array>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -124,7 +126,7 @@ bool SaveSystem::Save(const GameContext& context)
     const PlayerData& player = context.player;
     const Inventory& inventory = player.GetInventory();
 
-    file << "# The Eclipse セーブデータ（" << version::kVersionLabel << " で保存）\n";
+    file << "# " << config::kGameTitle << " セーブデータ（" << version::kVersionLabel << " で保存）\n";
     file << "version " << kSaveVersion << "\n";
 
     // --- プレイヤー ---------------------------------------------------------
@@ -193,6 +195,10 @@ bool SaveSystem::Save(const GameContext& context)
         if (player.IsQuestCleared(quest.id)) file << "cleared " << quest.id << "\n";
     }
     file << "selectedquest " << context.selectedQuestId << "\n";
+    //   hiddenfloor <クエストID> <前回の抽選からの挑戦回数> <次に抽選する回>
+    for (const HiddenFloorProgress& entry : player.HiddenFloors()) {
+        file << "hiddenfloor " << entry.questId << ' ' << entry.attempts << ' ' << entry.threshold << "\n";
+    }
 
     // --- 設定 ---------------------------------------------------------------
     const GameSettings& settings = context.settings;
@@ -242,6 +248,7 @@ bool SaveSystem::Load(GameContext& context)
     int col = 0;
     int material = 0;
     int selectedQuest = 1;
+    std::vector<std::array<int, 3>> hiddenFloors;   // クエストID・挑戦回数・次に抽選する回
     std::string playerName;
     int parryCount = 0;
     AbilityScores abilities;
@@ -279,6 +286,9 @@ bool SaveSystem::Load(GameContext& context)
         else if (key == "col") col = ToInt(arg(1));
         else if (key == "material") material = ToInt(arg(1));
         else if (key == "selectedquest") selectedQuest = ToInt(arg(1), 1);
+        else if (key == "hiddenfloor" && tokens.size() >= 4) {
+            hiddenFloors.push_back({ ToInt(arg(1)), ToInt(arg(2)), ToInt(arg(3)) });
+        }
         else if (key == "equip") {
             int slot = ToInt(arg(1), -1);
             // v2 以前は武器スロットが 1 つだったため、以降のスロットを 1 つずらす
@@ -414,6 +424,9 @@ bool SaveSystem::Load(GameContext& context)
         abilityPoints = (loaded.Level() - 1) * kAbilityPointsPerLevel;
     }
     loaded.RestoreAbilities(abilities, abilityPoints);
+    for (const std::array<int, 3>& entry : hiddenFloors) {
+        loaded.RestoreHiddenFloor(entry[0], entry[1], entry[2]);
+    }
     inventory.SetCurrency(col, material);
     for (int i = 0; i < static_cast<int>(EquipSlot::Count); ++i) {
         if (equippedUid[i] == 0) continue;

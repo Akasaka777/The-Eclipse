@@ -142,7 +142,7 @@ void Actor::FaceTowards(float targetX)
     else if (targetX < pos.x - 4.0f) facing = -1;
 }
 
-void Actor::DrawBody(const Camera& camera, int alpha) const
+void Actor::DrawBody(const Camera& camera, int alpha, bool shadow) const
 {
     const Rect bounds = Bounds();
     if (!camera.IsVisible(bounds, 200.0f)) return;
@@ -153,7 +153,7 @@ void Actor::DrawBody(const Camera& camera, int alpha) const
     const Rect screen = Rect::FromFoot(feet.x, feet.y, halfWidth * scale, height * scale);
 
     // 影
-    if (alive || DeathPhase() < 1.0f) {
+    if (shadow && (alive || DeathPhase() < 1.0f)) {
         DrawActorShadow(feet.x, feet.y, halfWidth * 2.2f * scale,
                         static_cast<int>(90.0f * (alive ? 1.0f : 1.0f - DeathPhase())));
     }

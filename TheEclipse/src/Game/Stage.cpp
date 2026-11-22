@@ -73,6 +73,16 @@ ThemeColors ColorsFor(StageTheme theme)
         c.groundEdge = ColorRGB(198, 86, 40);
         c.accent = ColorRGB(255, 142, 56);
         break;
+    case StageTheme::Sanctum:
+        // 金剛の伽藍：火山の奥に隠れた金色の寺院
+        c.skyTop = ColorRGB(16, 10, 6);
+        c.skyBottom = ColorRGB(74, 46, 18);
+        c.far_ = ColorRGB(46, 30, 14);
+        c.mid = ColorRGB(30, 19, 10);
+        c.ground = ColorRGB(44, 32, 20);
+        c.groundEdge = ColorRGB(222, 176, 86);
+        c.accent = ColorRGB(255, 208, 112);
+        break;
     case StageTheme::Home:
     default:
         c.skyTop = ColorRGB(10, 14, 30);
@@ -94,6 +104,7 @@ void Stage::Load(const FloorDef& def)
     def_ = def;
     gateOpen_ = false;
     gateAnim_ = 0.0f;
+    gateLabel_ = "▶ 次のフロアへ";
     time_ = 0.0f;
 }
 
@@ -180,7 +191,22 @@ void Stage::DrawSky(const Camera& camera) const
     // 天体（蝕の祭壇では日蝕）
     const float moonX = 1520.0f - camera.ViewLeft() * 0.04f;
     const float moonY = 210.0f;
-    if (def_.theme == StageTheme::Altar) {
+    if (def_.theme == StageTheme::Sanctum) {
+        // 天に浮かぶ大きな光背（ゆっくり回る）
+        const ThemeColors gold = ColorsFor(def_.theme);
+        // ボスの光背と重なっても主役が埋もれないよう、空の光背は控えめにする
+        draw::Glow(moonX, moonY, 230.0f, gold.accent, 70, 6);
+        draw::Circle(moonX, moonY, 150.0f, gold.accent, false, 6.0f, 110);
+        draw::Circle(moonX, moonY, 128.0f, gold.accent, false, 2.0f, 80);
+        for (int i = 0; i < 24; ++i) {
+            const float a = time_ * 0.15f + static_cast<float>(i) * (6.2831853f / 24.0f);
+            const float c = std::cos(a), s = std::sin(a);
+            draw::Triangle(Vec2(moonX + c * 156.0f - s * 9.0f, moonY + s * 156.0f + c * 9.0f),
+                           Vec2(moonX + c * 156.0f + s * 9.0f, moonY + s * 156.0f - c * 9.0f),
+                           Vec2(moonX + c * 190.0f, moonY + s * 190.0f), gold.accent, true, 90);
+        }
+        draw::Circle(moonX, moonY, 40.0f, ColorRGB(255, 236, 190), true, 1.0f, 150);
+    } else if (def_.theme == StageTheme::Altar) {
         draw::Glow(moonX, moonY, 200.0f, ColorRGB(210, 120, 255), 150, 6);
         draw::Circle(moonX, moonY, 96.0f, ColorRGB(255, 226, 200), true, 1.0f, 255);
         draw::Circle(moonX, moonY, 88.0f, ColorRGB(10, 6, 16), true, 1.0f, 255);
@@ -228,6 +254,20 @@ void Stage::DrawFarLayer(const Camera& camera) const
                            Vec2(x, baseY - h), colors.far_, true, 255);
             draw::Glow(x, baseY - h + 20.0f, 54.0f, colors.accent, 90, 4);
             break;
+        case StageTheme::Sanctum: {
+            // 層塔（屋根を重ねた塔）の影
+            const int tiers = 3 + static_cast<int>(Hash01(i * 7 + 14) * 3.0f);
+            const float tierH = h / static_cast<float>(tiers + 1);
+            for (int t = 0; t < tiers; ++t) {
+                const float y = baseY - tierH * static_cast<float>(t + 1);
+                const float roofW = w * (0.62f - 0.07f * static_cast<float>(t));
+                draw::FillRect(Rect(x - roofW * 0.32f, y, x + roofW * 0.32f, y + tierH), colors.far_, 255);
+                draw::Triangle(Vec2(x - roofW * 0.62f, y + tierH * 0.18f), Vec2(x + roofW * 0.62f, y + tierH * 0.18f),
+                               Vec2(x, y - tierH * 0.42f), colors.far_, true, 255);
+            }
+            draw::Line(x, baseY - tierH * static_cast<float>(tiers + 1), x, baseY - h - 30.0f, colors.far_, 4.0f, 255);
+            break;
+        }
         case StageTheme::Home:
         default:
             // 遠景の街並み
@@ -276,6 +316,18 @@ void Stage::DrawMidLayer(const Camera& camera) const
             const float pulse = 0.6f + 0.4f * std::sin(time_ * 2.2f + static_cast<float>(i));
             draw::Circle(x, baseY - h * 0.55f, 10.0f, colors.accent, true, 1.0f,
                          static_cast<int>(200.0f * pulse));
+            break;
+        }
+        case StageTheme::Sanctum: {
+            // 丸柱と、吊るした灯籠
+            draw::FillRect(Rect(x - w * 0.16f, baseY - h, x + w * 0.16f, baseY), colors.mid, 255);
+            draw::FillRect(Rect(x - w * 0.30f, baseY - h - 14.0f, x + w * 0.30f, baseY - h), colors.mid, 255);
+            const float sway = std::sin(time_ * 1.3f + static_cast<float>(i)) * 4.0f;
+            const float lanternY = baseY - h * 0.62f;
+            draw::Line(x + w * 0.16f, baseY - h + 20.0f, x + w * 0.42f + sway, lanternY - 16.0f, colors.mid, 2.0f, 255);
+            const float flicker = 0.75f + 0.25f * std::sin(time_ * 6.0f + static_cast<float>(i) * 1.9f);
+            draw::Glow(x + w * 0.42f + sway, lanternY, 40.0f * flicker, colors.accent, 120, 4);
+            draw::FillRect(Rect::FromCenter(x + w * 0.42f + sway, lanternY, 14.0f, 20.0f), colors.accent.Scaled(0.8f), 230);
             break;
         }
         case StageTheme::Volcano: {
@@ -435,7 +487,7 @@ void Stage::DrawGate(const Camera& camera) const
                          static_cast<int>((1.0f - t) * 220.0f * gateAnim_));
         }
         draw::Text(FontSize::Medium, screen.CenterX(), screen.top - 50.0f, palette::kAccent,
-                   "▶ 次のフロアへ", draw::TextAlign::Center);
+                   gateLabel_, draw::TextAlign::Center);
     } else {
         // 封鎖：障壁
         const int alpha = 150;

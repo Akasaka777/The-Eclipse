@@ -34,6 +34,7 @@ void CombatSystem::Clear()
     slashes_.clear();
     rings_.clear();
     popups_.clear();
+    bolts_.clear();
 }
 
 void CombatSystem::AddHitBox(const HitBox& hitBox)
@@ -145,6 +146,18 @@ void CombatSystem::AddPopup(const Vec2& pos, const std::string& text, const Colo
     popups_.push_back(popup);
 }
 
+void CombatSystem::AddBolt(float x, float topY, float bottomY, const ColorRGB& color, float duration)
+{
+    BoltEffect bolt;
+    bolt.x = x;
+    bolt.topY = topY;
+    bolt.bottomY = bottomY;
+    bolt.maxLife = duration;
+    bolt.seed = math::RandInt(0, 100000);
+    bolt.color = color;
+    bolts_.push_back(bolt);
+}
+
 void CombatSystem::Update(float dt)
 {
     // --- 攻撃判定 -----------------------------------------------------------
@@ -207,6 +220,11 @@ void CombatSystem::Update(float dt)
                                 [](const RingEffect& r) { return r.life >= r.maxLife; }),
                  rings_.end());
 
+    for (BoltEffect& bolt : bolts_) bolt.life += dt;
+    bolts_.erase(std::remove_if(bolts_.begin(), bolts_.end(),
+                                [](const BoltEffect& b) { return b.life >= b.maxLife; }),
+                 bolts_.end());
+
     for (PopupText& popup : popups_) {
         popup.life += dt;
         popup.pos.y -= 46.0f * dt;
@@ -255,12 +273,81 @@ void CombatSystem::DrawFrontOfActors(const Camera& camera, bool showDamageNumber
             draw::Triangle(a, b, tip, projectile.color, true, 230);
             break;
         }
+        case 3: { // 金剛杵（両端に三つ叉の爪がある短い杵）
+            const float angle = std::atan2(projectile.velocity.y, projectile.velocity.x);
+            const Vec2 u(std::cos(angle), std::sin(angle));
+            const Vec2 n(-u.y, u.x);
+            const float len = projectile.radius * 1.6f;
+            draw::Glow(screen.x, screen.y, projectile.radius * 1.5f, projectile.color, 170, 4);
+            const Vec2 a(screen.x - u.x * len, screen.y - u.y * len);
+            const Vec2 b(screen.x + u.x * len, screen.y + u.y * len);
+            draw::Line(a.x, a.y, b.x, b.y, ColorRGB(60, 40, 16), projectile.radius * 0.55f, 255);
+            draw::Line(a.x, a.y, b.x, b.y, projectile.color, projectile.radius * 0.32f, 255);
+            draw::Circle(screen.x, screen.y, projectile.radius * 0.42f, palette::kWhite, true, 1.0f, 230);
+            for (int end = -1; end <= 1; end += 2) {
+                const Vec2 base(screen.x + u.x * len * 0.62f * static_cast<float>(end),
+                                screen.y + u.y * len * 0.62f * static_cast<float>(end));
+                for (int prong = -1; prong <= 1; ++prong) {
+                    const float spread = projectile.radius * 0.5f * static_cast<float>(prong);
+                    const Vec2 tip(base.x + u.x * projectile.radius * 0.9f * static_cast<float>(end) + n.x * spread,
+                                   base.y + u.y * projectile.radius * 0.9f * static_cast<float>(end) + n.y * spread);
+                    draw::Line(base.x, base.y, tip.x, tip.y, projectile.color, 3.0f, 255);
+                }
+            }
+            break;
+        }
+        case 4: { // 光輪（地面すれすれを走る輪）
+            const float r = projectile.radius;
+            draw::Glow(screen.x, screen.y, r * 1.5f, projectile.color, 160, 4);
+            DrawOvalAA(screen.x, screen.y, r, r * 0.9f, 32, draw::ToDx(projectile.color), FALSE, r * 0.22f);
+            DrawOvalAA(screen.x, screen.y, r * 0.72f, r * 0.64f, 32, draw::ToDx(palette::kWhite), FALSE, 2.0f);
+            const float spin = projectile.life * 9.0f;
+            for (int i = 0; i < 6; ++i) {
+                const float a = spin + static_cast<float>(i) * 1.0471976f;
+                const float c = std::cos(a), s = std::sin(a);
+                draw::Triangle(Vec2(screen.x + c * r * 1.02f, screen.y + s * r * 0.92f),
+                               Vec2(screen.x + std::cos(a + 0.3f) * r * 1.02f, screen.y + std::sin(a + 0.3f) * r * 0.92f),
+                               Vec2(screen.x + std::cos(a + 0.15f) * r * 1.4f, screen.y + std::sin(a + 0.15f) * r * 1.26f),
+                               projectile.color, true, 230);
+            }
+            break;
+        }
         default: { // 球
             draw::Glow(screen.x, screen.y, projectile.radius * 1.6f, projectile.color, 190, 5);
             draw::Circle(screen.x, screen.y, projectile.radius * 0.6f, palette::kWhite, true, 1.0f, 230);
             break;
         }
         }
+    }
+
+    // --- 雷 -----------------------------------------------------------------
+    for (const BoltEffect& bolt : bolts_) {
+        const float t = math::Clamp(bolt.life / bolt.maxLife, 0.0f, 1.0f);
+        const int alpha = static_cast<int>((1.0f - t * t) * 255.0f);
+        const Vec2 top = camera.WorldToScreen(Vec2(bolt.x, bolt.topY));
+        const Vec2 bottom = camera.WorldToScreen(Vec2(bolt.x, bolt.bottomY));
+        // 稲妻の折れ目（数フレームごとに形を変えてちらつかせる）
+        const int flicker = bolt.seed + static_cast<int>(bolt.life * 30.0f);
+        constexpr int kSegments = 11;
+        Vec2 points[kSegments + 1];
+        for (int i = 0; i <= kSegments; ++i) {
+            const float k = static_cast<float>(i) / static_cast<float>(kSegments);
+            const unsigned int h = static_cast<unsigned int>(flicker * 2654435761u + static_cast<unsigned int>(i) * 40503u);
+            const float jitter = (i == 0 || i == kSegments) ? 0.0f
+                               : (static_cast<float>(h % 1000u) / 1000.0f - 0.5f) * 58.0f;
+            points[i] = Vec2(top.x + jitter, math::Lerp(top.y, bottom.y, k));
+        }
+        SetDrawBlendMode(DX_BLENDMODE_ADD, math::ClampInt(alpha / 3, 0, 255));
+        DrawBoxAA(bottom.x - 46.0f, top.y, bottom.x + 46.0f, bottom.y, draw::ToDx(bolt.color), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_ADD, math::ClampInt(alpha, 0, 255));
+        for (int i = 0; i < kSegments; ++i) {
+            DrawLineAA(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y, draw::ToDx(bolt.color), 14.0f);
+        }
+        for (int i = 0; i < kSegments; ++i) {
+            DrawLineAA(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y, draw::ToDx(palette::kWhite), 5.0f);
+        }
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        draw::Glow(bottom.x, bottom.y, 90.0f, bolt.color, static_cast<int>(200.0f * (1.0f - t)), 4);
     }
 
     // --- 斬撃エフェクト ------------------------------------------------------

@@ -34,7 +34,10 @@ constexpr float kDepthMoveRate = 0.62f;
 // 攻撃が当たる奥行きの許容幅
 constexpr float kHitDepthRange = 58.0f;
 
-constexpr const char* kWindowTitle = "The Eclipse";
+// ゲーム名（v0.10.0 で「The Eclipse」から変更）。タイトル画面・設定画面・ウィンドウのタイトルに出す
+constexpr const char* kGameTitle = "Ars Gladii";
+constexpr const char* kGameTitleUpper = "ARS GLADII";
+constexpr const char* kWindowTitle = kGameTitle;
 constexpr const char* kAssetRoot = "assets";
 
 } // namespace config

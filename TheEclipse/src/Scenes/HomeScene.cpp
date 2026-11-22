@@ -56,6 +56,7 @@ enum class DebugAction
     AllArmors,     // 全防具を入手する
     UnlockSkills,  // スキルを全解放
     UnlockUnique,  // ユニークスキルを解放（プルダウンで選ぶ）
+    HiddenQuest,   // 隠しクエスト（まだ実装していない。押すと案内だけ出す。隠しフロアとは別）
 };
 
 struct DebugButtonDef
@@ -74,6 +75,7 @@ const DebugButtonDef kDebugButtons[] = {
     { DebugAction::AllArmors,     "全防具取得" },
     { DebugAction::UnlockSkills,  "スキル全習得" },
     { DebugAction::UnlockUnique,  "ユニーク解放 ▼" },
+    { DebugAction::HiddenQuest,   "隠しクエスト" },
 };
 
 constexpr int   kDebugButtonCount = static_cast<int>(sizeof(kDebugButtons) / sizeof(kDebugButtons[0]));
@@ -236,7 +238,8 @@ void HomeScene::BuildDebugButtons()
         for (const UniqueSkillDef& def : UniqueSkillDatabase::Instance().All()) {
             labels.push_back(def.name);
         }
-        buildMenu(debugUniqueMenu_, debugButtons_.back().GetRect(), labels, true);
+        const size_t index = static_cast<size_t>(DebugButtonIndex(DebugAction::UnlockUnique));
+        buildMenu(debugUniqueMenu_, debugButtons_[index].GetRect(), labels, true);
     }
 }
 
@@ -351,6 +354,10 @@ void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& co
             debugMenuOpen_ =
                 (debugMenuOpen_ == DebugMenu::Unique) ? DebugMenu::None : DebugMenu::Unique;
             return;
+        case DebugAction::HiddenQuest:
+            // 隠しクエストはまだ無い（竜王の火山の隠しフロアとは別のもの）
+            debugMessage_ = "隠しクエストはまだ実装されていません";
+            break;
         }
         debugMessageTimer_ = 2.8f;
     }
@@ -658,7 +665,7 @@ void HomeScene::DrawFieldForeground(const GameContext& context)
     draw::FillRect(screen, ColorRGB(58, 46, 38), 255);
     draw::StrokeRect(screen, ColorRGB(120, 96, 70), 3.0f, 255);
     draw::Text(FontSize::Small, screen.CenterX(), screen.top + 16.0f, palette::kText,
-               "THE ECLIPSE", draw::TextAlign::Center);
+               config::kGameTitleUpper, draw::TextAlign::Center);
     draw::Text(FontSize::Tiny, screen.CenterX(), screen.top + 54.0f, palette::kTextDim,
                "拠点", draw::TextAlign::Center);
     draw::Text(FontSize::Tiny, screen.CenterX(), screen.top + 84.0f, palette::kTextDim,

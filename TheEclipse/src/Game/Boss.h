@@ -20,8 +20,16 @@ enum class BossAttackKind
     JumpSlam, // 跳躍からの叩きつけ＋衝撃波
     Shot,     // 3 方向の遠距離弾
     Combo,    // 3 連撃
-    Burst     // 咆哮＋全方位の衝撃
+    Burst,    // 咆哮＋全方位の衝撃
+    // --- 空を飛ぶボス（ヴァジュラ・ラグナシュラ）用 -----------------------------
+    SkyVolley,   // 空中から金剛杵を扇状に撃ち下ろす（遠距離）
+    SkyThunder,  // 予告した 3 か所に順に雷を落とす（遠距離）
+    SkyHalo,     // 地面すれすれを左右へ走る光輪（遠距離。ジャンプでよける）
+    DiveSlam     // 急降下して掌で叩きつける（近距離）。着地したあとしばらく地上にとどまる
 };
+
+// 竜王の火山の隠しボス「ヴァジュラ・ラグナシュラ」の ID
+constexpr int kVajraBossId = 6;
 
 //------------------------------------------------------------------------------
 // ボス定義
@@ -49,6 +57,11 @@ struct BossDef
 
     // assets/bosses/<assetFolder> から素材を読み込む（空なら代替表示）
     std::string assetFolder;
+
+    // 空を飛ぶボス。浮いている間は地上からの攻撃が届かない
+    //   （ジャンプ攻撃で当てるか、降りてきて地上にいる間に当てる）
+    bool  flying = false;
+    float hoverHeight = 0.0f;   // 地面から体の下端までの高さ
 
     std::vector<BossAttackKind> patterns;
 };
@@ -129,6 +142,17 @@ public:
     // 今どの攻撃パターンを出しているか（HUD の表示やテストで使う）
     BossAttackKind CurrentAttack() const { return currentKind_; }
     bool IsAttacking() const { return state_ == BossState::Attack; }
+    BossState State() const { return state_; }
+
+    // --- 空を飛ぶボス -------------------------------------------------------------
+    bool  IsFlying() const { return def_ && def_->flying; }
+    // 地面から体の下端までの高さ（地上にいれば 0）
+    float Altitude() const { return altitude_; }
+    // 降魔の掌で降りてきて、地上にとどまっているか（地上からの攻撃が当たる）
+    bool  IsGrounded() const { return IsFlying() && altitude_ <= 1.0f; }
+    // 天雷の落ちる位置（予備動作の間に予告する）
+    const std::vector<float>& ThunderTargets() const { return thunderTargets_; }
+    float DiveTargetX() const { return diveTargetX_; }
     // 予備動作に入ってから攻撃が終わるまで（この間は向きを変えない）
     bool IsCommittedToAttack() const
     {
@@ -159,6 +183,14 @@ private:
                        float damageMultiplier, float knockback, bool launch);
     void UpdatePose();
     void DrawHpBars(const Camera& camera) const;
+    // 空を飛ぶボスの移動（重力を受けず、決めた高さへ寄せる）と、浮いている間の位置取り
+    void ApplyFlightPhysics(float dt, const Stage& stage);
+    void UpdateFlightAltitudeTarget();
+    void KeepFlightDistance(float distance);
+    void SpawnThunder(CombatSystem& combat, float x);
+    // ボスの攻撃の弾（共通の値を入れて返す）
+    Projectile MakeProjectile(const Vec2& from, const Vec2& shotVelocity, float radius, float damageMultiplier,
+                              float knockback, int kind) const;
 
     const BossDef* def_ = nullptr;
     BossState state_ = BossState::Intro;
@@ -183,6 +215,21 @@ private:
     int   lastPatternIndex_ = -1;
     // 頭の位置を向きに合わせてずらす量（-1〜1。振り向くとなめらかに入れ替わる）
     float headSide_ = -1.0f;
+
+    // 空を飛ぶボス
+    float altitude_ = 0.0f;         // 地面から体の下端までの高さ
+    float altitudeTarget_ = 0.0f;
+    float groundY_ = 0.0f;          // いる奥行きの地面の Y
+    float stageGroundY_ = 0.0f;     // いちばん手前（奥行き 0）の地面の Y
+    float stageWidth_ = 0.0f;
+    float flightTime_ = 0.0f;       // 浮遊の上下の揺れ
+    float diveTargetX_ = 0.0f;      // 降魔の掌で降りる位置
+    bool  diveLanded_ = false;      // 降魔の掌で地上に着いたか（硬直が終わるまで地上にとどまる）
+    int   attacksSinceDive_ = 0;    // 降魔の掌を出していない回数（続いたら必ず降りる）
+    std::vector<float> thunderTargets_;
+    float thunderZ_ = 0.0f;
+    Vec2  lastPlayerPos_;
+    float lastPlayerZ_ = 0.0f;
 
     // 登場演出
     bool  introHeld_ = false;

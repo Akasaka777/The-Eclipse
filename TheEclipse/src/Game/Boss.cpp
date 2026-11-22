@@ -1,6 +1,7 @@
 #include "Game/Boss.h"
 
 #include "Common/MathUtil.h"
+#include "Core/DxInclude.h"
 #include "Game/ActorAssets.h"
 #include "Game/WeaponMotion.h"
 #include "Core/GameConfig.h"
@@ -21,6 +22,10 @@ const char* AttackName(BossAttackKind kind)
     case BossAttackKind::Shot:     return "邪弾";
     case BossAttackKind::Combo:    return "連続斬り";
     case BossAttackKind::Burst:    return "咆哮";
+    case BossAttackKind::SkyVolley:  return "金剛杵の雨";
+    case BossAttackKind::SkyThunder: return "天雷";
+    case BossAttackKind::SkyHalo:    return "光輪";
+    case BossAttackKind::DiveSlam:   return "降魔の掌";
     default: return "攻撃";
     }
 }
@@ -41,6 +46,10 @@ PatternTiming TimingFor(BossAttackKind kind)
     case BossAttackKind::Shot:     return { 0.65f, 0.50f, 0.80f };
     case BossAttackKind::Combo:    return { 0.50f, 0.95f, 0.85f };
     case BossAttackKind::Burst:    return { 0.85f, 0.45f, 1.10f };
+    case BossAttackKind::SkyVolley:  return { 0.75f, 0.55f, 0.65f };
+    case BossAttackKind::SkyThunder: return { 1.05f, 0.55f, 0.75f };   // 落ちる場所を長めに予告する
+    case BossAttackKind::SkyHalo:    return { 0.80f, 0.50f, 0.70f };
+    case BossAttackKind::DiveSlam:   return { 0.85f, 0.80f, 1.90f };   // 着地したあと長く地上にとどまる（反撃のチャンス）
     default: return { 0.6f, 0.6f, 0.8f };
     }
 }
@@ -55,9 +64,32 @@ bool RangeMatches(BossAttackKind kind, float distance)
     case BossAttackKind::Charge:   return distance > 240.0f;
     case BossAttackKind::JumpSlam: return distance > 200.0f;
     case BossAttackKind::Shot:     return distance > 320.0f;
-    default: return true;
+    case BossAttackKind::DiveSlam: return distance < 760.0f;
+    default: return true;   // 空からの遠距離攻撃はどの間合いでも使う
     }
 }
+
+// 仏像の攻撃の構え（CharacterArt の kStatueMotion*）
+int StatueMotionFor(BossAttackKind kind)
+{
+    switch (kind) {
+    case BossAttackKind::SkyVolley:  return kStatueMotionVolley;
+    case BossAttackKind::SkyThunder: return kStatueMotionThunder;
+    case BossAttackKind::SkyHalo:    return kStatueMotionHalo;
+    case BossAttackKind::DiveSlam:   return kStatueMotionDive;
+    default:                         return kStatueMotionNone;
+    }
+}
+
+// --- 空を飛ぶボスの動き ---------------------------------------------------------
+constexpr float kFlightBob = 12.0f;          // 浮遊の上下の揺れ幅
+constexpr float kFlightRiseSpeed = 380.0f;   // 浮き上がる速さ
+constexpr float kFlightSinkSpeed = 320.0f;   // ゆっくり下がる速さ
+constexpr float kDiveSpeed = 1500.0f;        // 降魔の掌の急降下の速さ
+constexpr float kFlightNear = 420.0f;        // これより近いと離れる
+constexpr float kFlightFar = 720.0f;         // これより遠いと近づく
+constexpr int   kForceDiveAfter = 4;         // 遠距離攻撃がこの回数続いたら、次は必ず降りてくる
+constexpr float kDiveChance = 0.20f;         // 降魔の掌を選ぶ確率（最後の形態で +10%）
 
 } // namespace
 
@@ -154,6 +186,28 @@ BossDatabase::BossDatabase()
                        BossAttackKind::Shot, BossAttackKind::Combo, BossAttackKind::Burst };
         bosses_.push_back(b);
     }
+    {
+        // 竜王の火山の隠しボス。上半身だけの金属の仏像で、腕が六本（二本は腕組み）。
+        // 空に浮いたまま遠くから攻撃し、ときどき降りてきて掌で叩きつける。
+        // 浮いている間はジャンプ攻撃でしか届かない。降りてきて地上にいる間は普通に当たる。
+        BossDef b;
+        b.id = kVajraBossId;
+        b.name = "ヴァジュラ・ラグナシュラ";
+        b.title = "六臂の金剛像";
+        b.style = ArtStyle::Statue;
+        b.main = ColorRGB(156, 116, 58);     // 青銅に金をかぶせた地
+        b.accent = ColorRGB(246, 214, 138);  // 磨かれた面
+        b.trim = ColorRGB(255, 196, 92);     // 光（光背・攻撃）
+        b.maxHp = 76000.0f; b.attack = 9400.0f; b.defense = 940.0f; b.moveSpeed = 230.0f;
+        b.halfWidth = 96.0f; b.height = 236.0f;
+        b.flying = true;
+        b.hoverHeight = 240.0f;   // 地上の攻撃（ソードスキルでも高さ約 210 まで）は届かず、ジャンプ攻撃は届く高さ
+        b.assetFolder = "vajra";
+        b.expReward = 12500; b.colReward = 16000;
+        b.patterns = { BossAttackKind::SkyVolley, BossAttackKind::SkyThunder, BossAttackKind::SkyHalo,
+                       BossAttackKind::DiveSlam };
+        bosses_.push_back(b);
+    }
 }
 
 const BossDatabase& BossDatabase::Instance()
@@ -203,6 +257,19 @@ void Boss::Setup(const BossDef& def, const Vec2& position, float powerScale, int
     art.hasWeapon = (def.style == ArtStyle::Knight || def.style == ArtStyle::Humanoid);
 
     animator.SetSet(ActorAssets::Instance().BossSet(def.id, def.assetFolder));
+
+    // 空を飛ぶボスは浮いた高さから始める
+    altitude_ = def.flying ? def.hoverHeight : 0.0f;
+    altitudeTarget_ = altitude_;
+    groundY_ = position.y;
+    stageGroundY_ = position.y;
+    pos.y = position.y - altitude_;
+    flightTime_ = 0.0f;
+    diveTargetX_ = position.x;
+    diveLanded_ = false;
+    attacksSinceDive_ = 0;
+    thunderTargets_.clear();
+    lastPlayerPos_ = position;
 
     alive = true;
     state_ = BossState::Intro;
@@ -324,6 +391,38 @@ void Boss::ChoosePattern(float distance)
 {
     if (!def_ || def_->patterns.empty()) return;
 
+    if (def_->flying) {
+        // 空を飛ぶボス：基本は空からの遠距離攻撃。ときどき（約 2 割、最後の形態で約 3 割）降りてきて
+        // 掌で叩く。遠距離攻撃が続いたら必ず降りてくる（地上で攻撃できる機会を作る）
+        int diveIndex = -1;
+        std::vector<int> ranged;
+        for (size_t i = 0; i < def_->patterns.size(); ++i) {
+            if (def_->patterns[i] == BossAttackKind::DiveSlam) diveIndex = static_cast<int>(i);
+            else if (static_cast<int>(i) != lastPatternIndex_) ranged.push_back(static_cast<int>(i));
+        }
+        if (ranged.empty()) {
+            for (size_t i = 0; i < def_->patterns.size(); ++i) {
+                if (def_->patterns[i] != BossAttackKind::DiveSlam) ranged.push_back(static_cast<int>(i));
+            }
+        }
+        const float progress = (hpBars_ > 1) ? static_cast<float>(phase_ - 1) / static_cast<float>(hpBars_ - 1) : 0.0f;
+        const bool lastWasDive = (lastPatternIndex_ == diveIndex);
+        const bool dive = diveIndex >= 0 && !lastWasDive
+                       && (ranged.empty() || attacksSinceDive_ >= kForceDiveAfter
+                           || (RangeMatches(BossAttackKind::DiveSlam, distance)
+                               && math::RandChance(kDiveChance + 0.1f * progress)));
+        int pick = diveIndex;
+        if (dive) {
+            attacksSinceDive_ = 0;
+        } else {
+            pick = ranged[static_cast<size_t>(math::RandInt(0, static_cast<int>(ranged.size()) - 1))];
+            ++attacksSinceDive_;
+        }
+        lastPatternIndex_ = pick;
+        StartWindup(def_->patterns[static_cast<size_t>(pick)]);
+        return;
+    }
+
     // 間合いに合うパターンを優先し、直前と同じものは避ける
     std::vector<int> candidates;
     for (size_t i = 0; i < def_->patterns.size(); ++i) {
@@ -360,6 +459,66 @@ void Boss::StartWindup(BossAttackKind kind)
     nextStepTime_ = 0.0f;
     velocity.x = 0.0f;
     animator.Play(PoseKind::Attack, true);
+
+    // 空を飛ぶボスの狙い：予備動作に入った時点のプレイヤーの位置へ降りる / 雷を落とす
+    auto clampX = [this](float x) {
+        if (stageWidth_ <= 0.0f) return x;
+        return math::Clamp(x, halfWidth + 40.0f, stageWidth_ - halfWidth - 40.0f);
+    };
+    if (kind == BossAttackKind::DiveSlam) {
+        diveTargetX_ = clampX(lastPlayerPos_.x);
+        diveLanded_ = false;
+    } else if (kind == BossAttackKind::SkyThunder) {
+        // 足元 → 左右の順に落とす
+        thunderTargets_ = { clampX(lastPlayerPos_.x), clampX(lastPlayerPos_.x - 300.0f),
+                            clampX(lastPlayerPos_.x + 300.0f) };
+        thunderZ_ = lastPlayerZ_;
+    }
+}
+
+Projectile Boss::MakeProjectile(const Vec2& from, const Vec2& shotVelocity, float radius, float damageMultiplier,
+                                float knockback, int kind) const
+{
+    Projectile projectile;
+    projectile.pos = from;
+    projectile.velocity = shotVelocity;
+    projectile.radius = radius;
+    projectile.team = Team::Enemy;
+    projectile.sourceId = id;
+    projectile.attack = stats.attack * damageBoost_;
+    projectile.damageMultiplier = damageMultiplier;
+    projectile.critRate = stats.critRate;
+    projectile.critDamage = stats.critDamage;
+    projectile.knockback = knockback;
+    projectile.z = z;
+    projectile.life = 3.4f;
+    projectile.kind = kind;
+    projectile.color = art.trim;
+    return projectile;
+}
+
+void Boss::SpawnThunder(CombatSystem& combat, float x)
+{
+    // 予告した奥行きの地面に落とす（雷の柱は高いので、ジャンプしてもよけられない。奥行きをずらしてよける）
+    const float ground = stageGroundY_ - thunderZ_;
+    HitBox hitBox;
+    hitBox.area = Rect(x - 64.0f, ground - 760.0f, x + 64.0f, ground);
+    hitBox.team = Team::Enemy;
+    hitBox.sourceId = id;
+    hitBox.attack = stats.attack * damageBoost_;
+    hitBox.damageMultiplier = 1.3f;
+    hitBox.critRate = stats.critRate;
+    hitBox.critDamage = stats.critDamage;
+    hitBox.knockback = 300.0f;
+    hitBox.launch = true;
+    hitBox.z = thunderZ_;
+    hitBox.zRange = config::kHitDepthRange * 1.6f;
+    hitBox.life = 0.2f;
+    hitBox.color = art.trim;
+    combat.AddHitBox(hitBox);
+    combat.AddBolt(x, ground - 1100.0f, ground, art.trim, 0.4f);
+    combat.AddImpact(Vec2(x, ground - 10.0f), art.trim, 14, 420.0f);
+    combat.AddRing(Vec2(x, ground), 160.0f, art.trim, 0.35f);
 }
 
 void Boss::SpawnMeleeHit(CombatSystem& combat, float reachScale, float heightScale,
@@ -465,6 +624,33 @@ void Boss::ExecuteAttack(CombatSystem& combat)
         combat.AddHitBox(hitBox);
         break;
     }
+    case BossAttackKind::SkyVolley: {
+        // 上の腕から、プレイヤーの胸元へ向けて 5 本を扇状に撃ち下ろす
+        const Vec2 from(pos.x + static_cast<float>(facing) * halfWidth * 0.5f, pos.y - height * 0.55f);
+        const Vec2 target(lastPlayerPos_.x, lastPlayerPos_.y - 80.0f);
+        const float base = std::atan2(target.y - from.y, target.x - from.x);
+        for (int i = -2; i <= 2; ++i) {
+            const float angle = base + math::DegToRad(9.0f * static_cast<float>(i));
+            const Vec2 velocityDir(std::cos(angle), std::sin(angle));
+            combat.AddProjectile(MakeProjectile(from, velocityDir * 640.0f, 18.0f, 0.75f, 260.0f, 3));
+        }
+        combat.AddImpact(from, art.trim, 10, 300.0f);
+        break;
+    }
+    case BossAttackKind::SkyHalo:
+        // 地面すれすれを左右へ走る光輪（ジャンプで飛び越える）
+        for (int side = -1; side <= 1; side += 2) {
+            combat.AddProjectile(MakeProjectile(Vec2(pos.x + static_cast<float>(side) * 30.0f, groundY_ - 72.0f),
+                                                Vec2(static_cast<float>(side) * 560.0f, 0.0f), 46.0f, 0.9f, 320.0f, 4));
+        }
+        combat.AddRing(Vec2(pos.x, groundY_), 260.0f, art.trim, 0.45f);
+        break;
+
+    case BossAttackKind::SkyThunder:   // 雷は UpdateAttackPhase で順に落とす
+    case BossAttackKind::DiveSlam:     // 急降下も UpdateAttackPhase で進める
+        velocity.x = 0.0f;
+        break;
+
     default:
         break;
     }
@@ -532,6 +718,39 @@ void Boss::UpdateAttackPhase(float dt, CombatSystem& combat, const Vec2& playerP
         }
         break;
 
+    case BossAttackKind::SkyThunder:
+        // 足元 → 左右の順に 0.16 秒おきに落とす
+        while (attackStep_ < static_cast<int>(thunderTargets_.size())
+               && stateTimer_ >= 0.16f * static_cast<float>(attackStep_)) {
+            SpawnThunder(combat, thunderTargets_[static_cast<size_t>(attackStep_)]);
+            ++attackStep_;
+        }
+        velocity.x *= 0.9f;
+        break;
+
+    case BossAttackKind::DiveSlam:
+        if (!diveLanded_) {
+            // 予告した位置へ寄りながら急降下する
+            velocity.x = math::Clamp((diveTargetX_ - pos.x) * 7.0f, -1200.0f, 1200.0f);
+            if (altitude_ <= 0.5f) {
+                // 着地：掌で叩きつけ、左右へ衝撃波。このあと硬直が終わるまで地上にとどまる
+                diveLanded_ = true;
+                attackStep_ = 1;
+                velocity.x = 0.0f;
+                SpawnMeleeHit(combat, 2.3f, 1.15f, 1.65f, 460.0f, true);
+                combat.AddRing(Vec2(pos.x, pos.y), 460.0f, art.trim, 0.5f);
+                combat.AddDust(Vec2(pos.x, pos.y), 1, 18);
+                for (int side = -1; side <= 1; side += 2) {
+                    combat.AddProjectile(MakeProjectile(Vec2(pos.x + static_cast<float>(side) * halfWidth, pos.y - 30.0f),
+                                                        Vec2(static_cast<float>(side) * 560.0f, 0.0f), 34.0f, 0.8f,
+                                                        320.0f, 1));
+                }
+            }
+        } else {
+            velocity.x *= 0.8f;
+        }
+        break;
+
     default:
         velocity.x *= 0.9f;
         break;
@@ -548,11 +767,52 @@ void Boss::TrackDepth(float dt, float playerZ, const Stage& stage)
     MoveDepth(math::Clamp(gap, -step, step), stage);
 }
 
+void Boss::UpdateFlightAltitudeTarget()
+{
+    // ふだんは決めた高さでゆっくり上下に揺れる
+    altitudeTarget_ = def_->hoverHeight + std::sin(flightTime_ * 1.7f) * kFlightBob;
+    if (currentKind_ == BossAttackKind::DiveSlam) {
+        if (state_ == BossState::Windup) altitudeTarget_ = def_->hoverHeight + 50.0f;     // 構え：少し浮き上がる
+        else if (state_ == BossState::Attack) altitudeTarget_ = 0.0f;                     // 急降下
+        else if (state_ == BossState::Recover && diveLanded_) altitudeTarget_ = 0.0f;     // 硬直の間は地上にとどまる
+    }
+}
+
+void Boss::KeepFlightDistance(float distance)
+{
+    // 遠距離攻撃しやすい間合い（420〜720）を保つ。近づかれたら離れ、遠ければ寄る
+    const float toward = (lastPlayerPos_.x >= pos.x) ? 1.0f : -1.0f;
+    float desired = 0.0f;
+    if (distance < kFlightNear) desired = -toward * def_->moveSpeed * 0.9f;
+    else if (distance > kFlightFar) desired = toward * def_->moveSpeed;
+    velocity.x += (desired * speedBoost_ - velocity.x) * 0.08f;
+}
+
+void Boss::ApplyFlightPhysics(float dt, const Stage& stage)
+{
+    stageGroundY_ = stage.GroundYAt(0.0f);
+    groundY_ = stage.GroundYAt(z);
+    stageWidth_ = stage.Width();
+
+    const bool diving = (state_ == BossState::Attack && currentKind_ == BossAttackKind::DiveSlam);
+    const float speed = (altitudeTarget_ < altitude_) ? (diving ? kDiveSpeed : kFlightSinkSpeed) : kFlightRiseSpeed;
+    altitude_ = math::Approach(altitude_, altitudeTarget_, speed * dt);
+
+    pos.x = stage.ClampX(pos.x + velocity.x * dt, halfWidth);
+    pos.y = groundY_ - altitude_;
+    velocity.y = 0.0f;
+    onGround = altitude_ <= 0.5f;
+}
+
 void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
                   const Vec2& playerPos, bool playerAlive, float playerZ)
 {
     if (!def_) return;
 
+    lastPlayerPos_ = playerPos;
+    lastPlayerZ_ = playerZ;
+    flightTime_ += dt;
+    if (stageWidth_ <= 0.0f) stageWidth_ = stage.Width();
     stateTimer_ += dt;
     hpDisplay_ = math::Approach(hpDisplay_, HpRatio(), dt * 0.55f);
     roarTimer_ += dt;
@@ -563,7 +823,11 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
     if (!alive) {
         state_ = BossState::Dead;
         velocity.x *= 0.9f;
-        ApplyPhysics(dt, stage);
+        ApplyPhysics(dt, stage);   // 空を飛ぶボスも、倒れたら地面へ落ちる
+        if (IsFlying()) {
+            groundY_ = stage.GroundYAt(z);
+            altitude_ = math::MaxF(0.0f, groundY_ - pos.y);
+        }
         UpdateTimers(dt);
         pose = PoseKind::Dead;
 
@@ -599,7 +863,8 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
         break;
     }
     case BossState::Idle: {
-        velocity.x *= 0.86f;
+        if (IsFlying()) KeepFlightDistance(distance);
+        else velocity.x *= 0.86f;
         FaceTowards(playerPos.x);
         TrackDepth(dt, playerZ, stage);
         if (!playerAlive) break;
@@ -607,7 +872,7 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
         // 少し間を置いてから次の行動を決める
         const float waitTime = math::MaxF(0.25f, 0.85f / speedBoost_);
         if (stateTimer_ >= waitTime) {
-            if (distance > 320.0f && math::RandChance(0.45f)) {
+            if (!IsFlying() && distance > 320.0f && math::RandChance(0.45f)) {
                 state_ = BossState::Move;
                 stateTimer_ = 0.0f;
                 moveTarget_ = playerPos.x;
@@ -664,7 +929,12 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
         break;
     }
 
-    ApplyPhysics(dt, stage);
+    if (IsFlying()) {
+        UpdateFlightAltitudeTarget();
+        ApplyFlightPhysics(dt, stage);
+    } else {
+        ApplyPhysics(dt, stage);
+    }
     UpdateTimers(dt);
     UpdatePose();
 }
@@ -677,13 +947,16 @@ void Boss::UpdatePose()
     // 技ごとに違う振り方になるようモーションを割り当てる
     motionVariant = static_cast<int>(currentKind_)
                   % math::MaxI(1, WeaponComboLength(art.weapon));
+    const bool statue = (art.style == ArtStyle::Statue);
+    if (statue) motionVariant = StatueMotionFor(currentKind_);
 
     switch (state_) {
     case BossState::Intro:
         // 登場演出の咆哮：口を開き（武器持ちは振りかぶり）、そのまま吠え続ける
         if (introRoar_) {
             pose = PoseKind::Attack;
-            motionVariant = static_cast<int>(BossAttackKind::Burst) % math::MaxI(1, WeaponComboLength(art.weapon));
+            motionVariant = statue ? kStatueMotionThunder
+                                   : static_cast<int>(BossAttackKind::Burst) % math::MaxI(1, WeaponComboLength(art.weapon));
             motionPhase = math::Clamp(0.15f + roarTimer_ * 1.2f, 0.15f, 0.55f);
         } else {
             pose = PoseKind::Idle;
@@ -715,7 +988,8 @@ void Boss::UpdatePose()
         pose = (math::Abs(velocity.x) > 40.0f) ? PoseKind::Run : PoseKind::Idle;
         break;
     }
-    if (!onGround && alive) pose = (velocity.y < 0.0f) ? PoseKind::Jump : PoseKind::Fall;
+    // 空を飛ぶボスは浮いていても跳躍・落下のポーズにしない
+    if (!onGround && alive && !IsFlying()) pose = (velocity.y < 0.0f) ? PoseKind::Jump : PoseKind::Fall;
     animator.Play(pose, false);
 }
 
@@ -746,6 +1020,35 @@ void Boss::Draw(const Camera& camera) const
         } else if (currentKind_ == BossAttackKind::Burst) {
             const Vec2 center = camera.WorldToScreen(Vec2(pos.x, pos.y));
             draw::Circle(center.x, center.y, 450.0f * t, palette::kDanger, false, 3.0f, 150);
+        } else if (currentKind_ == BossAttackKind::DiveSlam) {
+            // 降りてくる場所（地面の帯）
+            const Rect area = Rect::FromFoot(diveTargetX_, groundY_, 250.0f, 46.0f);
+            const Rect screenArea = camera.WorldToScreen(area);
+            draw::FillRect(screenArea, palette::kDanger, static_cast<int>(70.0f * t));
+            draw::StrokeRect(screenArea, palette::kDanger, 2.0f, static_cast<int>(200.0f * t));
+            const Vec2 mark = camera.WorldToScreen(Vec2(diveTargetX_, groundY_));
+            DrawOvalAA(mark.x, mark.y, 120.0f, 30.0f, 32, draw::ToDx(palette::kDanger), FALSE, 3.0f);
+        } else if (currentKind_ == BossAttackKind::SkyHalo) {
+            // 光輪が走る高さ（左右へ）
+            const Rect lane(pos.x - 900.0f, groundY_ - 118.0f, pos.x + 900.0f, groundY_ - 26.0f);
+            draw::FillRect(camera.WorldToScreen(lane), palette::kDanger, static_cast<int>(40.0f * t));
+        }
+    }
+
+    // 天雷の予告（予備動作の間と、まだ落ちていない場所）
+    if (alive && currentKind_ == BossAttackKind::SkyThunder
+        && (state_ == BossState::Windup || state_ == BossState::Attack)) {
+        const float t = (state_ == BossState::Windup)
+                      ? math::Clamp(stateTimer_ / math::MaxF(windupTime_, 0.01f), 0.0f, 1.0f) : 1.0f;
+        const float ground = stageGroundY_ - thunderZ_;
+        const int first = (state_ == BossState::Attack) ? attackStep_ : 0;
+        for (int i = first; i < static_cast<int>(thunderTargets_.size()); ++i) {
+            const float x = thunderTargets_[static_cast<size_t>(i)];
+            const Rect column = camera.WorldToScreen(Rect(x - 64.0f, ground - 760.0f, x + 64.0f, ground));
+            draw::FillRect(column, palette::kDanger, static_cast<int>(36.0f * t));
+            const Vec2 mark = camera.WorldToScreen(Vec2(x, ground));
+            DrawOvalAA(mark.x, mark.y, 70.0f * (0.4f + 0.6f * t), 20.0f * (0.4f + 0.6f * t), 32,
+                       draw::ToDx(palette::kDanger), FALSE, 3.0f);
         }
     }
 
@@ -757,7 +1060,18 @@ void Boss::Draw(const Camera& camera) const
                    static_cast<int>(30.0f + 60.0f * progress), 4);
     }
 
-    DrawBody(camera);
+    // 空を飛ぶボスの影は、いる場所の真下の地面に描く（高く浮くほど小さく薄く）
+    const bool flying = IsFlying();
+    if (flying) {
+        const float scale = DepthScale();
+        const Vec2 ground = camera.WorldToScreen(Vec2(pos.x, groundY_));
+        const float lift = math::Clamp(altitude_ / 500.0f, 0.0f, 0.7f);
+        const float fade = alive ? 1.0f : 1.0f - math::Clamp((deathTimer - 0.6f) / 0.6f, 0.0f, 1.0f);
+        DrawActorShadow(ground.x, ground.y, halfWidth * 2.2f * scale * (1.0f - lift * 0.5f),
+                        static_cast<int>(90.0f * (1.0f - lift) * fade));
+    }
+
+    DrawBody(camera, 255, !flying);
     DrawHpBars(camera);
 }
 
@@ -832,6 +1146,10 @@ void Boss::HeadCircle(Vec2& center, float& radius) const
     case ArtStyle::Wisp:
         center = Vec2(pos.x, pos.y - h * 0.62f);
         radius = w * 0.30f;
+        break;
+    case ArtStyle::Statue:   // 上半身の上の頭（光背の中心）
+        center = Vec2(pos.x + side * w * 0.03f, pos.y - h * 0.80f);
+        radius = h * 0.12f;
         break;
     default:                 // 人型・騎士
         center = Vec2(pos.x + side * w * 0.04f, pos.y - h * 0.88f);

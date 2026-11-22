@@ -31,6 +31,7 @@ struct HudInfo
     int   combo = 0;
     float comboTimer = 0.0f;
     bool  showFps = false;
+    bool  hiddenFloor = false;   // 隠しフロアにいる（「FLOOR 1 / 5」の代わりに「HIDDEN FLOOR」と出す）
 };
 
 //------------------------------------------------------------------------------

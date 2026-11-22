@@ -708,8 +708,12 @@ void BattleHud::DrawFloorInfo(const HudInfo& info) const
     draw::ChamferRect(panel, 10.0f, palette::kPanelDark, 200);
     draw::StrokeRect(panel, palette::kBorder.Scaled(0.7f), 1.0f, 160);
 
-    draw::Text(FontSize::Small, panel.left + 16.0f, panel.top + 8.0f, palette::kAccent,
-               str::Format("FLOOR %d / %d", info.floorIndex, info.floorCount));
+    if (info.hiddenFloor) {
+        draw::Text(FontSize::Small, panel.left + 16.0f, panel.top + 8.0f, palette::kAccentWarm, "HIDDEN FLOOR");
+    } else {
+        draw::Text(FontSize::Small, panel.left + 16.0f, panel.top + 8.0f, palette::kAccent,
+                   str::Format("FLOOR %d / %d", info.floorIndex, info.floorCount));
+    }
     draw::Text(FontSize::Small, panel.right - 16.0f, panel.top + 8.0f, palette::kTextDim,
                str::TimeText(info.questTime), draw::TextAlign::Right);
     draw::Text(FontSize::Small, panel.left + 16.0f, panel.top + 38.0f, palette::kText, info.floorName);

@@ -403,6 +403,24 @@ QuestDatabase::QuestDatabase()
             { kMatDragonScale, 1.00f, 1, 1 },
             { kMatFireScale,   0.70f, 2, 4 },
         };
+
+        // --- 隠しフロア：金剛の伽藍 -------------------------------------------------
+        //   挑戦 10〜30 回ごとの抽選に当たったときだけ、竜王を倒したあとに進める。
+        //   ボスは空に浮かぶ金属の仏像（ヴァジュラ・ラグナシュラ）。HP バーは竜王より 1 本多い。
+        quest.hasHiddenFloor = true;
+        quest.hiddenFloor = MakeFloor("HIDDEN FLOOR - 金剛の伽藍", 3400.0f, StageTheme::Sanctum);
+        quest.hiddenFloor.bossId = 6;
+        quest.hiddenFloor.bossHpBars = BossHpBarCountForPower(quest.recommendedPower) + 1;
+        // 装備は「黒い剣」だけ（1%）。クエスト詳細のボスドロップには載せない
+        quest.hiddenBossDrops = {
+            { kBlackSwordId, 0.01f, 98, 100 },
+        };
+        quest.hiddenBossMaterials = {
+            { kMatDragonScale, 1.00f, 2, 3 },
+            { kMatFireScale,   1.00f, 4, 6 },
+            { kMatObsidian,    0.60f, 2, 4 },
+            { kMatHolySilver,  0.35f, 1, 2 },
+        };
         quests_.push_back(quest);
     }
 }
@@ -574,6 +592,40 @@ std::vector<ItemStack> QuestDatabase::RollMaterials(const QuestDef& quest, bool 
     // ボス：撃破時に候補ごとに抽選する
     if (bossDefeated) {
         for (const MaterialDrop& entry : quest.bossMaterials) rollEntry(entry);
+    }
+    return result;
+}
+
+std::vector<EquipmentItem> QuestDatabase::RollHiddenBossDrops(const QuestDef& quest, float dropRate) const
+{
+    std::vector<EquipmentItem> drops;
+    const ItemDatabase& items = ItemDatabase::Instance();
+    const float rate = math::MaxF(0.0f, dropRate);
+    for (const DropEntry& entry : quest.hiddenBossDrops) {
+        if (!math::RandChance(math::MinF(1.0f, entry.chance * rate))) continue;
+        EquipmentItem item = items.Create(entry.templateId, RollIv(entry, quest.difficulty));
+        if (item.IsValid()) drops.push_back(item);
+    }
+    return drops;
+}
+
+std::vector<ItemStack> QuestDatabase::RollHiddenBossMaterials(const QuestDef& quest, float dropRate) const
+{
+    std::vector<ItemStack> result;
+    const float rate = math::MaxF(0.0f, dropRate);
+    for (const MaterialDrop& entry : quest.hiddenBossMaterials) {
+        if (!math::RandChance(math::MinF(1.0f, entry.chance * rate))) continue;
+        const int low = math::MaxI(1, entry.minCount);
+        const int high = math::MaxI(low, entry.maxCount);
+        const int count = math::RandInt(low, high);
+        bool merged = false;
+        for (ItemStack& stack : result) {
+            if (stack.itemId == entry.itemId) {
+                stack.count += count;
+                merged = true;
+            }
+        }
+        if (!merged) result.push_back(ItemStack{ entry.itemId, count });
     }
     return result;
 }

@@ -48,6 +48,16 @@ struct BossDropOdds
 };
 
 //------------------------------------------------------------------------------
+// 隠しフロアの抽選
+//   隠しフロアのあるクエストに挑むたびに数え、10〜30 回（毎回ランダム）に 1 回だけ抽選する。
+//   当たれば、最後のボスを倒したあとに隠しフロアへのゲートが開く。
+//   当たっても外れても、その回のクエストが終わったら数え直す。
+//------------------------------------------------------------------------------
+constexpr int   kHiddenFloorMinAttempts = 10;   // 抽選までの挑戦回数（最少）
+constexpr int   kHiddenFloorMaxAttempts = 30;   // 同（最多）
+constexpr float kHiddenFloorChance = 0.5f;      // 抽選が当たる確率
+
+//------------------------------------------------------------------------------
 // クエスト定義
 //------------------------------------------------------------------------------
 struct QuestDef
@@ -76,6 +86,14 @@ struct QuestDef
     // クエスト詳細にボスドロップの中身を載せず「不明」とだけ出す
     bool hideDrops = false;
 
+    // --- 隠しフロア（抽選に当たったときだけ、最後のボスを倒したあとに進める）--------
+    //   floors には含めない（フロア数・クリアの判定は floors だけで数える）。
+    //   隠しボスのドロップはクエスト詳細に出さない。
+    bool                      hasHiddenFloor = false;
+    FloorDef                  hiddenFloor;
+    std::vector<DropEntry>    hiddenBossDrops;
+    std::vector<MaterialDrop> hiddenBossMaterials;
+
     int FloorCount() const { return static_cast<int>(floors.size()); }
 };
 
@@ -97,6 +115,10 @@ public:
     // 素材の抽選（同じ素材はまとめて個数にする）
     std::vector<ItemStack> RollMaterials(const QuestDef& quest, bool bossDefeated,
                                          int enemiesDefeated, float dropRate = 1.0f) const;
+
+    // 隠しボスを倒したときの抽選（候補ごとに個別に引く。初回クリアの確定ドロップは無し）
+    std::vector<EquipmentItem> RollHiddenBossDrops(const QuestDef& quest, float dropRate = 1.0f) const;
+    std::vector<ItemStack>     RollHiddenBossMaterials(const QuestDef& quest, float dropRate = 1.0f) const;
 
     // ボスドロップの実際の確率（RollDrops と同じ手順で計算する）
     std::vector<BossDropOdds> CalcBossDropOdds(const QuestDef& quest,

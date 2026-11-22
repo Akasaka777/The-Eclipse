@@ -73,8 +73,8 @@ public:
     void UpdateTimers(float dt);
     void FaceTowards(float targetX);
 
-    // 足元の影＋本体を描画
-    void DrawBody(const Camera& camera, int alpha = 255) const;
+    // 足元の影＋本体を描画（shadow = false なら影を描かない。空を飛ぶボスは地面に自分で描く）
+    void DrawBody(const Camera& camera, int alpha = 255, bool shadow = true) const;
 
 protected:
     // 死亡演出の進行度（0〜1）

@@ -118,7 +118,7 @@ void TitleScene::Draw(GameContext& context)
     draw::Circle(cx, cy, 140.0f, ColorRGB(8, 6, 16), true, 1.0f, 255);
 
     // --- タイトル ------------------------------------------------------------
-    draw::TextShadow(FontSize::Title, cx, 470.0f, palette::kText, "The Eclipse",
+    draw::TextShadow(FontSize::Title, cx, 470.0f, palette::kText, config::kGameTitle,
                      draw::TextAlign::Center);
     draw::Text(FontSize::Normal, cx, 580.0f, palette::kAccent,
                "― 蝕の夜に、剣を執れ ―", draw::TextAlign::Center);

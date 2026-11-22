@@ -57,12 +57,14 @@ constexpr float kLetterboxHeight = 120.0f;
 constexpr float kDebugPanelX = 28.0f;
 constexpr float kDebugPanelY = 254.0f;
 constexpr float kDebugPanelW = 420.0f;
-constexpr float kDebugPanelH = 230.0f;
+constexpr float kDebugPanelH = 272.0f;
 constexpr float kDebugFloorTextY = 158.0f;   // パネル上端から「フロア移動」の見出しまで
 constexpr float kDebugFloorRowY = 182.0f;    // パネル上端からボタンの段まで
 constexpr float kDebugFloorButtonH = 34.0f;
 constexpr float kDebugArrowW = 44.0f;        // ◀ / ▶ の幅
 constexpr float kDebugButtonGap = 6.0f;
+constexpr float kDebugHiddenRowY = 226.0f;   // パネル上端から「隠しフロア」の段まで
+constexpr float kDebugHiddenButtonW = 132.0f;
 
 Rect DebugPanelRect()
 {
@@ -112,16 +114,58 @@ void QuestScene::OnEnter(GameContext& context)
     debugClickConsumed_ = false;
     bossRewardGranted_ = false;
 
+    // 隠しフロアの抽選（隠しフロアのあるクエストに挑むたびに数え、10〜30 回ごとに 1 回抽選する）
+    hiddenLotteryHeld_ = false;
+    hiddenRoute_ = false;
+    mainBossDefeated_ = false;
+    hiddenFloorReached_ = false;
+    hiddenBossDefeated_ = false;
+    if (quest_ && quest_->hasHiddenFloor) {
+        const HiddenFloorDraw draw = context.player.BeginHiddenFloorAttempt(quest_->id);
+        hiddenLotteryHeld_ = draw.held;
+        hiddenRoute_ = draw.won;
+    }
+
     camera_.SetShakeEnabled(context.settings.screenShake);
     LoadFloor(0, context);
+}
+
+const FloorDef& QuestScene::FloorAt(int index) const
+{
+    if (IsHiddenFloor(index)) return quest_->hiddenFloor;
+    return quest_->floors[static_cast<size_t>(math::ClampInt(index, 0, quest_->FloorCount() - 1))];
+}
+
+int QuestScene::LastFloorIndex() const
+{
+    if (!quest_) return 0;
+    return quest_->FloorCount() - 1 + (quest_->hasHiddenFloor ? 1 : 0);
+}
+
+bool QuestScene::IsHiddenFloor(int index) const
+{
+    return quest_ && quest_->hasHiddenFloor && index == quest_->FloorCount();
+}
+
+void QuestScene::OpenHiddenGate()
+{
+    // 竜王を倒した場所に、隠しフロアへのゲートが開く（通常の勝利の代わり）
+    phase_ = Phase::FloorClear;
+    phaseTimer_ = 0.0f;
+    stage_.SetGateOpen(true);
+    stage_.SetGateLabel("▶ 隠しフロアへ");
+    bannerMain_ = "HIDDEN FLOOR";
+    bannerSub_ = "隠しフロアへの扉が開いた……右のゲートへ";
+    bannerTimer_ = 3.2f;
 }
 
 void QuestScene::LoadFloor(int index, GameContext& context)
 {
     if (!quest_) return;
 
-    floorIndex_ = math::ClampInt(index, 0, quest_->FloorCount() - 1);
-    const FloorDef& floor = quest_->floors[static_cast<size_t>(floorIndex_)];
+    floorIndex_ = math::ClampInt(index, 0, LastFloorIndex());
+    const FloorDef& floor = FloorAt(floorIndex_);
+    if (IsHiddenFloor(floorIndex_)) hiddenFloorReached_ = true;
 
     stage_.Load(floor);
     enemies_.clear();
@@ -145,9 +189,14 @@ void QuestScene::LoadFloor(int index, GameContext& context)
         if (def) {
             boss_.reset(new Boss());
             const float bossZ = stage_.Depth() * 0.5f;
+            // HP バーの本数はフロアで決めていればそれ、無ければクエストの強さから
+            const int bars = (floor.bossHpBars > 0) ? math::ClampInt(floor.bossHpBars, kMinBossHpBars, kMaxBossHpBars)
+                                                    : QuestDatabase::BossHpBarCount(*quest_);
             boss_->Setup(*def, Vec2(stage_.Width() - 600.0f, stage_.GroundYAt(bossZ)),
-                         quest_->enemyPowerScale, QuestDatabase::BossHpBarCount(*quest_));
+                         quest_->enemyPowerScale, bars);
             boss_->z = bossZ;
+            // ボスごとに撃破の報酬を渡す（隠しボスは竜王とは別に貰える）
+            bossRewardGranted_ = false;
         }
     }
 
@@ -322,7 +371,7 @@ void QuestScene::SpawnFloorEnemies(const GameContext& context)
     (void)context;
     if (!quest_) return;
 
-    const FloorDef& floor = quest_->floors[static_cast<size_t>(floorIndex_)];
+    const FloorDef& floor = FloorAt(floorIndex_);
     const EnemyDatabase& database = EnemyDatabase::Instance();
 
     for (const EnemySpawn& spawn : floor.spawns) {
@@ -446,10 +495,21 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
             phaseTimer_ = 0.0f;
             camera_.Shake(18.0f, 0.5f);
         } else if (boss_ && !boss_->alive) {
-            phase_ = Phase::Victory;
-            phaseTimer_ = 0.0f;
             combat_.AddPopup(Vec2(player_.pos.x, player_.pos.y - 240.0f), "BOSS DEFEATED",
                              palette::kAccentWarm, true);
+            if (IsHiddenFloor(floorIndex_)) {
+                hiddenBossDefeated_ = true;
+                phase_ = Phase::Victory;
+                phaseTimer_ = 0.0f;
+            } else {
+                mainBossDefeated_ = true;
+                if (hiddenRoute_ && quest_ && quest_->hasHiddenFloor) {
+                    OpenHiddenGate();   // 抽選に当たっていれば、勝利の代わりに隠しフロアへ
+                } else {
+                    phase_ = Phase::Victory;
+                    phaseTimer_ = 0.0f;
+                }
+            }
         } else if (!boss_ && AliveEnemyCount() == 0) {
             phase_ = Phase::FloorClear;
             phaseTimer_ = 0.0f;
@@ -468,7 +528,7 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
             transitioning_ = true;
             transitionAlpha_ = 0.0f;
             pendingFloor_ = floorIndex_ + 1;
-            transitionText_ = "次のフロアへ...";
+            transitionText_ = IsHiddenFloor(pendingFloor_) ? "隠しフロアへ..." : "次のフロアへ...";
         }
         break;
 
@@ -613,6 +673,12 @@ void QuestScene::LayoutDebugFloorButtons()
     debugPrevFloorButton_.SetAccent(palette::kAccentWarm);
     debugNextFloorButton_.SetAccent(palette::kAccentWarm);
     for (ui::Button& button : debugFloorButtons_) button.SetAccent(palette::kAccentWarm);
+
+    // 「隠しフロア」（抽選に関係なく、すぐ隠しフロアへ移る）
+    debugHiddenFloorButton_ = ui::Button(Rect::FromXYWH(left, panel.top + kDebugHiddenRowY, kDebugHiddenButtonW,
+                                                        kDebugFloorButtonH),
+                                         "隠しフロア", FontSize::Tiny);
+    debugHiddenFloorButton_.SetAccent(palette::kAccentWarm);
 }
 
 void QuestScene::UpdateDebugFloorButtons(const Input& input, float dt)
@@ -633,12 +699,19 @@ void QuestScene::UpdateDebugFloorButtons(const Input& input, float dt)
         button.SetEnabled(allowed && i != floorIndex_);
         if (button.Update(input, dt)) target = i;
     }
+    // 隠しフロア（隠しフロアのあるクエストだけ押せる）
+    const bool hasHidden = quest_->hasHiddenFloor;
+    debugHiddenFloorButton_.SetSelected(IsHiddenFloor(floorIndex_));
+    debugHiddenFloorButton_.SetEnabled(allowed && hasHidden && !IsHiddenFloor(floorIndex_));
+    if (debugHiddenFloorButton_.Update(input, dt)) target = count;
 
     // ボタンの段をクリックしたフレームは、同じクリックで攻撃しない（押せないボタンの上でも）
     if (input.MouseClicked(MouseButton::Left)) {
         const Rect row(debugPrevFloorButton_.GetRect().left, debugPrevFloorButton_.GetRect().top,
                        debugNextFloorButton_.GetRect().right, debugNextFloorButton_.GetRect().bottom);
-        if (row.Expanded(4.0f).Contains(static_cast<float>(input.MouseX()), static_cast<float>(input.MouseY()))) {
+        const float mx = static_cast<float>(input.MouseX());
+        const float my = static_cast<float>(input.MouseY());
+        if (row.Expanded(4.0f).Contains(mx, my) || debugHiddenFloorButton_.GetRect().Expanded(4.0f).Contains(mx, my)) {
             debugClickConsumed_ = true;
         }
     }
@@ -657,7 +730,7 @@ bool QuestScene::DebugFloorMoveAllowed() const
 void QuestScene::DebugMoveToFloor(int index)
 {
     if (!DebugFloorMoveAllowed()) return;
-    if (index < 0 || index >= quest_->FloorCount() || index == floorIndex_) return;
+    if (index < 0 || index > LastFloorIndex() || index == floorIndex_) return;
 
     // ゲートを通ったときと同じく、暗転してからフロアを読み込む（敵は出し直し、HP / MP はそのまま）
     transitioning_ = true;
@@ -665,13 +738,13 @@ void QuestScene::DebugMoveToFloor(int index)
     pendingFloor_ = index;
     transitionText_ = DebugFloorName(index) + " へ移動...";
     bannerTimer_ = 0.0f;
-    debugMessage_ = str::Format("%s「%s」へ移動しました", DebugFloorName(index).c_str(),
-                                quest_->floors[static_cast<size_t>(index)].name.c_str());
+    debugMessage_ = str::Format("%s「%s」へ移動しました", DebugFloorName(index).c_str(), FloorAt(index).name.c_str());
     debugMessageTimer_ = 2.5f;
 }
 
 std::string QuestScene::DebugFloorName(int index) const
 {
+    if (IsHiddenFloor(index)) return "隠しフロア";
     if (quest_ && index >= 0 && index < quest_->FloorCount()
         && quest_->floors[static_cast<size_t>(index)].bossId >= 0) {
         return "ボスフロア";
@@ -735,6 +808,24 @@ void QuestScene::DrawDebugOverlay(const GameContext& context) const
     debugPrevFloorButton_.Draw();
     for (const ui::Button& button : debugFloorButtons_) button.Draw();
     debugNextFloorButton_.Draw();
+
+    // --- 隠しフロア（ボタンと、抽選の様子）--------------------------------------------
+    debugHiddenFloorButton_.Draw();
+    {
+        const Rect button = debugHiddenFloorButton_.GetRect();
+        const float x = button.right + 10.0f;
+        if (!quest_ || !quest_->hasHiddenFloor) {
+            draw::Text(FontSize::Tiny, x, button.top + 10.0f, palette::kTextDim, "このクエストに隠しフロアはありません");
+        } else {
+            const char* result = !hiddenLotteryHeld_ ? "今回の抽選：なし" : (hiddenRoute_ ? "今回の抽選：当たり" : "今回の抽選：外れ");
+            draw::Text(FontSize::Tiny, x, button.top + 1.0f, hiddenRoute_ ? palette::kAccentWarm : palette::kText, result);
+            const HiddenFloorProgress* progress = context.player.HiddenFloor(quest_->id);
+            const std::string next = (progress && progress->threshold > 0)
+                ? str::Format("挑戦 %d 回目（%d 回目で抽選）", progress->attempts, progress->threshold)
+                : std::string("まだ数えていません");
+            draw::Text(FontSize::Tiny, x, button.top + 18.0f, palette::kTextDim, next);
+        }
+    }
 
     if (debugMessageTimer_ > 0.0f) {
         draw::Text(FontSize::Small, panel.left + 12.0f, panel.bottom + 8.0f, palette::kAccentWarm,
@@ -1051,7 +1142,7 @@ void QuestScene::UpdateFloorTransition(float dt, GameContext& context)
     transitionAlpha_ = math::Approach(transitionAlpha_, 1.0f, dt * 2.4f);
     if (transitionAlpha_ < 1.0f) return;
 
-    if (pendingFloor_ < quest_->FloorCount()) {
+    if (pendingFloor_ <= LastFloorIndex()) {
         LoadFloor(pendingFloor_, context);
     }
     transitioning_ = false;
@@ -1062,6 +1153,12 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
 {
     QuestResult& result = context.lastResult;
     result.Reset();
+
+    // 最後のボスを倒していれば、隠しフロアで倒れても・リタイアしてもクリア扱い
+    if (mainBossDefeated_) {
+        cleared = true;
+        retired = false;
+    }
 
     result.cleared = cleared;
     result.retired = retired;
@@ -1099,13 +1196,37 @@ void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
     // ドロップ抽選
     if (quest_) {
         // LUK でドロップ率が上がる。初回クリアはボスドロップから必ず 1 つ落ちる。
+        //   ボスドロップは最後のボスを倒したときだけ（開発者モードで隠しフロアへ直行したときは無し）
         result.drops = QuestDatabase::Instance().RollDrops(
-            *quest_, cleared, enemiesDefeated_, context.player.DropRateMultiplier(),
+            *quest_, mainBossDefeated_, enemiesDefeated_, context.player.DropRateMultiplier(),
             result.firstClear);
         // 素材（道中は倒した数だけ、ボスは撃破時）
         result.materials = QuestDatabase::Instance().RollMaterials(
-            *quest_, cleared, enemiesDefeated_, context.player.DropRateMultiplier());
+            *quest_, mainBossDefeated_, enemiesDefeated_, context.player.DropRateMultiplier());
+
+        // 隠しボスのドロップ（黒い剣は 1%。持ち帰れる数の上限で消えないよう先頭に置く）
+        if (hiddenBossDefeated_) {
+            const float rate = context.player.DropRateMultiplier();
+            const std::vector<EquipmentItem> hidden = QuestDatabase::Instance().RollHiddenBossDrops(*quest_, rate);
+            result.drops.insert(result.drops.begin(), hidden.begin(), hidden.end());
+            if (result.drops.size() > 12) result.drops.resize(12);
+            for (const ItemStack& stack : QuestDatabase::Instance().RollHiddenBossMaterials(*quest_, rate)) {
+                bool merged = false;
+                for (ItemStack& have : result.materials) {
+                    if (have.itemId == stack.itemId) {
+                        have.count += stack.count;
+                        merged = true;
+                    }
+                }
+                if (!merged) result.materials.push_back(stack);
+            }
+        }
     }
+    result.hiddenFloorReached = hiddenFloorReached_;
+    result.hiddenBossDefeated = hiddenBossDefeated_;
+
+    // 隠しフロアの抽選をした回なら、ここで数え直す（当たっても外れても）
+    if (quest_ && quest_->hasHiddenFloor) context.player.EndHiddenFloorAttempt(quest_->id);
 
     // LUK で獲得経験値が増える（撃破ぶん＋クリア報酬の合計に掛ける。未クリアの半減のあと）
     result.expRate = context.player.ExpRateMultiplier();
@@ -1167,9 +1288,10 @@ void QuestScene::Draw(GameContext& context)
 
     // --- HUD ---------------------------------------------------------------
     ui::HudInfo info;
-    info.floorName = quest_ ? quest_->floors[static_cast<size_t>(floorIndex_)].name : "";
+    info.floorName = quest_ ? FloorAt(floorIndex_).name : "";
     info.floorIndex = floorIndex_ + 1;
     info.floorCount = quest_ ? quest_->FloorCount() : 1;
+    info.hiddenFloor = IsHiddenFloor(floorIndex_);
     info.enemiesRemaining = AliveEnemyCount();
     info.questTime = questTime_;
     info.combo = combo_;

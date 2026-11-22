@@ -11,6 +11,8 @@
   「HP / MP バーの流れるハイライトをなくす」を v0.8.1、「公式サイトにつながらないときは DXライブラリのキャッシュを使う」を
   v0.8.2 として push（下の「2.」の表）
 - 2026-11-20 追記：「端でカメラをゆっくり止める」「LUK で獲得経験値を上げる」を v0.9.0 として push（下の「2.」の表）
+- 2026-11-22 追記：ゲーム名を **Ars Gladii** に変更し、竜王の火山の隠しフロア・隠しボス・黒い剣・開発者モードのボタンを
+  v0.10.0 として push（下の「2.」の表）。リポジトリ名・プロジェクト名・フォルダ名（TheEclipse）は変えていない
 
 ---
 
@@ -71,6 +73,7 @@ DxLib / C++17 / Visual Studio 2022 / 1920x1080 の横スクロール 2D アク�
 | v0.8.1 | プレイヤーの HP バーと MP バーの流れるハイライトをなくす | `DrawGauge` の流れる光と `kShimmer*` を削除（先端の光・被弾 / 回復の光・瀕死の脈動は残す）。**流れる光を戻さないこと** |
 | v0.8.2 | リリースで DXライブラリの公式サイトにつながらないときはキャッシュを使う | v0.8.1 の 1 回目のリリースが公式サイトへの接続の時間切れ（WinError 10060）で失敗したため。`release.py` の `dxlib-url` は 3 回読み直し、だめなら `url=`（空）を出して止めない。ワークフローは url が空のとき `actions/cache/restore@v4`（`restore-keys: dxlib-http`、`fail-on-cache-miss`）で前回のキャッシュを使う |
 | v0.9.0 | 端でカメラがいきなり止まる → 端に近づくとカメラを遅くする／LUK で経験値の獲得倍率を上げる | カメラ：`Core/Camera.*` の `EaseIntoRange` と `kCameraEdgeEase = 240`（追従の目標を端の内側 240px から寄せ、外側 240px でちょうど端。ボス登場演出は `SnapToTarget(false)` / `Update(dt, false)` で今までどおり）。LUK：`Game/Ability.*` の `kLukExpRatePerPoint = 0.01` と `AbilityExpRate`、`PlayerData::ExpRateMultiplier`、`QuestScene::FinishQuest` で合計に掛けて四捨五入（`QuestResult::expRate`）。ステータス画面に「獲得経験値」の行、リザルトに「LUK 補正 ×1.20 込み」 |
+| v0.10.0 | ゲーム名を Ars Gladii に／竜王の火山に隠しフロア（10〜30 回に 1 回の抽選）／隠しボス ヴァジュラ・ラグナシュラ（上半身の仏像・腕 6 本・空から遠距離、たまに降りる）／黒い剣（1%・戦力 700〜710・クエスト詳細に出さない）／開発者モードに「隠しフロア」「隠しクエスト」 | 名前：`config::kGameTitle`。リリース：`release.py` の `product()` / `RENAMED_VERSION = (0,10,0)` で zip・exe・題名を版ごとに切り替え（ワークフローは `matrix.asset` / `matrix.title`）。抽選：`QuestDatabase.h` の `kHiddenFloor*`（確率 50% は**仕様に無く私が決めた**）、`PlayerData::Begin/EndHiddenFloorAttempt`、セーブの `hiddenfloor` 行。隠しフロア：`QuestDef::hasHiddenFloor / hiddenFloor / hiddenBoss*`（floors には含めず、番号は `FloorCount()`）、`QuestScene::FloorAt / IsHiddenFloor / OpenHiddenGate`、テーマ `StageTheme::Sanctum`。ボス：`kVajraBossId = 6`、`BossDef::flying / hoverHeight = 240`、攻撃 `SkyVolley / SkyThunder / SkyHalo / DiveSlam`、描画 `ArtStyle::Statue`（`CharacterArt.cpp` の `DrawStatue`）、雷 `CombatSystem::AddBolt`。剣：`kBlackSwordId = 170`、個体値 98〜100 で落とす。隠しクエストのボタンは**未実装の案内だけ** |
 
 過去の版とコミットの対応（`CHANGELOG.md` に書いてある）：
 v0.1.0=`27072c7`、v0.2.0=`fcc879d`、v0.3.0=`9c6c725`、v0.4.0=`dd109be`、v0.5.0=`d81fcf4`、
@@ -237,6 +240,7 @@ v0.6.0=`0aec2fc`、v0.7.0=`bdfe659`。v0.5.0 以前はバージョンの仕組�
 - 2026-11-05 のセッションで dxstub・build_lib.sh・harness.h を作り直し、status_hud（88 件、fail=0）と
   shots_status（左上の撮影）を足した。これらもリポジトリには入っていない。
 - 2026-11-20 のセッションでは camera_edge（50 件）・luk_exp（36 件）・shots_luk を足した（すべて fail=0）。
+- 2026-11-22 のセッションでは hidden_floor（150 件）・test_release_names.py（20 件）・shots_vajra・shots_debug を足した。
 - `tests/shots.cpp` ＋ FreeType（IPAGothic）：スクリーンショット。
 - `regen_vcxproj.py`：`src` 以下の .cpp / .h から vcxproj と .filters の一覧を作り直す（ファイルを足したら必要）。
 

@@ -115,11 +115,11 @@ jobs:
           python tools/.github/scripts/release.py package
           --version ${{ matrix.version }} --date ${{ matrix.date }} --commit ${{ matrix.commit }}
           --game game --bin game/bin/x64/Release --licenses dxlib/licenses
-          --out dist/TheEclipse-v${{ matrix.version }}-win64.zip
+          --out dist/${{ matrix.asset }}
       - uses: actions/upload-artifact@v4
         with:
           name: v${{ matrix.version }}
-          path: dist/TheEclipse-v${{ matrix.version }}-win64.zip
+          path: dist/${{ matrix.asset }}
           if-no-files-found: error
 
   publish:
@@ -144,8 +144,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 .github/scripts/release.py notes "${{ matrix.version }}" --commit "${{ matrix.commit }}" > notes.md
-          gh release create "${{ matrix.tag }}" "dist/TheEclipse-v${{ matrix.version }}-win64.zip" \
+          # zip の名前と題名は版ごとのゲーム名（v0.10.0 から Ars Gladii）。release.py plan が決める
+          gh release create "${{ matrix.tag }}" "dist/${{ matrix.asset }}" \
             --target "${{ matrix.commit }}" \
-            --title "The Eclipse v${{ matrix.version }}（${{ matrix.date }}）" \
+            --title "${{ matrix.title }}" \
             --notes-file notes.md \
             --latest=${{ matrix.latest }}

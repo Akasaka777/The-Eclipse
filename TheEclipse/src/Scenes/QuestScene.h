@@ -84,6 +84,14 @@ private:
     int  AliveEnemyCount() const;
     bool BossAlive() const;
 
+    // --- 隠しフロア -------------------------------------------------------------
+    //   フロアの番号は floors の順。隠しフロアのあるクエストでは、FloorCount() 番目が隠しフロア。
+    const FloorDef& FloorAt(int index) const;
+    int  LastFloorIndex() const;
+    bool IsHiddenFloor(int index) const;
+    // 最後のボスを倒したあと、抽選に当たっていれば隠しフロアへのゲートを開く
+    void OpenHiddenGate();
+
     // --- デバッグモード -------------------------------------------------------
     void UpdateDebug(const Input& input, GameContext& context);
     void DrawDebugOverlay(const GameContext& context) const;
@@ -94,7 +102,7 @@ private:
     bool DebugFloorMoveAllowed() const;
     // 暗転してから index のフロアを読み込む
     void DebugMoveToFloor(int index);
-    // 「2F」「ボスフロア」などの呼び名
+    // 「2F」「ボスフロア」「隠しフロア」などの呼び名
     std::string DebugFloorName(int index) const;
 
     const QuestDef* quest_ = nullptr;
@@ -139,6 +147,13 @@ private:
     int   expGained_ = 0;
     int   colGained_ = 0;
     bool  bossRewardGranted_ = false;
+
+    // 隠しフロア
+    bool  hiddenLotteryHeld_ = false;   // 今回の挑戦で抽選したか
+    bool  hiddenRoute_ = false;         // 抽選に当たったか（最後のボスを倒すと隠しフロアへのゲートが開く）
+    bool  mainBossDefeated_ = false;    // 最後のボス（隠しボスではない）を倒したか
+    bool  hiddenFloorReached_ = false;  // 隠しフロアに入ったか
+    bool  hiddenBossDefeated_ = false;  // 隠しボスを倒したか
     int   combo_ = 0;
     int   maxCombo_ = 0;
     int   parryCount_ = 0;
@@ -159,6 +174,7 @@ private:
     ui::Button debugPrevFloorButton_;
     ui::Button debugNextFloorButton_;
     std::vector<ui::Button> debugFloorButtons_;
+    ui::Button debugHiddenFloorButton_;   // 「隠しフロア」（隠しフロアのあるクエストだけ押せる）
     bool  debugClickConsumed_ = false;   // ボタンを押したフレームは、同じクリックで攻撃しない
 };
 

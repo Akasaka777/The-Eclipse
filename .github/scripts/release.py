@@ -54,6 +54,22 @@ def version_key(version):
     return tuple(int(part) for part in version.split("."))
 
 
+# ゲーム名は v0.10.0 で「The Eclipse」から「Ars Gladii」に変えた。
+# それより前の版は、作り直すときも元の名前（zip・exe・リリースの題名）のままにする。
+RENAMED_VERSION = (0, 10, 0)
+
+
+def product(version):
+    """(表示名, ファイル名に使う名前) を返す"""
+    if version_key(version) >= RENAMED_VERSION:
+        return "Ars Gladii", "ArsGladii"
+    return "The Eclipse", "TheEclipse"
+
+
+def release_title(version, date):
+    return f"{product(version)[0]} v{version}（{date}）"
+
+
 # --- CHANGELOG.md ---------------------------------------------------------------
 
 def read_changelog(path=CHANGELOG):
@@ -169,6 +185,8 @@ def cmd_plan(args):
             "date": entry["date"],
             "commit": commit,
             "latest": "true" if entry["version"] == newest else "false",
+            "asset": asset_name(entry["version"]),
+            "title": release_title(entry["version"], entry["date"]),
         })
     print(f"matrix={json.dumps(todo, ensure_ascii=False)}")
     print(f"count={len(todo)}")
@@ -177,7 +195,7 @@ def cmd_plan(args):
 # --- リリースノート ----------------------------------------------------------------
 
 def asset_name(version):
-    return f"TheEclipse-v{version}-win64.zip"
+    return f"{product(version)[1]}-v{version}-win64.zip"
 
 
 def cmd_notes(args):
@@ -192,8 +210,8 @@ def cmd_notes(args):
         print(body)
         print()
         print("### ダウンロード")
-        print(f"- 下の **{asset_name(args.version)}** をダウンロードして展開し、`TheEclipse.exe` を起動してください"
-              "（Windows 10 / 11、64 ビット）")
+        print(f"- 下の **{asset_name(args.version)}** をダウンロードして展開し、`{product(args.version)[1]}.exe` "
+              "を起動してください（Windows 10 / 11、64 ビット）")
         print("- 遊び方とセーブデータの場所は、zip の中の `README.txt` に書いてあります")
         return
     fail(f"CHANGELOG.md に v{args.version} がありません")
@@ -300,17 +318,17 @@ def cmd_dxlib(args):
 
 # --- 配布用 zip -------------------------------------------------------------------
 
-README_TEXT = """The Eclipse v{version}（{date}）
+README_TEXT = """{name} v{version}（{date}）
 横スクロール型 2D アクション RPG
 
 ■ 遊び方
   1. この zip を好きな場所に展開します（zip の中から直接起動しないでください）。
-  2. TheEclipse.exe をダブルクリックして起動します。
+  2. {exe} をダブルクリックして起動します。
      「Windows によって PC が保護されました」と出たときは「詳細情報」→「実行」を押してください。
   操作は、ゲームの「設定」タブの「操作一覧」で確認できます（キー設定もそこから変えられます）。
 
 ■ セーブデータ
-  TheEclipse.exe と同じフォルダの save\\save.txt に保存されます。
+  {exe} と同じフォルダの save\\save.txt に保存されます。
   バージョンごとに別のフォルダへ展開すれば、セーブデータも別々になります。
   新しいバージョンへ引き継ぐときは、save フォルダをコピーしてください。
   （古いバージョンでは、新しいバージョンのセーブデータを読めないことがあります）
@@ -330,14 +348,20 @@ README_TEXT = """The Eclipse v{version}（{date}）
 
 
 def cmd_package(args):
-    exe = os.path.join(args.bin, "TheEclipse.exe")
-    if not os.path.isfile(exe):
-        fail(f"{exe} がありません（ビルドに失敗しています）")
-    top = f"TheEclipse-v{args.version}"
+    # Visual Studio のプロジェクト名は TheEclipse のままなので、できる exe は TheEclipse.exe。
+    # zip にはその版のゲーム名（v0.10.0 からは ArsGladii.exe）で入れる
+    candidates = [os.path.join(args.bin, name) for name in ("TheEclipse.exe", "ArsGladii.exe")]
+    exe = next((path for path in candidates if os.path.isfile(path)), None)
+    if exe is None:
+        fail(f"{candidates[0]} がありません（ビルドに失敗しています）")
+    name, file_name = product(args.version)
+    exe_name = f"{file_name}.exe"
+    top = f"{file_name}-v{args.version}"
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with zipfile.ZipFile(args.out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
-        archive.write(exe, f"{top}/TheEclipse.exe")
-        readme = README_TEXT.format(version=args.version, date=args.date, repo=REPO_URL, commit=args.commit)
+        archive.write(exe, f"{top}/{exe_name}")
+        readme = README_TEXT.format(name=name, exe=exe_name, version=args.version, date=args.date,
+                                    repo=REPO_URL, commit=args.commit)
         # メモ帳で文字化けしないよう BOM つき UTF-8・CRLF にする
         archive.writestr(f"{top}/README.txt", "﻿" + readme.replace("\n", "\r\n"))
         assets = os.path.join(args.game, "assets")
@@ -387,7 +411,7 @@ def main():
     pack.add_argument("--date", required=True)
     pack.add_argument("--commit", required=True)
     pack.add_argument("--game", required=True, help="ビルドしたソース（assets を含む）")
-    pack.add_argument("--bin", required=True, help="TheEclipse.exe のあるフォルダ")
+    pack.add_argument("--bin", required=True, help="ビルドした exe（TheEclipse.exe）のあるフォルダ")
     pack.add_argument("--licenses", default="")
     pack.add_argument("--out", required=True)
     pack.set_defaults(func=cmd_package)

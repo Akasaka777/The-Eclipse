@@ -13,6 +13,27 @@
 
 namespace ecl {
 
+//------------------------------------------------------------------------------
+// 隠しフロアの抽選の進み具合（隠しフロアのあるクエストごと）
+//   attempts  : 前回の抽選のあとに挑んだ回数
+//   threshold : この回数に達した挑戦で抽選する（10〜30。0 ならまだ決めていない）
+//   lotteryHeld : 今の挑戦で抽選したか（クエストを終えたら数え直す。セーブしない）
+//------------------------------------------------------------------------------
+struct HiddenFloorProgress
+{
+    int  questId = 0;
+    int  attempts = 0;
+    int  threshold = 0;
+    bool lotteryHeld = false;
+};
+
+// 挑戦を始めたときの抽選の結果
+struct HiddenFloorDraw
+{
+    bool held = false;   // この挑戦で抽選したか
+    bool won = false;    // 当たったか（当たれば隠しフロアへ進める）
+};
+
 class PlayerData
 {
 public:
@@ -139,6 +160,17 @@ public:
     bool IsQuestCleared(int questId) const;
     void MarkQuestCleared(int questId);
 
+    // --- 隠しフロアの抽選 ------------------------------------------------------
+    // 隠しフロアのあるクエストに挑むたびに呼ぶ。回数を数え、抽選の回なら抽選する
+    HiddenFloorDraw BeginHiddenFloorAttempt(int questId);
+    // そのクエストを終えたら呼ぶ（クリア・戦闘不能・リタイアのどれでも）。抽選した回なら数え直す
+    void EndHiddenFloorAttempt(int questId);
+    // 進み具合（まだ一度も挑んでいなければ nullptr）
+    const HiddenFloorProgress* HiddenFloor(int questId) const;
+    const std::vector<HiddenFloorProgress>& HiddenFloors() const { return hiddenFloors_; }
+    // セーブから戻す
+    void RestoreHiddenFloor(int questId, int attempts, int threshold);
+
     // --- セーブデータの復元 ---------------------------------------------------
     void RestoreProgress(int level, int exp, int skillPoints,
                          const std::vector<int>& unlockedSkills,
@@ -170,6 +202,9 @@ private:
     int abilityPoints_ = 0;
     std::vector<int> unlockedSkills_;
     std::vector<int> clearedQuests_;
+    std::vector<HiddenFloorProgress> hiddenFloors_;
+
+    HiddenFloorProgress& HiddenFloorEntry(int questId);
 };
 
 } // namespace ecl

@@ -921,6 +921,272 @@ void DrawWisp(const Rect& rect, int facing, PoseKind pose, float phase,
 }
 
 //------------------------------------------------------------------------------
+// 金属の仏像（ヴァジュラ・ラグナシュラ）
+//   上半身だけが宙に浮く。背に光背、頭は螺髪と肉髻、長い耳たぶ、閉じた目と白毫。
+//   腕は六本：二本は胸の前で腕組み、上の二本は金剛杵を、下の二本は小さな光輪を持つ。
+//   腰から下は蓮の花びらで終わり、その下から光が漏れる。
+//   motion（kStatueMotion*）で攻撃の構えが変わる。
+//------------------------------------------------------------------------------
+void DrawStatue(const Rect& rect, int facing, PoseKind pose, float phase,
+                const ActorArt& art, int alpha, const ColorRGB& main, const ColorRGB& accent, int motion)
+{
+    const float w = rect.Width();
+    const float h = rect.Height();
+    const float dir = (facing >= 0) ? 1.0f : -1.0f;
+    const bool dead = (pose == PoseKind::Dead);
+    const bool attacking = (pose == PoseKind::Attack || pose == PoseKind::Skill);
+    const float ink = math::MaxF(1.0f, h * 0.008f);
+    // ふだんはゆっくり上下に揺れる（攻撃中は止める）
+    const float bob = (!attacking && !dead) ? std::sin(phase * kTwoPi) * h * 0.015f : 0.0f;
+    const float cx = rect.CenterX();
+    const float top = rect.top + bob;
+    const float bottom = rect.bottom + bob;
+
+    const ColorRGB glow = dead ? art.trim.Scaled(0.35f) : art.trim;
+    const ColorRGB metal = dead ? main.Scaled(0.7f) : main;
+    const ColorRGB light = dead ? accent.Scaled(0.7f) : accent;
+    const ColorRGB shade = metal.Scaled(0.62f);
+    const ColorRGB face = ColorRGB::Lerp(metal, light, 0.45f);
+
+    // 攻撃の進み（予備動作で charge 0 → 1、振り切りで strike 0 → 1）
+    float charge = 0.0f;
+    float strike = 0.0f;
+    if (attacking) {
+        const float p = math::Clamp(phase, 0.0f, 1.0f);
+        if (p < 0.36f) {
+            charge = p / 0.36f;
+        } else {
+            charge = 1.0f;
+            strike = (p - 0.36f) / 0.64f;
+        }
+    }
+    const float k = math::SmoothStep(charge);
+    const float ks = math::SmoothStep(math::MinF(1.0f, strike * 2.0f));
+    auto lerp = [](const Vec2& a, const Vec2& b, float t) {
+        return Vec2(math::Lerp(a.x, b.x, t), math::Lerp(a.y, b.y, t));
+    };
+    // 届かない位置を狙ったときは腕を伸ばしきったところで止める
+    auto reach = [](const Vec2& root, const Vec2& hand, float length) {
+        const Vec2 d = hand - root;
+        const float len = d.Length();
+        return (len > length && len > 0.001f) ? root + d * (length / len) : hand;
+    };
+
+    // --- 光背（頭と肩の後ろの大きな輪と炎）---------------------------------------------
+    const Vec2 haloC(cx - dir * w * 0.02f, top + h * 0.27f);
+    const float haloR = h * 0.40f;
+    if (!dead) draw::Glow(haloC.x, haloC.y, haloR * 1.15f, glow, 80, 5);
+    const int flames = 18;
+    for (int i = 0; i < flames; ++i) {
+        if (dead && i % 3 == 0) continue;   // 倒れると光背が欠ける
+        const float a = (static_cast<float>(i) + phase) * (kTwoPi / static_cast<float>(flames));
+        const float len = (i % 2 == 0) ? 0.17f : 0.11f;
+        const Vec2 dirA(std::cos(a), std::sin(a));
+        const Vec2 side(-dirA.y, dirA.x);
+        const Vec2 base = haloC + dirA * (haloR * 1.0f);
+        draw::Triangle(base + side * (h * 0.022f), base - side * (h * 0.022f), haloC + dirA * (haloR * (1.0f + len)),
+                       ColorRGB::Lerp(glow, light, 0.3f), true, dead ? alpha / 2 : alpha);
+    }
+    draw::Circle(haloC.x, haloC.y, haloR, kInk, false, h * 0.05f, alpha);
+    draw::Circle(haloC.x, haloC.y, haloR, ColorRGB::Lerp(light, glow, 0.5f), false, h * 0.032f, alpha);
+    draw::Circle(haloC.x, haloC.y, haloR * 0.86f, glow, false, math::MaxF(1.5f, h * 0.008f), dead ? alpha / 3 : alpha);
+
+    // --- 腕（上の二本と下の二本は体の後ろ、腕組みの二本は胸の前）----------------------------
+    const float upperLen = h * 0.22f;
+    const float lowerLen = h * 0.19f;
+    auto drawArm = [&](const Vec2& root, const Vec2& handTarget, float len, float side, const ColorRGB& color) {
+        const Vec2 hand = reach(root, handTarget, len * 2.0f);
+        const Vec2 elbow = Joint(root, hand, len, len, side);
+        Capsule(root, elbow, h * 0.032f, color, ink, alpha);
+        Capsule(elbow, hand, h * 0.028f, color.Scaled(1.06f), ink, alpha);
+        Ball(hand, h * 0.040f, color.Scaled(1.1f), ink, alpha);
+        return hand;
+    };
+
+    Vec2 upperHands[2];
+    Vec2 lowerHands[2];
+    for (int i = 0; i < 2; ++i) {
+        const float s = (i == 0) ? -1.0f : 1.0f;
+        // 向いている側の腕は明るく、奥の腕は少し暗く
+        const ColorRGB armColor = (s == dir) ? metal : metal.Scaled(0.82f);
+        const Vec2 upperRoot(cx + s * w * 0.30f, top + h * 0.41f);
+        const Vec2 lowerRoot(cx + s * w * 0.33f, top + h * 0.47f);
+        Vec2 upperHand(cx + s * w * 0.64f, top + h * 0.10f + std::sin(phase * kTwoPi + s) * h * 0.01f);
+        Vec2 lowerHand(cx + s * w * 0.74f, top + h * 0.60f);
+        switch (motion) {
+        case kStatueMotionVolley: {   // 振りかぶって、向いている側へ突き出す
+            const Vec2 wind(cx + s * w * 0.48f, top - h * 0.04f);
+            const Vec2 thrust(cx + dir * w * 0.92f + s * w * 0.06f, top + h * 0.34f);
+            upperHand = lerp(lerp(upperHand, wind, k), thrust, ks);
+            break;
+        }
+        case kStatueMotionThunder:    // 上の腕を頭上に掲げる
+            upperHand = lerp(upperHand, Vec2(cx + s * w * 0.22f, top - h * 0.20f), k);
+            lowerHand = lerp(lowerHand, Vec2(cx + s * w * 0.80f, top + h * 0.40f), k * 0.6f);
+            break;
+        case kStatueMotionHalo:       // 下の腕を大きく開き、振り下ろす
+            lowerHand = lerp(lerp(lowerHand, Vec2(cx + s * w * 0.98f, top + h * 0.52f), k),
+                             Vec2(cx + s * w * 1.02f, top + h * 0.74f), ks);
+            break;
+        case kStatueMotionDive:       // 四本の腕を下へ
+            upperHand = lerp(upperHand, Vec2(cx + s * w * 0.40f, bottom + h * 0.04f), k);
+            lowerHand = lerp(lowerHand, Vec2(cx + s * w * 0.62f, bottom - h * 0.02f), k);
+            break;
+        default:
+            break;
+        }
+        upperHands[i] = drawArm(upperRoot, upperHand, upperLen, s, armColor);
+        lowerHands[i] = drawArm(lowerRoot, lowerHand, lowerLen, s, armColor.Scaled(0.94f));
+    }
+
+    // --- 蓮の台座（奥の列）と、その下から漏れる光 ---------------------------------------
+    const float baseY = bottom - h * 0.02f;
+    auto petal = [&](float x, float pw, float ph, const ColorRGB& color) {
+        PolyInk({ Vec2(x - pw, baseY), Vec2(x - pw * 0.7f, baseY - ph * 0.55f), Vec2(x, baseY - ph),
+                  Vec2(x + pw * 0.7f, baseY - ph * 0.55f), Vec2(x + pw, baseY) }, color, ink, alpha);
+        draw::Line(x, baseY - ph * 0.85f, x, baseY - ph * 0.15f, color.Scaled(1.25f), math::MaxF(1.0f, h * 0.005f), alpha);
+    };
+    if (!dead) {
+        const float pulse = 0.75f + 0.25f * std::sin(phase * kTwoPi * 2.0f);
+        draw::Glow(cx, bottom + h * 0.02f, w * 0.48f * pulse, glow, 130, 5);
+    }
+    for (int i = 0; i < 6; ++i) {
+        petal(cx + (static_cast<float>(i) - 2.5f) * w * 0.15f, w * 0.09f, h * 0.15f, shade.Scaled(0.9f));
+    }
+
+    // --- 胴（肩の張った上半身）-----------------------------------------------------------
+    const float sy = top + h * 0.37f;
+    const float wy = bottom - h * 0.15f;
+    const std::vector<Vec2> torso = {
+        Vec2(cx - w * 0.37f, sy + h * 0.02f), Vec2(cx - w * 0.20f, sy - h * 0.02f),
+        Vec2(cx + w * 0.20f, sy - h * 0.02f), Vec2(cx + w * 0.37f, sy + h * 0.02f),
+        Vec2(cx + w * 0.30f, sy + h * 0.18f), Vec2(cx + w * 0.24f, wy),
+        Vec2(cx - w * 0.24f, wy), Vec2(cx - w * 0.30f, sy + h * 0.18f),
+    };
+    PolyInk(torso, metal, ink, alpha);
+    // 光は左上から：左の面を明るく、右の面を暗く
+    Poly({ torso[0], torso[1], Vec2(cx - w * 0.06f, sy - h * 0.01f), Vec2(cx - w * 0.10f, wy), torso[6], torso[7] },
+         ColorRGB::Lerp(metal, light, 0.35f), alpha);
+    Poly({ Vec2(cx + w * 0.14f, sy), torso[3], torso[4], torso[5], Vec2(cx + w * 0.12f, wy) }, shade, alpha);
+    // 胸の線と、肩から腰へ掛けた条帛（帯）
+    draw::Line(cx - w * 0.20f, sy + h * 0.13f, cx - w * 0.03f, sy + h * 0.15f, shade.Scaled(0.8f), ink, alpha);
+    draw::Line(cx + w * 0.03f, sy + h * 0.15f, cx + w * 0.20f, sy + h * 0.13f, shade.Scaled(0.8f), ink, alpha);
+    draw::Line(cx - w * 0.30f, sy + h * 0.02f, cx + w * 0.22f, wy - h * 0.02f, kInk, h * 0.045f, alpha);
+    draw::Line(cx - w * 0.30f, sy + h * 0.02f, cx + w * 0.22f, wy - h * 0.02f, shade.Scaled(0.85f), h * 0.034f, alpha);
+    draw::Line(cx - w * 0.29f, sy + h * 0.005f, cx + w * 0.23f, wy - h * 0.035f, light, math::MaxF(1.0f, h * 0.006f), alpha);
+    // 首飾り（玉を連ねた弧）
+    for (int i = 0; i <= 8; ++i) {
+        const float t = static_cast<float>(i) / 8.0f;
+        const float bx = cx + (t - 0.5f) * w * 0.34f;
+        const float by = sy + h * 0.015f + std::sin(t * math::kPi) * h * 0.07f;
+        Ball(Vec2(bx, by), h * 0.013f, (i == 4) ? glow : light, ink * 0.6f, alpha);
+    }
+    // 金属のつや
+    draw::Line(cx - w * 0.26f, sy + h * 0.05f, cx - w * 0.20f, wy - h * 0.06f, palette::kWhite, math::MaxF(1.0f, h * 0.006f),
+               dead ? alpha / 6 : alpha / 3);
+
+    // --- 蓮の台座（手前の列：腰の下端を覆う）------------------------------------------------
+    for (int i = 0; i < 5; ++i) {
+        petal(cx + (static_cast<float>(i) - 2.0f) * w * 0.17f, w * 0.10f, h * 0.17f,
+              ColorRGB::Lerp(metal, light, 0.25f + 0.05f * static_cast<float>(i % 2)));
+    }
+
+    // --- 首と頭 -------------------------------------------------------------------------
+    const Vec2 head(cx + dir * w * 0.03f, top + h * 0.20f);
+    const float r = h * 0.12f;
+    // 首（三道の線）
+    draw::FillRect(Rect(head.x - r * 0.45f - ink, head.y + r * 0.8f, head.x + r * 0.45f + ink, sy + ink), kInk, alpha);
+    draw::FillRect(Rect(head.x - r * 0.45f, head.y + r * 0.8f, head.x + r * 0.45f, sy), face.Scaled(0.92f), alpha);
+    for (int i = 0; i < 3; ++i) {
+        const float ny = head.y + r * (1.0f + 0.16f * static_cast<float>(i));
+        draw::Line(head.x - r * 0.38f, ny, head.x + r * 0.38f, ny, shade, math::MaxF(1.0f, h * 0.004f), alpha);
+    }
+    // 長い耳たぶ
+    for (int s = -1; s <= 1; s += 2) {
+        Capsule(Vec2(head.x + static_cast<float>(s) * r * 0.92f, head.y - r * 0.05f),
+                Vec2(head.x + static_cast<float>(s) * r * 0.98f, head.y + r * 1.0f), r * 0.16f, face.Scaled(0.95f), ink,
+                alpha);
+    }
+    Ball(head, r, face, ink, alpha);
+    // 螺髪（頭の上半分）と肉髻（頭頂の盛り上がり）
+    {
+        std::vector<Vec2> cap;
+        for (int i = 0; i <= 10; ++i) {
+            const float a = math::kPi + math::kPi * static_cast<float>(i) / 10.0f;
+            cap.push_back(Vec2(head.x + std::cos(a) * r * 1.02f, head.y + std::sin(a) * r * 1.02f));
+        }
+        cap.push_back(Vec2(head.x + r * 0.96f, head.y - r * 0.18f));
+        cap.push_back(Vec2(head.x - r * 0.96f, head.y - r * 0.18f));
+        Poly(cap, metal.Scaled(0.72f), alpha);
+        Ball(Vec2(head.x, head.y - r * 1.02f), r * 0.48f, metal.Scaled(0.72f), ink, alpha);
+        for (int row = 0; row < 3; ++row) {
+            const int count = 7 - row;
+            for (int i = 0; i < count; ++i) {
+                const float a = math::kPi * (1.12f + 0.76f * (static_cast<float>(i) + 0.5f) / static_cast<float>(count));
+                const float rr = r * (0.86f - 0.24f * static_cast<float>(row));
+                draw::Circle(head.x + std::cos(a) * rr, head.y + std::sin(a) * rr, r * 0.075f, metal.Scaled(0.95f), true,
+                             1.0f, alpha);
+            }
+        }
+        draw::Circle(head.x, head.y - r * 1.12f, r * 0.11f, glow, true, 1.0f, alpha);   // 肉髻の珠
+    }
+    // 顔：眉・目（ふだんは閉じ、攻撃のときは光る）・白毫・鼻・口
+    for (int s = -1; s <= 1; s += 2) {
+        const float ex = head.x + static_cast<float>(s) * r * 0.36f + dir * r * 0.04f;
+        draw::Line(ex - r * 0.24f, head.y - r * 0.06f, ex + r * 0.24f, head.y - r * 0.06f, shade,
+                   math::MaxF(1.0f, h * 0.005f), alpha);
+        if (attacking && !dead) {
+            draw::Glow(ex, head.y + r * 0.14f, r * 0.30f, glow, 150, 3);
+            draw::Line(ex - r * 0.18f, head.y + r * 0.14f, ex + r * 0.18f, head.y + r * 0.12f, glow,
+                       math::MaxF(1.5f, h * 0.009f), alpha);
+        } else {
+            draw::Line(ex - r * 0.20f, head.y + r * 0.10f, ex, head.y + r * 0.18f, kInk, math::MaxF(1.0f, h * 0.006f), alpha);
+            draw::Line(ex, head.y + r * 0.18f, ex + r * 0.20f, head.y + r * 0.10f, kInk, math::MaxF(1.0f, h * 0.006f), alpha);
+        }
+    }
+    draw::Circle(head.x + dir * r * 0.04f, head.y - r * 0.24f, r * 0.08f, glow, true, 1.0f, alpha);   // 白毫
+    if (!dead) draw::Glow(head.x + dir * r * 0.04f, head.y - r * 0.24f, r * 0.30f, glow, 120, 3);
+    draw::Line(head.x + dir * r * 0.04f, head.y + r * 0.02f, head.x + dir * r * 0.10f, head.y + r * 0.34f, shade,
+               math::MaxF(1.0f, h * 0.005f), alpha);
+    draw::Line(head.x - r * 0.16f + dir * r * 0.04f, head.y + r * 0.54f, head.x + r * 0.16f + dir * r * 0.04f,
+               head.y + r * 0.54f, kInk, math::MaxF(1.0f, h * 0.006f), alpha);
+
+    // --- 腕組みの二本（胸の前で交差させる）---------------------------------------------
+    for (int i = 0; i < 2; ++i) {
+        const float s = (i == 0) ? -1.0f : 1.0f;
+        const Vec2 root(cx + s * w * 0.28f, top + h * 0.43f);
+        const Vec2 elbow(cx + s * w * 0.34f, top + h * 0.62f);
+        const Vec2 hand(cx - s * w * 0.15f, top + h * 0.57f);
+        Capsule(root, elbow, h * 0.034f, metal.Scaled(0.95f), ink, alpha);
+        Capsule(elbow, hand, h * 0.031f, ColorRGB::Lerp(metal, light, 0.2f), ink, alpha);
+        Ball(hand, h * 0.036f, ColorRGB::Lerp(metal, light, 0.3f), ink, alpha);
+    }
+
+    // --- 持ち物：上の手に金剛杵、下の手に小さな光輪。攻撃の溜めで光る -------------------------
+    for (int i = 0; i < 2; ++i) {
+        const Vec2& hu = upperHands[i];
+        const float bar = h * 0.07f;
+        draw::Line(hu.x, hu.y - bar, hu.x, hu.y + bar, kInk, h * 0.026f, alpha);
+        draw::Line(hu.x, hu.y - bar, hu.x, hu.y + bar, light, h * 0.016f, alpha);
+        for (int end = -1; end <= 1; end += 2) {
+            const float ty = hu.y + static_cast<float>(end) * bar;
+            for (int prong = -1; prong <= 1; ++prong) {
+                draw::Line(hu.x, ty, hu.x + static_cast<float>(prong) * h * 0.02f, ty + static_cast<float>(end) * h * 0.035f,
+                           light, math::MaxF(1.0f, h * 0.007f), alpha);
+            }
+        }
+        const Vec2& hl = lowerHands[i];
+        draw::Circle(hl.x, hl.y, h * 0.05f, glow, false, math::MaxF(1.5f, h * 0.009f), dead ? alpha / 3 : alpha);
+        if (attacking && !dead) {
+            const bool upperActive = (motion == kStatueMotionVolley || motion == kStatueMotionThunder || motion == kStatueMotionDive);
+            const bool lowerActive = (motion == kStatueMotionHalo || motion == kStatueMotionDive);
+            if (upperActive) draw::Glow(hu.x, hu.y, h * (0.07f + 0.08f * k), glow, 170, 4);
+            if (lowerActive) draw::Glow(hl.x, hl.y, h * (0.07f + 0.08f * k), glow, 170, 4);
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
 // 竜（竜王 / レッドドレイク / ドラゴンハッチリング）
 //   羽ばたく翼、角のある頭と長い首、腹の鱗板、トゲの並んだ長い尾、爪のある脚。
 //   攻撃中は口の奥に炎が灯る。
@@ -1566,6 +1832,9 @@ void DrawActor(const Rect& screenRect, int facing, PoseKind pose, float phase,
         break;
     case ArtStyle::Dragon:
         DrawDragon(screenRect, facing, pose, phase, art, alpha, main, accent);
+        break;
+    case ArtStyle::Statue:
+        DrawStatue(screenRect, facing, pose, phase, art, alpha, main, accent, motionVariant);
         break;
     case ArtStyle::Humanoid:
     case ArtStyle::Knight:

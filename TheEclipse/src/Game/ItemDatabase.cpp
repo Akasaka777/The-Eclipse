@@ -167,6 +167,10 @@ ItemDatabase::ItemDatabase()
         { 150, "神聖剣グレイス",       "聖別された白刃。折れることなく持ち主を守る。", EquipSlot::WeaponRight, SWD, 3, WeaponStats(96.0f, 0.12f, 0.30f, 0.06f) },
 
         //--- 竜王の火山のボスドロップ（部位ごとに 1 つずつ）----------------------
+        //--- 竜王の火山の隠しボスのドロップ（名前は仮）-------------------------------
+        //   個体値 98〜100 で落ち、+0 の戦力は 700〜710（98: 700 / 99: 704 / 100: 709）
+        { 170, "黒い剣",               "光を呑む漆黒の刃。金剛の仏が六本の腕で封じていた。", EquipSlot::WeaponRight, SWD, 3, WeaponStats(105.5f, 0.16f, 0.42f, 0.08f) },
+
         { 160, "ヴァルグリム・ドラゴンソード", "竜王の牙から鍛えた大剣。振るうたびに熱を帯びる。", EquipSlot::WeaponRight, SWD, 3, WeaponStats(132.0f, 0.11f, 0.34f, 0.05f) },
 
         //--- 頭装備 -------------------------------------------------------------
@@ -326,6 +330,8 @@ ItemDatabase::ItemDatabase()
         }
         // 竜王のセットもボスドロップ専用（ランダム抽選には出さない）
         if (IsDragonSetItem(t.id)) t.special = true;
+        // 隠しボスのドロップも専用
+        if (t.id == kBlackSwordId) t.special = true;
         // ショップ専用の装備とアクセサリーはドロップ抽選に出さない
         if (t.id >= kShopOnlyIdBase) t.special = true;
     }

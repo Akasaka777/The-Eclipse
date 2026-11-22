@@ -21,8 +21,16 @@ enum class ArtStyle
     Golem,     // 岩石系
     Imp,       // 小型
     Wisp,      // 浮遊体
-    Dragon     // 竜（翼・角・長い首と尾）
+    Dragon,    // 竜（翼・角・長い首と尾）
+    Statue     // 金属の仏像（上半身だけ・六本の腕。ヴァジュラ・ラグナシュラ）
 };
+
+// 仏像の攻撃の構え（DrawActor の motionVariant に入れる）
+constexpr int kStatueMotionNone = 0;
+constexpr int kStatueMotionVolley = 1;   // 上の腕を前へ突き出す（金剛杵の雨）
+constexpr int kStatueMotionThunder = 2;  // 上の腕を高く掲げる（天雷）
+constexpr int kStatueMotionHalo = 3;     // 下の腕を大きく開く（光輪）
+constexpr int kStatueMotionDive = 4;     // 四本の腕を下へ叩きつける（降魔の掌）
 
 //------------------------------------------------------------------------------
 // 描画パラメータ
