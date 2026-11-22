@@ -21,10 +21,10 @@
 namespace ecl {
 namespace version {
 
-constexpr const char* kVersion = "0.10.0";
+constexpr const char* kVersion = "0.10.1";
 constexpr const char* kVersionDate = "2026-11-22";
 // 画面に出す表記（「Ver. X.Y.Z」）
-constexpr const char* kVersionLabel = "Ver. 0.10.0";
+constexpr const char* kVersionLabel = "Ver. 0.10.1";
 
 } // namespace version
 } // namespace ecl
