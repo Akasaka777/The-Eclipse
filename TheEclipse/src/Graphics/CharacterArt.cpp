@@ -313,7 +313,8 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
         const Vec2 root(cx - dir * torsoW * 0.12f + lean * 0.5f, shoulderY + h * 0.04f);
         const ColorRGB voidColor = ColorRGB::Lerp(main.Scaled(1.7f), art.trim, 0.08f);
         const ColorRGB coreColor = ColorRGB::Lerp(main.Scaled(2.2f), art.trim, 0.35f);
-        auto blade = [&](float degFromUp, float length, float width, bool far) {
+        //   distant：肩越しに見える向こう側の翼（暗く描く。far は Windows のヘッダでマクロなので使わない）
+        auto blade = [&](float degFromUp, float length, float width, bool distant) {
             // degFromUp：真上から後ろ（-dir）側へ倒す角度
             const float a = math::DegToRad(degFromUp);
             const Vec2 axis(-dir * std::sin(a), -std::cos(a));
@@ -327,20 +328,20 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
                 Vec2(mid.x - side.x * width * 0.55f, mid.y - side.y * width * 0.55f),
                 Vec2(root.x - side.x * width * 0.45f, root.y - side.y * width * 0.45f),
             };
-            const ColorRGB fill = far ? voidColor.Scaled(0.6f) : voidColor;
+            const ColorRGB fill = distant ? voidColor.Scaled(0.6f) : voidColor;
             PolyInk(pts, fill, ink, alpha);
             // 刃の内側の面（少し明るい）
             Poly({ Vec2(root.x + axis.x * length * 0.12f, root.y + axis.y * length * 0.12f),
                    Vec2(mid.x + side.x * width * 0.45f, mid.y + side.y * width * 0.45f),
                    Vec2(tip.x - axis.x * length * 0.10f, tip.y - axis.y * length * 0.10f),
                    Vec2(mid.x - side.x * width * 0.15f, mid.y - side.y * width * 0.15f) },
-                 far ? coreColor.Scaled(0.6f) : coreColor, alpha);
+                 distant ? coreColor.Scaled(0.6f) : coreColor, alpha);
             // 刃の縁（金）と、芯を走る光
-            draw::Line(pts[1].x, pts[1].y, tip.x, tip.y, far ? art.trim.Scaled(0.55f) : art.trim,
+            draw::Line(pts[1].x, pts[1].y, tip.x, tip.y, distant ? art.trim.Scaled(0.55f) : art.trim,
                        math::MaxF(1.0f, h * 0.010f), alpha);
             draw::Line(mid.x, mid.y, tip.x - axis.x * length * 0.08f, tip.y - axis.y * length * 0.08f,
                        ColorRGB::Lerp(art.trim, palette::kWhite, 0.3f), math::MaxF(1.0f, h * 0.003f), alpha / 2);
-            if (!far) draw::Glow(tip.x, tip.y, h * 0.035f, art.trim, 110, 3);
+            if (!distant) draw::Glow(tip.x, tip.y, h * 0.035f, art.trim, 110, 3);
         };
         // 向こう側（手前の体に隠れる側）
         blade(-16.0f - flap * 0.5f, h * 0.34f, h * 0.050f, true);
