@@ -622,6 +622,12 @@ void ShopPanel::DrawItemDetail(const GameContext& context) const
     draw::Text(FontSize::Small, x, y, palette::kTextDim, "効果");
     draw::Text(FontSize::Small, right, y, palette::kAccentWarm, item->effect, draw::TextAlign::Right);
     y += 34.0f;
+    if (item->kind != ConsumableKind::Material) {
+        draw::Text(FontSize::Small, x, y, palette::kTextDim, "使用後の待ち時間");
+        draw::Text(FontSize::Small, right, y, palette::kText, str::Format("%.1f 秒", item->UseCooldown()),
+                   draw::TextAlign::Right);
+        y += 34.0f;
+    }
     draw::Text(FontSize::Small, x, y, palette::kTextDim, "所持数");
     draw::Text(FontSize::Small, right, y, palette::kText,
                str::Format("%d / %d", inventory.ItemCount(item->id), item->MaxStack()),

@@ -107,6 +107,8 @@ public:
     // 回復・バフアイテムを使う。Used のときだけ効果が出る（所持数は呼び出し側で減らす）
     ItemUseResult UseItem(const ConsumableDef& item, CombatSystem& combat);
     float ItemCooldown() const { return itemCooldown_; }
+    // 直前に使ったアイテムの待ち時間（HUD で残りの割合を出すのに使う）
+    float ItemCooldownMax() const { return itemCooldownMax_; }
     // 効いているバフアイテム（無ければ nullptr）
     const ConsumableDef* ItemBuff() const { return (itemBuffTimer_ > 0.0f) ? itemBuff_ : nullptr; }
     float ItemBuffRemain() const { return itemBuffTimer_; }
@@ -145,6 +147,7 @@ private:
     const ConsumableDef* itemBuff_ = nullptr;
     float itemBuffTimer_ = 0.0f;
     float itemCooldown_ = 0.0f;
+    float itemCooldownMax_ = 1.0f;
 
     // 通常攻撃
     int   comboIndex_ = 0;

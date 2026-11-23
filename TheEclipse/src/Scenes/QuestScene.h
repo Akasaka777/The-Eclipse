@@ -92,6 +92,14 @@ private:
     // 最後のボスを倒したあと、抽選に当たっていれば隠しフロアへのゲートを開く
     void OpenHiddenGate();
 
+    // --- ボスラッシュ -------------------------------------------------------------
+    // 中ボスを倒したフロアのゲートを開く（最後のフロア以外）
+    void OpenBossRushGate();
+    // 最後のフロアで中ボスを倒したあと、最後のボスを出して登場演出を始める
+    void SpawnFinalBoss();
+    // 今のフロアの中ボスを倒すと最後のボスが出るか（まだ出していない）
+    bool FinalBossPending() const;
+
     // --- デバッグモード -------------------------------------------------------
     void UpdateDebug(const Input& input, GameContext& context);
     void DrawDebugOverlay(const GameContext& context) const;
@@ -154,6 +162,11 @@ private:
     bool  mainBossDefeated_ = false;    // 最後のボス（隠しボスではない）を倒したか
     bool  hiddenFloorReached_ = false;  // 隠しフロアに入ったか
     bool  hiddenBossDefeated_ = false;  // 隠しボスを倒したか
+
+    // ボスラッシュ
+    bool  finalBossSpawned_ = false;    // 最後のフロアで最後のボスを出したか
+    bool  awaitingFinalBoss_ = false;   // 中ボスを倒して、最後のボスが現れるのを待っている
+    float finalBossTimer_ = 0.0f;
     int   combo_ = 0;
     int   maxCombo_ = 0;
     int   parryCount_ = 0;

@@ -48,6 +48,20 @@ struct BossDropOdds
 };
 
 //------------------------------------------------------------------------------
+// 推奨戦力は層から決める
+//   1 層 = 380、50 層 = 14,000、100 層 = 55,000 の 3 点を通る 2 次式（およそ層の 2 乗に比例）で、
+//   10 の位で丸める。クエストを増やすときは層（floorLevel）を決めれば推奨戦力が決まる。
+//     例：12 層 1,150 / 25 層 3,770 / 75 層 約 32,000
+//------------------------------------------------------------------------------
+constexpr int kPowerAnchorFloor1 = 1;
+constexpr int kPowerAnchorFloor2 = 50;
+constexpr int kPowerAnchorFloor3 = 100;
+constexpr int kPowerAnchor1 = 380;
+constexpr int kPowerAnchor2 = 14000;
+constexpr int kPowerAnchor3 = 55000;
+int RecommendedPowerForFloor(int floorLevel);
+
+//------------------------------------------------------------------------------
 // 隠しフロアの抽選
 //   隠しフロアのあるクエストに挑むたびに数え、10〜30 回（毎回ランダム）に 1 回だけ抽選する。
 //   当たれば、最後のボスを倒したあとに隠しフロアへのゲートが開く。
@@ -68,6 +82,8 @@ struct QuestDef
     std::string description;
     std::string bossName;
     int         difficulty = 1;         // ★の数
+    // 層（1〜100）。推奨戦力はここから決める（RecommendedPowerForFloor）。0 なら層に属さない特別クエスト
+    int         floorLevel = 0;
     int         recommendedPower = 400;
     float       enemyPowerScale = 1.0f;
     int         colReward = 400;
@@ -85,6 +101,10 @@ struct QuestDef
     bool special = false;
     // クエスト詳細にボスドロップの中身を載せず「不明」とだけ出す
     bool hideDrops = false;
+    // ボスラッシュ：どのフロアにも中ボスがいて、最後のフロア以外は中ボスを倒すとゲートが開く。
+    //   最後のフロアは中ボスのあとに最後のボス（FloorDef::finalBossId）が現れ、それを倒すとクリア。
+    //   ボスドロップ（bossDrops / bossMaterials）は最後のボスを倒したときだけ。
+    bool bossRush = false;
 
     // --- 隠しフロア（抽選に当たったときだけ、最後のボスを倒したあとに進める）--------
     //   floors には含めない（フロア数・クリアの判定は floors だけで数える）。

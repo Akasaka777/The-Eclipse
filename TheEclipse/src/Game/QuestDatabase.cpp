@@ -5,6 +5,8 @@
 #include "Game/ItemDatabase.h"
 #include "Game/UniqueSkill.h"
 
+#include <cmath>
+
 namespace ecl {
 
 namespace {
@@ -27,6 +29,17 @@ FloorDef MakeFloor(const std::string& name, float width, StageTheme theme)
 
 } // namespace
 
+int RecommendedPowerForFloor(int floorLevel)
+{
+    // 3 点（1・50・100 層）を通る 2 次式（ラグランジュ補間）
+    const double f = static_cast<double>(floorLevel);
+    const double x1 = kPowerAnchorFloor1, x2 = kPowerAnchorFloor2, x3 = kPowerAnchorFloor3;
+    const double y = kPowerAnchor1 * (f - x2) * (f - x3) / ((x1 - x2) * (x1 - x3))
+                   + kPowerAnchor2 * (f - x1) * (f - x3) / ((x2 - x1) * (x2 - x3))
+                   + kPowerAnchor3 * (f - x1) * (f - x2) / ((x3 - x1) * (x3 - x2));
+    return static_cast<int>(std::lround(y / 10.0)) * 10;
+}
+
 QuestDatabase::QuestDatabase()
 {
     //==========================================================================
@@ -40,7 +53,8 @@ QuestDatabase::QuestDatabase()
         quest.description = "第1層の外周に広がる森。狼と小鬼が徘徊している。";
         quest.bossName = "深緑の狼王 ファングルフ";
         quest.difficulty = 1;
-        quest.recommendedPower = 380;
+        quest.floorLevel = 1;
+        quest.recommendedPower = RecommendedPowerForFloor(quest.floorLevel);   // 380
         quest.enemyPowerScale = 1.0f;
         quest.colReward = 420;
         quest.expReward = 260;
@@ -112,11 +126,13 @@ QuestDatabase::QuestDatabase()
         quest.description = "遺跡の地下に続く回廊。石の番兵が侵入者を拒む。";
         quest.bossName = "石牢の守護者 ゴーレム・ガルド";
         quest.difficulty = 2;
-        quest.recommendedPower = 900;
-        quest.enemyPowerScale = 1.55f;
-        quest.colReward = 880;
-        quest.expReward = 620;
-        quest.firstClearCol = 3200;
+        // 12 層。推奨戦力 900 → 1,150 に合わせて、敵の強さと報酬も同じ割合（×1.28）で上げた
+        quest.floorLevel = 12;
+        quest.recommendedPower = RecommendedPowerForFloor(quest.floorLevel);   // 1,150
+        quest.enemyPowerScale = 1.98f;
+        quest.colReward = 1120;
+        quest.expReward = 790;
+        quest.firstClearCol = 4090;
 
         {
             FloorDef floor = MakeFloor("FLOOR 1 - 崩れた前室", 4000.0f, StageTheme::Ruins);
@@ -197,11 +213,13 @@ QuestDatabase::QuestDatabase()
         quest.description = "月が欠けるとき、祭壇には蝕の騎士が現れる。";
         quest.bossName = "蝕の騎士 エクリプス・ナイト";
         quest.difficulty = 3;
-        quest.recommendedPower = 1900;
-        quest.enemyPowerScale = 2.35f;
-        quest.colReward = 1650;
-        quest.expReward = 1250;
-        quest.firstClearCol = 6000;
+        // 25 層。推奨戦力 1,900 → 3,770 に合わせて、敵の強さと報酬も同じ割合（×1.98）で上げた
+        quest.floorLevel = 25;
+        quest.recommendedPower = RecommendedPowerForFloor(quest.floorLevel);   // 3,770
+        quest.enemyPowerScale = 4.66f;
+        quest.colReward = 3270;
+        quest.expReward = 2480;
+        quest.firstClearCol = 11900;
 
         {
             FloorDef floor = MakeFloor("FLOOR 1 - 蝕の参道", 4200.0f, StageTheme::Altar);
@@ -322,7 +340,8 @@ QuestDatabase::QuestDatabase()
         quest.description = "溶岩が脈打つ火口。頂にはこの層の主が眠っている。";
         quest.bossName = "竜王 ヴァルグリム・ザ・エンシェントドラゴン";
         quest.difficulty = 5;
-        quest.recommendedPower = 14000;
+        quest.floorLevel = 50;
+        quest.recommendedPower = RecommendedPowerForFloor(quest.floorLevel);   // 14,000
         quest.enemyPowerScale = 1.0f;
         quest.colReward = 4200;
         quest.expReward = 6500;
@@ -420,6 +439,78 @@ QuestDatabase::QuestDatabase()
             { kMatFireScale,   1.00f, 4, 6 },
             { kMatObsidian,    0.60f, 2, 4 },
             { kMatHolySilver,  0.35f, 1, 2 },
+        };
+        quests_.push_back(quest);
+    }
+
+    //==========================================================================
+    // クエスト 6 : 世界終焉の玉座（100 層）
+    //   推奨戦力 55,000。5 フロアのボスラッシュで、1 フロアに中ボスが 1 体ずつ。
+    //   5 フロア目は中ボスを倒すと、最後のボス アークゼノス・ザ・エンドオブワールドが現れる。
+    //   ボスドロップは武器全 5 種とエンドワールドシリーズ 6 部位（竜王と同じく 1 回で 1 部位）。
+    //==========================================================================
+    {
+        QuestDef quest;
+        quest.id = 6;
+        quest.name = "世界終焉の玉座";
+        quest.subtitle = "THRONE OF THE WORLD'S END";
+        quest.description = "世界の果てに浮かぶ玉座。終焉の王へ至る道を、五体の守護者が阻む。";
+        quest.bossName = "終焉の王 アークゼノス・ザ・エンドオブワールド";
+        quest.difficulty = 5;
+        quest.floorLevel = 100;
+        quest.recommendedPower = RecommendedPowerForFloor(quest.floorLevel);   // 55,000
+        quest.enemyPowerScale = 1.0f;
+        quest.colReward = 16000;
+        quest.expReward = 26000;
+        quest.firstClearCol = 60000;
+        quest.bossRush = true;
+
+        struct RushFloor { const char* name; int bossId; int bars; };
+        const RushFloor rush[] = {
+            { "FLOOR 1 - 喰われた大地", kWorldEaterBossId, 6 },
+            { "FLOOR 2 - 深淵の淵", kAbyssDragonBossId, 6 },
+            { "FLOOR 3 - 混沌の回廊", kChaosLordBossId, 7 },
+            { "FLOOR 4 - 虚無の聖域", kVoidColossusBossId, 7 },
+            { "FINAL FLOOR - 世界終焉の玉座", kNemesisBossId, 8 },
+        };
+        for (const RushFloor& r : rush) {
+            FloorDef floor = MakeFloor(r.name, 3400.0f, StageTheme::Throne);
+            floor.bossId = r.bossId;
+            floor.bossHpBars = r.bars;
+            quest.floors.push_back(floor);
+        }
+        // 最後のフロア：ネメシス・インフェルノを倒すと、終焉の王が現れる（HP バーは最多の 10 本）
+        quest.floors.back().finalBossId = kArcXenosBossId;
+        quest.floors.back().finalBossHpBars = kMaxBossHpBars;
+
+        // 雑魚敵はいない（ドロップは最後のボスから）
+        quest.floorDrops.clear();
+
+        // 部位ごとに 1 つずつ。撃破 1 回で落ちるのはどれか 1 部位だけ（武器は 5 種のどれか）
+        quest.bossDrops = {
+            { kArcXenosSwordId,  0.50f, 75, 100 },
+            { kArcXenosMaceId,   0.50f, 75, 100 },
+            { kArcXenosDaggerId, 0.50f, 75, 100 },
+            { kArcXenosRapierId, 0.50f, 75, 100 },
+            { kArcXenosSpearId,  0.50f, 75, 100 },
+            { kEndWorldHelmId,   0.50f, 75, 100 },
+            { kEndWorldMailId,   0.50f, 75, 100 },
+            { kEndWorldShieldId, 0.50f, 75, 100 },
+            { kEndWorldArmId,    0.50f, 75, 100 },
+            { kEndWorldGloveId,  0.50f, 75, 100 },
+            { kEndWorldBootsId,  0.50f, 75, 100 },
+        };
+        // 道中の素材は、倒したボスの数だけ抽選する
+        quest.floorMaterials = {
+            { kMatAbyssScale,   0.45f, 1, 2 },
+            { kMatChaosCrystal, 0.45f, 1, 2 },
+            { kMatObsidian,     0.50f, 2, 3 },
+        };
+        quest.bossMaterials = {
+            { kMatEndShard,     1.00f, 1, 2 },
+            { kMatChaosCrystal, 0.80f, 2, 3 },
+            { kMatAbyssScale,   0.80f, 2, 3 },
+            { kMatDragonScale,  0.40f, 1, 2 },
         };
         quests_.push_back(quest);
     }

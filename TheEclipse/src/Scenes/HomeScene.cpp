@@ -13,6 +13,7 @@
 #include "Game/SaveData.h"
 #include "Game/UniqueSkill.h"
 #include "Graphics/DrawUtil.h"
+#include "Scenes/HomeTown.h"
 
 #include <cmath>
 
@@ -23,8 +24,6 @@ namespace {
 constexpr float kScreenW = static_cast<float>(config::kScreenWidth);
 constexpr float kScreenH = static_cast<float>(config::kScreenHeight);
 constexpr float kTabBarHeight = 104.0f;
-constexpr float kFieldWidth = 2600.0f;
-constexpr float kGateX = 2300.0f;
 
 struct TabDef
 {
@@ -41,6 +40,18 @@ const TabDef kTabs[] = {
 };
 
 constexpr int kTabCount = static_cast<int>(sizeof(kTabs) / sizeof(kTabs[0]));
+
+// 街の施設に入ったときに開く画面
+HomeTab TabFor(town::Facility facility)
+{
+    switch (facility) {
+    case town::Facility::Home:    return HomeTab::Player;
+    case town::Facility::Shop:    return HomeTab::Shop;
+    case town::Facility::Smith:   return HomeTab::Smith;
+    case town::Facility::Dungeon: return HomeTab::Quest;
+    }
+    return HomeTab::None;
+}
 
 //------------------------------------------------------------------------------
 // 開発者モードのボタン
@@ -407,7 +418,7 @@ void HomeScene::BuildField()
 {
     FloorDef field;
     field.name = "HOME";
-    field.width = kFieldWidth;
+    field.width = town::kTownWidth;
     field.groundY = 880.0f;
     field.depth = config::kDefaultFieldDepth;
     field.theme = StageTheme::Home;
@@ -423,12 +434,14 @@ void HomeScene::OnEnter(GameContext& context)
 
     player_.Setup(context.player);
     const float startZ = stage_.Depth() * 0.5f;
-    player_.PlaceAt(Vec2(360.0f, stage_.GroundYAt(startZ)));
+    player_.PlaceAt(Vec2(town::kStartX, stage_.GroundYAt(startZ)));
     player_.z = startZ;
+    player_.facing = 1;
     player_.FullHeal();
+    nearBuilding_ = -1;
 
     camera_.Reset();
-    camera_.SetWorldBounds(0.0f, kFieldWidth, 0.0f, kScreenH);
+    camera_.SetWorldBounds(0.0f, town::kTownWidth, 0.0f, kScreenH);
     camera_.SetTarget(Vec2(player_.pos.x, kScreenH * 0.5f));
     camera_.SnapToTarget();
     camera_.SetShakeEnabled(context.settings.screenShake);
@@ -572,11 +585,19 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
     player_.Update(dt, stage_, combat_, input, !panelOpen && !overDebugPanel);
     combat_.Update(dt);
 
-    // ゲートに触れたらクエスト選択を開く
-    if (!panelOpen && !startQuest_ && player_.pos.x > kGateX - 60.0f) {
+    // --- 街の施設 ------------------------------------------------------------
+    //   入口の前で決定キーを押すと、その施設の画面を開く（パネルを閉じたのと同じフレームでは開かない）
+    nearBuilding_ = panelOpen ? -1 : town::BuildingNear(player_.pos.x);
+    if (!panelOpen && !panelOpenBefore && !startQuest_ && nearBuilding_ >= 0
+        && input.Pressed(GameAction::Confirm)) {
+        OpenTab(TabFor(town::BuildingAt(nearBuilding_).facility), context);
+    }
+    // ダンジョン入口の奥のゲートに踏み込んだときも、クエスト選択を開く（入口の手前へ戻す）
+    const town::Building& dungeon = town::BuildingFor(town::Facility::Dungeon);
+    if (!AnyPanelOpen() && !startQuest_ && player_.pos.x > dungeon.x + town::kDungeonStepIn) {
         OpenTab(HomeTab::Quest, context);
         const float z = player_.z;
-        player_.PlaceAt(Vec2(kGateX - 160.0f, stage_.GroundYAt(z)));
+        player_.PlaceAt(Vec2(dungeon.x - 40.0f, stage_.GroundYAt(z)));
         player_.z = z;
     }
 
@@ -632,44 +653,19 @@ void HomeScene::DrawField(const GameContext& context)
 {
     (void)context;
     stage_.DrawBackground(camera_);
-
-    // 出撃ゲート
-    const Rect gate = Rect::FromCenter(kGateX, stage_.GroundY() - 190.0f, 220.0f, 380.0f);
-    if (camera_.IsVisible(gate, 200.0f)) {
-        const Rect screen = camera_.WorldToScreen(gate);
-        const float pulse = 0.8f + 0.2f * std::sin(time_ * 2.4f);
-
-        draw::Glow(screen.CenterX(), screen.CenterY(), 140.0f * pulse, palette::kAccent, 120, 5);
-        draw::StrokeRect(screen, palette::kAccent, 4.0f, 220);
-        draw::FillRect(screen, palette::kAccent.Scaled(0.25f), 120);
-        draw::Text(FontSize::Medium, screen.CenterX(), screen.top - 60.0f, palette::kAccent,
-                   "出撃ゲート", draw::TextAlign::Center);
-        draw::Text(FontSize::Small, screen.CenterX(), screen.top - 24.0f, palette::kTextDim,
-                   "近づくとクエスト選択", draw::TextAlign::Center);
-    }
-
+    // 建物は通りの奥の端に建っている（プレイヤーより奥）
+    town::DrawBuildings(camera_, stage_.GroundYAt(stage_.Depth()) + 4.0f, time_, nearBuilding_);
 }
 
 void HomeScene::DrawFieldForeground(const GameContext& context)
 {
-    (void)context;
-
-    // 案内看板はプレイヤーより手前に立っている（player_.Draw の後に描く）
-    const Rect board = Rect::FromCenter(700.0f, stage_.GroundY() - 120.0f, 240.0f, 150.0f);
-    if (!camera_.IsVisible(board, 200.0f)) return;
-
-    const Rect screen = camera_.WorldToScreen(board);
-    // 支柱を先に描いて、板で根元を隠す
-    draw::Line(screen.CenterX() - 8.0f, screen.bottom, screen.CenterX() - 8.0f, screen.bottom + 60.0f,
-               ColorRGB(90, 72, 54), 8.0f, 255);
-    draw::FillRect(screen, ColorRGB(58, 46, 38), 255);
-    draw::StrokeRect(screen, ColorRGB(120, 96, 70), 3.0f, 255);
-    draw::Text(FontSize::Small, screen.CenterX(), screen.top + 16.0f, palette::kText,
-               config::kGameTitleUpper, draw::TextAlign::Center);
-    draw::Text(FontSize::Tiny, screen.CenterX(), screen.top + 54.0f, palette::kTextDim,
-               "拠点", draw::TextAlign::Center);
-    draw::Text(FontSize::Tiny, screen.CenterX(), screen.top + 84.0f, palette::kTextDim,
-               "→ 東へ", draw::TextAlign::Center);
+    // 街灯と道しるべは通りの手前に立っている（player_.Draw の後に描く）
+    town::DrawForeground(camera_, stage_.GroundY(), time_);
+    // 入口の前に立っているときの案内
+    if (nearBuilding_ >= 0 && !AnyPanelOpen()) {
+        town::DrawEnterPrompt(camera_, nearBuilding_, stage_.GroundYAt(stage_.Depth()) + 4.0f,
+                              context.settings.keys.PrimaryName(GameAction::Confirm), time_);
+    }
 }
 
 void HomeScene::DrawFieldGuide(const GameContext& context) const
@@ -681,8 +677,8 @@ void HomeScene::DrawFieldGuide(const GameContext& context) const
     // タブを開くキー（ソードスキルのキーが初期設定のままなら「1〜4」とまとめる）
     const std::string tabKeys = keys.SkillKeysSummary(4);
 
-    const Rect hint = Rect::FromXYWH(kScreenW - 508.0f, kScreenH - kTabBarHeight - 132.0f,
-                                     480.0f, 116.0f);
+    const Rect hint = Rect::FromXYWH(kScreenW - 508.0f, kScreenH - kTabBarHeight - 156.0f,
+                                     480.0f, 140.0f);
     draw::ChamferRect(hint, 10.0f, palette::kPanelDark, 190);
     draw::StrokeRect(hint, palette::kBorder.Scaled(0.6f), 1.0f, 150);
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 12.0f, palette::kAccent, "操作");
@@ -699,6 +695,8 @@ void HomeScene::DrawFieldGuide(const GameContext& context) const
     draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 86.0f, palette::kTextDim,
                str::Format("パリィ : ガード中に%s   タブ : %s・ESC", key(GameAction::Attack).c_str(),
                            tabKeys.c_str()));
+    draw::Text(FontSize::Tiny, hint.left + 16.0f, hint.top + 110.0f, palette::kTextDim,
+               str::Format("施設に入る : 入口の前で %s", key(GameAction::Confirm).c_str()));
 }
 
 void HomeScene::DrawPlayerSummary(const GameContext& context) const

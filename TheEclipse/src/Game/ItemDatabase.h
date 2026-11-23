@@ -35,6 +35,27 @@ bool IsDragonSetItem(int templateId);
 constexpr int kBlackSwordId = 170;  // 片手剣「黒い剣」
 
 //------------------------------------------------------------------------------
+// 100 層「世界終焉の玉座」の最後のボス（アークゼノス・ザ・エンドオブワールド）のドロップ
+//   武器は全 5 種（アークゼノス〇〇）、防具はエンドワールドシリーズ 6 部位。
+//   竜王のセットと同じく部位ごとに 1 つずつで、1 回の撃破で落ちるのはそのうち 1 部位だけ。
+//   竜王のセットのおよそ 3 倍の性能（Lv 99・個体値 100・+14 でそろえると戦力が約 55,000）。
+//------------------------------------------------------------------------------
+constexpr int kArcXenosSwordId  = 180;  // 片手剣
+constexpr int kArcXenosMaceId   = 181;  // 片手棍
+constexpr int kArcXenosDaggerId = 182;  // 短剣
+constexpr int kArcXenosRapierId = 183;  // 細剣
+constexpr int kArcXenosSpearId  = 184;  // 槍
+constexpr int kEndWorldHelmId   = 205;  // 頭
+constexpr int kEndWorldMailId   = 215;  // 体
+constexpr int kEndWorldShieldId = 225;  // 盾
+constexpr int kEndWorldArmId    = 233;  // 腕
+constexpr int kEndWorldGloveId  = 243;  // 手
+constexpr int kEndWorldBootsId  = 253;  // 足
+
+// アークゼノスの武器かエンドワールドシリーズか
+bool IsEndWorldSetItem(int templateId);
+
+//------------------------------------------------------------------------------
 // 初期装備
 //------------------------------------------------------------------------------
 // 初期装備の個体値（低めに固定して、ドロップで更新していく想定）

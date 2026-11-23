@@ -11,6 +11,9 @@
 
 namespace ecl {
 
+struct QuestResult;
+struct ResultRewardLayout;   // 報酬パネルの割り付け（ResultScene.cpp）
+
 class ResultScene : public Scene
 {
 public:
@@ -49,6 +52,8 @@ private:
     void DrawHeader(const GameContext& context) const;
     void DrawStats(const GameContext& context) const;
     void DrawRewards(const GameContext& context) const;
+    void DrawDropColumn(const QuestResult& result, const ResultRewardLayout& layout) const;
+    void DrawMaterialColumn(const QuestResult& result, const ResultRewardLayout& layout) const;
     void DrawAnnouncement() const;
 
     ui::Button homeButton_;

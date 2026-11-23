@@ -6,6 +6,9 @@
 #include "Game/ItemDatabase.h"
 #include "Graphics/DrawUtil.h"
 
+#include <utility>
+#include <vector>
+
 namespace ecl {
 namespace ui {
 
@@ -48,12 +51,17 @@ void QuestPanel::Layout()
 
     questButtons_.clear();
 
-    // 開発者モードで特別クエストも並べられるよう、全クエスト分のボタンを用意する
-    float y = window_.top + 90.0f;
-    for (size_t i = 0; i < ListedQuests(true).size(); ++i) {
-        questButtons_.push_back(Button(Rect::FromXYWH(window_.left + 40.0f, y, 520.0f, 124.0f),
+    // 開発者モードで特別クエストも並べられるよう、全クエスト分のボタンを用意する。
+    //   クエストが増えても枠（下端の 40 px 上まで）に収まるよう、入りきらないときは間隔を詰める
+    const size_t count = ListedQuests(true).size();
+    const float top = window_.top + 90.0f;
+    const float room = window_.bottom - 40.0f - top;
+    const float step = math::MinF(140.0f, room / static_cast<float>(math::MaxI(1, static_cast<int>(count))));
+    float y = top;
+    for (size_t i = 0; i < count; ++i) {
+        questButtons_.push_back(Button(Rect::FromXYWH(window_.left + 40.0f, y, 520.0f, step - 16.0f),
                                        "", FontSize::Normal));
-        y += 140.0f;
+        y += step;
     }
 
     closeButton_ = Button(Rect::FromXYWH(window_.right - 200.0f, window_.bottom - 86.0f, 160.0f, 58.0f),
@@ -139,8 +147,11 @@ void QuestPanel::Draw(const GameContext& context) const
         }
 
         draw::Text(FontSize::Small, rect.left + 20.0f, rect.bottom - 34.0f, palette::kTextDim,
-                   str::Format("推奨戦力 %s ／ %dフロア",
-                               str::Comma(quest.recommendedPower).c_str(), quest.FloorCount()));
+                   (quest.floorLevel > 0)
+                       ? str::Format("第%d層 ／ 推奨戦力 %s ／ %dフロア", quest.floorLevel,
+                                     str::Comma(quest.recommendedPower).c_str(), quest.FloorCount())
+                       : str::Format("推奨戦力 %s ／ %dフロア",
+                                     str::Comma(quest.recommendedPower).c_str(), quest.FloorCount()));
 
         if (quest.special) {
             draw::Text(FontSize::Small, rect.right - 20.0f, rect.bottom - 34.0f, palette::kExp,
@@ -177,7 +188,8 @@ void QuestPanel::Draw(const GameContext& context) const
                draw::TextAlign::Right);
     y += 40.0f;
 
-    draw::Text(FontSize::Normal, detail.left + 24.0f, y, palette::kAccent, "推奨戦力");
+    draw::Text(FontSize::Normal, detail.left + 24.0f, y, palette::kAccent,
+               (quest->floorLevel > 0) ? str::Format("推奨戦力（第%d層）", quest->floorLevel) : std::string("推奨戦力"));
     {
         const bool enough = playerPower >= quest->recommendedPower;
         draw::Text(FontSize::Normal, detail.right - 24.0f, y, enough ? palette::kHp : palette::kDanger,
@@ -189,7 +201,8 @@ void QuestPanel::Draw(const GameContext& context) const
 
     draw::Text(FontSize::Normal, detail.left + 24.0f, y, palette::kAccent, "報酬");
     draw::Text(FontSize::Normal, detail.right - 24.0f, y, palette::kText,
-               str::Format("%s col ／ %d EXP", str::Comma(quest->colReward).c_str(), quest->expReward),
+               str::Format("%s col ／ %s EXP", str::Comma(quest->colReward).c_str(),
+                           str::Comma(quest->expReward).c_str()),
                draw::TextAlign::Right);
     y += 48.0f;
 
@@ -221,19 +234,27 @@ void QuestPanel::Draw(const GameContext& context) const
         return;
     }
 
+    // 6 件までは 1 列、それより多いとき（世界終焉の玉座は 11 件）は 2 列に並べる（最大 12 件）
     const ItemDatabase& items = ItemDatabase::Instance();
-    int shown = 0;
+    std::vector<std::pair<const ItemTemplate*, float>> drops;
     for (const DropEntry& entry : quest->bossDrops) {
-        if (shown >= 6) break;
-        const ItemTemplate* tmpl = items.Find(entry.templateId);
-        if (!tmpl) continue;
-
-        const Rect row(detail.left + 24.0f, y, detail.right - 24.0f, y + 34.0f);
-        draw::Text(FontSize::Small, row.left + 8.0f, row.top + 5.0f, palette::kText, tmpl->name);
+        if (const ItemTemplate* tmpl = items.Find(entry.templateId)) drops.emplace_back(tmpl, entry.chance);
+    }
+    constexpr int kRowsPerColumn = 6;
+    const int columns = (static_cast<int>(drops.size()) > kRowsPerColumn) ? 2 : 1;
+    const float columnGap = 32.0f;
+    const float columnWidth = (detail.Width() - 48.0f - columnGap * static_cast<float>(columns - 1))
+                            / static_cast<float>(columns);
+    const int rows = (static_cast<int>(drops.size()) + columns - 1) / columns;
+    for (size_t i = 0; i < drops.size() && static_cast<int>(i) < kRowsPerColumn * columns; ++i) {
+        const int column = static_cast<int>(i) / math::MaxI(1, rows);
+        const int rowIndex = static_cast<int>(i) % math::MaxI(1, rows);
+        const float left = detail.left + 24.0f + (columnWidth + columnGap) * static_cast<float>(column);
+        const Rect row(left, y + 38.0f * static_cast<float>(rowIndex), left + columnWidth,
+                       y + 38.0f * static_cast<float>(rowIndex) + 34.0f);
+        draw::Text(FontSize::Small, row.left + 8.0f, row.top + 5.0f, palette::kText, drops[i].first->name);
         draw::Text(FontSize::Small, row.right, row.top + 5.0f, palette::kTextDim,
-                   str::Format("%.0f%%", entry.chance * 100.0f), draw::TextAlign::Right);
-        y += 38.0f;
-        ++shown;
+                   str::Format("%.0f%%", drops[i].second * 100.0f), draw::TextAlign::Right);
     }
 
     startButton_.Draw();

@@ -343,6 +343,13 @@ void ItemPanel::DrawDetail(const GameContext& context) const
     draw::Text(FontSize::Small, x, y, palette::kTextDim, "効果");
     draw::Text(FontSize::Small, right, y, palette::kAccentWarm, selected->effect, draw::TextAlign::Right);
     y += 36.0f;
+    if (selected->kind != ConsumableKind::Material) {
+        // 効果が強いほど、戦闘中に次のアイテムを使えるまで長く待つ
+        draw::Text(FontSize::Small, x, y, palette::kTextDim, "使用後の待ち時間");
+        draw::Text(FontSize::Small, right, y, palette::kText, str::Format("%.1f 秒", selected->UseCooldown()),
+                   draw::TextAlign::Right);
+        y += 36.0f;
+    }
     draw::Text(FontSize::Small, x, y, palette::kTextDim, "所持数");
     draw::Text(FontSize::Small, right, y, palette::kText,
                str::Format("%d / %d", count, selected->MaxStack()), draw::TextAlign::Right);

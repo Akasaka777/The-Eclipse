@@ -47,8 +47,18 @@ ConsumableKind QuickSlotKind(QuickSlot slot);
 constexpr int kConsumableMaxStack = 99;   // 回復・バフ
 constexpr int kMaterialMaxStack = 999;    // 素材
 
+//------------------------------------------------------------------------------
 // 戦闘中にアイテムを使ったあと、次に使えるまでの待ち時間（秒）
-constexpr float kItemUseCooldown = 1.0f;
+//   効果が強いアイテムほど長くする。回復は回復量、バフは「強さの合計 × 効果時間」で決まる。
+//     待ち時間 = kItemCooldownBase
+//              + HP 回復率 × kItemCooldownPerHp + MP 回復率 × kItemCooldownPerMp
+//              + （能力の倍率の合計 + クリティカル率）× 効果時間 / 60 秒 × kItemCooldownPerBuff
+//   例：ポーション（HP 30%）4.0 秒 / 回復結晶（HP 100%）11.0 秒 / 剛力の秘薬（攻撃 +15% 60 秒）4.0 秒
+//------------------------------------------------------------------------------
+constexpr float kItemCooldownBase = 1.0f;       // どのアイテムにも掛かる最低の待ち時間
+constexpr float kItemCooldownPerHp = 10.0f;     // HP 100% 回復ぶん
+constexpr float kItemCooldownPerMp = 6.0f;      // MP 100% 回復ぶん
+constexpr float kItemCooldownPerBuff = 20.0f;   // 能力 +100% を 60 秒ぶん
 
 //------------------------------------------------------------------------------
 // 定義
@@ -76,6 +86,8 @@ struct ConsumableDef
     float     duration = 0.0f;    // 効果時間（秒）
 
     bool InShop() const { return price > 0; }
+    // 戦闘中に使ったあとの待ち時間（秒。素材は 0）
+    float UseCooldown() const;
     int  MaxStack() const
     {
         return (kind == ConsumableKind::Material) ? kMaterialMaxStack : kConsumableMaxStack;
@@ -146,5 +158,8 @@ constexpr int kMatHolySilver   = 1210;  // 聖銀
 constexpr int kMatObsidian     = 1211;  // 黒曜石
 constexpr int kMatFireScale    = 1212;  // 火竜の鱗
 constexpr int kMatDragonScale  = 1213;  // 竜王の逆鱗
+constexpr int kMatAbyssScale   = 1214;  // 深淵の鱗
+constexpr int kMatChaosCrystal = 1215;  // 混沌の結晶
+constexpr int kMatEndShard     = 1216;  // 終焉の欠片
 
 } // namespace ecl

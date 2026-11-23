@@ -18,7 +18,16 @@ assets/
 ├── bosses/
 │   ├── fangwolf/                深緑の狼王 ファングルフ
 │   ├── golem_guard/             石牢の守護者 ゴーレム・ガルド
-│   └── eclipse_knight/          蝕の騎士 エクリプス・ナイト
+│   ├── eclipse_knight/          蝕の騎士 エクリプス・ナイト
+│   ├── sacred_guardian/         聖剣の守護者 セイクリッド・ガーディアン
+│   ├── valgrim/                 竜王 ヴァルグリム・ザ・エンシェントドラゴン
+│   ├── vajra/                   六臂の金剛像 ヴァジュラ・ラグナシュラ（隠しボス）
+│   ├── world_eater/             世界を喰らう獣 ワールドイーター（世界終焉の玉座 1F）
+│   ├── abyss_dragon/            深淵の竜 アビスドラゴン（2F）
+│   ├── chaos_lord/              混沌の覇王 カオスロード（3F）
+│   ├── void_colossus/           虚無の巨像 ヴォイド・コロッサス（4F）
+│   ├── nemesis_inferno/         終焉の焔霊 ネメシス・インフェルノ（5F）
+│   └── arc_xenos/               終焉の王 アークゼノス・ザ・エンドオブワールド（最後のボス）
 └── fonts/                       日本語フォント（任意）
 ```
 

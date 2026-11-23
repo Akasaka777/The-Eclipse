@@ -14,6 +14,16 @@ bool IsDragonSetItem(int templateId)
         || templateId == kDragonBootsId;
 }
 
+bool IsEndWorldSetItem(int templateId)
+{
+    return templateId == kArcXenosSwordId || templateId == kArcXenosMaceId
+        || templateId == kArcXenosDaggerId || templateId == kArcXenosRapierId
+        || templateId == kArcXenosSpearId
+        || templateId == kEndWorldHelmId || templateId == kEndWorldMailId
+        || templateId == kEndWorldShieldId || templateId == kEndWorldArmId
+        || templateId == kEndWorldGloveId || templateId == kEndWorldBootsId;
+}
+
 namespace {
 
 // 武器用ステータス生成
@@ -173,12 +183,21 @@ ItemDatabase::ItemDatabase()
 
         { 160, "ヴァルグリム・ドラゴンソード", "竜王の牙から鍛えた大剣。振るうたびに熱を帯びる。", EquipSlot::WeaponRight, SWD, 3, WeaponStats(132.0f, 0.11f, 0.34f, 0.05f) },
 
+        //--- 世界終焉の玉座のボスドロップ（武器は全種。部位ごとに 1 つずつ）-------------
+        //   竜王の剣のおよそ 3 倍。ほかの武器種は、蝕の武器と蝕の剣の比で割り振る。
+        { 180, "アークゼノスソード",   "終焉の王が振るった剣。斬った場所から世界がほどける。", EquipSlot::WeaponRight, SWD, 3, WeaponStats(396.0f, 0.14f, 0.46f, 0.07f) },
+        { 181, "アークゼノスメイス",   "終焉の王の戦槌。打てば大地が音もなく崩れる。",       EquipSlot::WeaponRight, MCE, 3, WeaponStats(472.0f, 0.08f, 0.56f, -0.04f) },
+        { 182, "アークゼノスダガー",   "終焉の王の影から削り出した短剣。",                   EquipSlot::WeaponRight, DGR, 3, WeaponStats(275.0f, 0.30f, 0.50f, 0.30f, 24.0f) },
+        { 183, "アークゼノスレイピア", "終焉の光を一点に束ねた細剣。",                       EquipSlot::WeaponRight, RPR, 3, WeaponStats(326.0f, 0.23f, 0.48f, 0.22f, 20.0f) },
+        { 184, "アークゼノススピア",   "終焉の王の玉座を支えていた槍。届かぬ果てはない。",   EquipSlot::WeaponRight, SPR, 3, WeaponStats(420.0f, 0.14f, 0.48f, 0.02f) },
+
         //--- 頭装備 -------------------------------------------------------------
         { 200, "レザーキャップ",       "軽い革の帽子。",                           EquipSlot::Head, SWD, 1, ArmorStats(6.0f,  40.0f, 10.0f) },
         { 201, "アイアンヘルム",       "視界は狭いが頑丈。",                       EquipSlot::Head, SWD, 2, ArmorStats(12.0f, 75.0f,  6.0f) },
         { 202, "月光のサークレット",   "MP の巡りを良くする装飾。",                 EquipSlot::Head, SWD, 2, ArmorStats(8.0f,  45.0f, 38.0f, 0.02f, 0.0f, 0.05f) },
         { 203, "蝕の兜",               "闇を見通す視界を得る。",                   EquipSlot::Head, SWD, 3, ArmorStats(19.0f, 110.0f, 24.0f, 0.03f) },
         { 204, "エンシェントドラゴンヘルム", "竜鱗を重ねた兜。灼熱の息すら通さない。", EquipSlot::Head, SWD, 3, ArmorStats(42.0f, 280.0f, 60.0f, 0.04f) },
+        { 205, "エンドワールドヘルム", "世界の終わりを見届けた兜。目を閉じても果てが見える。", EquipSlot::Head, SWD, 3, ArmorStats(126.0f, 840.0f, 96.0f, 0.05f) },
 
         //--- 体装備 -------------------------------------------------------------
         { 210, "レザーアーマー",       "動きを妨げない革鎧。",                     EquipSlot::Body, SWD, 1, ArmorStats(11.0f, 80.0f,  8.0f, 0.0f, 6.0f) },
@@ -186,6 +205,7 @@ ItemDatabase::ItemDatabase()
         { 212, "月光のコート",         "魔力を織り込んだ外套。",                   EquipSlot::Body, SWD, 2, ArmorStats(15.0f, 100.0f, 52.0f, 0.0f, 10.0f, 0.08f) },
         { 213, "蝕の鎧",               "蝕の夜を纏うかのような漆黒。",             EquipSlot::Body, SWD, 3, ArmorStats(32.0f, 210.0f, 30.0f, 0.02f, 8.0f) },
         { 214, "エンシェントドラゴンメイル", "古竜の背鱗を並べた鎧。重さを感じさせない。", EquipSlot::Body, SWD, 3, ArmorStats(68.0f, 520.0f, 70.0f, 0.02f, 6.0f) },
+        { 215, "エンドワールドメイル", "崩れ落ちる世界の欠片を鍛え合わせた鎧。",             EquipSlot::Body, SWD, 3, ArmorStats(204.0f, 1560.0f, 112.0f, 0.03f, 8.0f) },
 
         //--- 盾 -----------------------------------------------------------------
         { 220, "ラウンドシールド",     "取り回しの良い小盾。",                     EquipSlot::Shield, SWD, 1, ArmorStats(9.0f,  55.0f, 0.0f) },
@@ -194,21 +214,25 @@ ItemDatabase::ItemDatabase()
         // ユニークスキル「神聖剣」専用のセット武器（特別クエストでのみ入手）
         { 223, "聖盾エーギス",         "神聖剣と対になる盾。あらゆる刃を受け止める。", EquipSlot::Shield, SWD, 3, ArmorStats(125.0f, 480.0f, 70.0f) },
         { 224, "エンシェントドラゴンシールド", "竜の翼膜を張った盾。炎を受け流す。", EquipSlot::Shield, SWD, 3, ArmorStats(58.0f, 380.0f, 40.0f) },
+        { 225, "エンドワールドシールド", "終焉の一撃すら受け止めた盾。表面に星図が浮かぶ。", EquipSlot::Shield, SWD, 3, ArmorStats(174.0f, 1140.0f, 64.0f) },
 
         //--- 腕装備 -------------------------------------------------------------
         { 230, "レザーブレイサー",     "手首を守る革当て。",                       EquipSlot::Arm, SWD, 1, ArmorStats(5.0f, 30.0f, 6.0f, 0.02f) },
         { 231, "鋼の篭手",             "打撃の威力を底上げする。",                 EquipSlot::Arm, SWD, 2, ArmorStats(10.0f, 55.0f, 0.0f, 0.04f) },
         { 232, "エンシェントドラゴンアーム", "竜爪を模した篭手。急所を的確に捉える。", EquipSlot::Arm, SWD, 3, ArmorStats(26.0f, 160.0f, 30.0f, 0.06f) },
+        { 233, "エンドワールドアーム", "終焉の王の腕甲。振るうたびに空間が軋む。",           EquipSlot::Arm, SWD, 3, ArmorStats(78.0f, 480.0f, 48.0f, 0.08f) },
 
         //--- 手装備 -------------------------------------------------------------
         { 240, "戦士のグローブ",       "武器を握る力が増す。",                     EquipSlot::Hand, SWD, 1, ArmorStats(4.0f, 24.0f, 4.0f, 0.03f) },
         { 241, "疾風の手甲",           "振りの速度が上がる。",                     EquipSlot::Hand, SWD, 2, ArmorStats(7.0f, 38.0f, 8.0f, 0.03f) },
         { 242, "エンシェントドラゴングローブ", "竜の握力を宿す手甲。武器がぴたりと吸い付く。", EquipSlot::Hand, SWD, 3, ArmorStats(20.0f, 120.0f, 24.0f, 0.05f) },
+        { 243, "エンドワールドグローブ", "掴んだものを決して離さない、終焉の手甲。",         EquipSlot::Hand, SWD, 3, ArmorStats(60.0f, 360.0f, 38.0f, 0.07f) },
 
         //--- 足装備 -------------------------------------------------------------
         { 250, "レザーブーツ",         "長時間の探索に向く。",                     EquipSlot::Foot, SWD, 1, ArmorStats(5.0f, 28.0f, 4.0f, 0.0f, 18.0f) },
         { 251, "韋駄天のブーツ",       "駆け抜ける者のための靴。",                 EquipSlot::Foot, SWD, 2, ArmorStats(9.0f, 46.0f, 8.0f, 0.0f, 34.0f) },
         { 252, "エンシェントドラゴンブーツ", "溶岩の上でも足を取られない具足。", EquipSlot::Foot, SWD, 3, ArmorStats(24.0f, 150.0f, 26.0f, 0.0f, 52.0f) },
+        { 253, "エンドワールドブーツ", "崩れゆく大地を踏みしめて歩くための具足。",           EquipSlot::Foot, SWD, 3, ArmorStats(72.0f, 450.0f, 42.0f, 0.0f, 64.0f) },
 
         //======================================================================
         // ショップ専用の武器（ドロップには出ない）
@@ -318,7 +342,8 @@ ItemDatabase::ItemDatabase()
     // 手装備の攻撃速度補正は個別に付与
     for (ItemTemplate& t : templates_) {
         if (t.slot == EquipSlot::Hand) {
-            if (t.id == 242) t.base.attackSpeed = 0.14f;
+            if (t.id == kEndWorldGloveId) t.base.attackSpeed = 0.18f;
+            else if (t.id == 242) t.base.attackSpeed = 0.14f;
             else if (t.id == 241) t.base.attackSpeed = 0.10f;
             else t.base.attackSpeed = 0.05f;
         }
@@ -332,6 +357,8 @@ ItemDatabase::ItemDatabase()
         if (IsDragonSetItem(t.id)) t.special = true;
         // 隠しボスのドロップも専用
         if (t.id == kBlackSwordId) t.special = true;
+        // 世界終焉の玉座のボスドロップも専用
+        if (IsEndWorldSetItem(t.id)) t.special = true;
         // ショップ専用の装備とアクセサリーはドロップ抽選に出さない
         if (t.id >= kShopOnlyIdBase) t.special = true;
     }

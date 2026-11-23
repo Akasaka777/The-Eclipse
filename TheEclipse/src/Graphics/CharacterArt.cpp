@@ -177,7 +177,9 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
     const float bottom = rect.bottom;
     const float dir = (facing >= 0) ? 1.0f : -1.0f;
     const float ink = math::MaxF(1.0f, h * 0.010f);
-    const bool knight = (art.style == ArtStyle::Knight);
+    // 終焉の王は騎士の体（兜・マント・鎧）に、刃の翼・光輪・冠を足す
+    const bool sovereign = (art.style == ArtStyle::Sovereign);
+    const bool knight = (art.style == ArtStyle::Knight) || sovereign;
     const bool imp = (art.style == ArtStyle::Imp);
 
     // --- 姿勢パラメータ -----------------------------------------------------
@@ -238,7 +240,9 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
                               : ColorRGB::Lerp(accent, ColorRGB(236, 196, 168), 0.55f);
     const ColorRGB cloth = main;
     const ColorRGB clothDark = main.Scaled(0.70f);
-    const ColorRGB armor = ColorRGB::Lerp(accent.Scaled(0.80f), main, 0.25f);
+    // 終焉の王の鎧は紫がかった黒鋼
+    const ColorRGB armor = sovereign ? ColorRGB::Lerp(main.Scaled(1.9f), accent, 0.22f)
+                                     : ColorRGB::Lerp(accent.Scaled(0.80f), main, 0.25f);
     const ColorRGB leather(84, 58, 42);
     const ColorRGB boots = ColorRGB::Lerp(main.Scaled(0.55f), leather, 0.5f);
 
@@ -274,6 +278,79 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
     Vec2 hand = Rotate(shoulder, armLen, angle - armTwist);
     hand.x += handOffset.x;
     hand.y += handOffset.y;
+
+    // --- 終焉の王：刃の翼と欠けた光輪（体の後ろ）-----------------------------------
+    if (sovereign) {
+        const float headCx = cx + lean * 0.9f + dir * w * 0.04f;
+        // 光輪：頭の後ろで欠けた輪がゆっくり回る。外側に棘
+        const Vec2 haloC(headCx - dir * headR * 0.35f, headY - headR * 0.25f);
+        const float haloR = headR * 2.15f;
+        draw::Glow(haloC.x, haloC.y, haloR * 1.35f, art.trim, 70, 5);
+        const int segments = 18;
+        const float spin = phase * kTwoPi * 0.25f;
+        for (int i = 0; i < segments; ++i) {
+            if (i % 6 == 5) continue;   // ところどころ欠けている
+            const float a0 = spin + kTwoPi * static_cast<float>(i) / static_cast<float>(segments);
+            const float a1 = a0 + kTwoPi / static_cast<float>(segments) * 0.82f;
+            const Vec2 p0(haloC.x + std::cos(a0) * haloR, haloC.y + std::sin(a0) * haloR);
+            const Vec2 p1(haloC.x + std::cos(a1) * haloR, haloC.y + std::sin(a1) * haloR);
+            draw::Line(p0.x, p0.y, p1.x, p1.y, kInk, math::MaxF(2.0f, headR * 0.30f), alpha);
+            draw::Line(p0.x, p0.y, p1.x, p1.y, art.trim, math::MaxF(1.0f, headR * 0.16f), alpha);
+            if (i % 2 == 0) {
+                const float am = (a0 + a1) * 0.5f;
+                const Vec2 n(std::cos(am), std::sin(am));
+                const Vec2 t(-n.y, n.x);
+                Poly({ Vec2(haloC.x + n.x * haloR * 1.04f + t.x * headR * 0.16f, haloC.y + n.y * haloR * 1.04f + t.y * headR * 0.16f),
+                       Vec2(haloC.x + n.x * haloR * 1.04f - t.x * headR * 0.16f, haloC.y + n.y * haloR * 1.04f - t.y * headR * 0.16f),
+                       Vec2(haloC.x + n.x * haloR * 1.38f, haloC.y + n.y * haloR * 1.38f) },
+                     art.trim.Scaled(0.85f), alpha);
+            }
+        }
+
+        // 刃の翼：背中から 6 枚。後ろ側の 3 枚は大きく、肩越しに見える向こう側の 3 枚は暗く小さく
+        const bool striking = (pose == PoseKind::Attack || pose == PoseKind::Skill);
+        const float flap = std::sin(phase * kTwoPi) * 4.0f + (striking ? 9.0f : 0.0f);
+        const Vec2 root(cx - dir * torsoW * 0.12f + lean * 0.5f, shoulderY + h * 0.04f);
+        const ColorRGB voidColor = ColorRGB::Lerp(main.Scaled(1.7f), art.trim, 0.08f);
+        const ColorRGB coreColor = ColorRGB::Lerp(main.Scaled(2.2f), art.trim, 0.35f);
+        auto blade = [&](float degFromUp, float length, float width, bool far) {
+            // degFromUp：真上から後ろ（-dir）側へ倒す角度
+            const float a = math::DegToRad(degFromUp);
+            const Vec2 axis(-dir * std::sin(a), -std::cos(a));
+            const Vec2 side(-axis.y, axis.x);
+            const Vec2 tip(root.x + axis.x * length, root.y + axis.y * length);
+            const Vec2 mid(root.x + axis.x * length * 0.38f, root.y + axis.y * length * 0.38f);
+            const std::vector<Vec2> pts = {
+                Vec2(root.x + side.x * width * 0.45f, root.y + side.y * width * 0.45f),
+                Vec2(mid.x + side.x * width, mid.y + side.y * width),
+                tip,
+                Vec2(mid.x - side.x * width * 0.55f, mid.y - side.y * width * 0.55f),
+                Vec2(root.x - side.x * width * 0.45f, root.y - side.y * width * 0.45f),
+            };
+            const ColorRGB fill = far ? voidColor.Scaled(0.6f) : voidColor;
+            PolyInk(pts, fill, ink, alpha);
+            // 刃の内側の面（少し明るい）
+            Poly({ Vec2(root.x + axis.x * length * 0.12f, root.y + axis.y * length * 0.12f),
+                   Vec2(mid.x + side.x * width * 0.45f, mid.y + side.y * width * 0.45f),
+                   Vec2(tip.x - axis.x * length * 0.10f, tip.y - axis.y * length * 0.10f),
+                   Vec2(mid.x - side.x * width * 0.15f, mid.y - side.y * width * 0.15f) },
+                 far ? coreColor.Scaled(0.6f) : coreColor, alpha);
+            // 刃の縁（金）と、芯を走る光
+            draw::Line(pts[1].x, pts[1].y, tip.x, tip.y, far ? art.trim.Scaled(0.55f) : art.trim,
+                       math::MaxF(1.0f, h * 0.010f), alpha);
+            draw::Line(mid.x, mid.y, tip.x - axis.x * length * 0.08f, tip.y - axis.y * length * 0.08f,
+                       ColorRGB::Lerp(art.trim, palette::kWhite, 0.3f), math::MaxF(1.0f, h * 0.003f), alpha / 2);
+            if (!far) draw::Glow(tip.x, tip.y, h * 0.035f, art.trim, 110, 3);
+        };
+        // 向こう側（手前の体に隠れる側）
+        blade(-16.0f - flap * 0.5f, h * 0.34f, h * 0.050f, true);
+        blade(-40.0f - flap * 0.7f, h * 0.30f, h * 0.044f, true);
+        blade(-62.0f - flap, h * 0.25f, h * 0.038f, true);
+        // 後ろ側
+        blade(24.0f + flap * 0.5f, h * 0.54f, h * 0.072f, false);
+        blade(54.0f + flap * 0.8f, h * 0.47f, h * 0.064f, false);
+        blade(86.0f + flap, h * 0.38f, h * 0.056f, false);
+    }
 
     // --- 奥の腕（盾を持つ / 歩きで振る）---------------------------------------
     const Vec2 backShoulder(cx - dir * torsoW * 0.30f + lean * 0.55f, shoulderY + h * 0.06f);
@@ -319,7 +396,8 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
         const float capeTop = shoulderY - h * 0.01f;
         const float capeX = cx - dir * torsoW * 0.15f + lean * 0.5f;
         const float hemY = bottom - h * 0.10f;
-        const ColorRGB cape = art.trim.Scaled(0.45f);
+        // 終焉の王のマントは深紅（裏地は金）
+        const ColorRGB cape = sovereign ? ColorRGB(96, 20, 46) : art.trim.Scaled(0.45f);
         std::vector<Vec2> pts = {
             Vec2(capeX + dir * torsoW * 0.30f, capeTop),
             Vec2(capeX - dir * torsoW * 0.45f, capeTop + h * 0.02f),
@@ -336,7 +414,7 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
             draw::Line(top.x, top.y, low.x, low.y, cape.Scaled(0.65f), math::MaxF(1.0f, h * 0.006f), alpha);
         }
         // 裏地
-        Poly({ pts[1], pts[2], pts[3] }, art.trim.Scaled(0.30f), alpha);
+        Poly({ pts[1], pts[2], pts[3] }, sovereign ? art.trim.Scaled(0.55f) : art.trim.Scaled(0.30f), alpha);
     }
 
     // --- 脚（膝で曲がる。奥の脚は暗く）-----------------------------------------
@@ -410,10 +488,12 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
         // 兜：丸い鉢・顔を覆う面頬・光る覗き穴・羽根飾り
         const ColorRGB helm = armor;
         const float plume = std::sin(phase * kTwoPi) * h * 0.01f;
-        PolyInk({ Vec2(headX - dir * headR * 0.2f, headY - headR * 0.9f),
-                  Vec2(headX - dir * headR * 1.9f, headY - headR * 1.2f + plume),
-                  Vec2(headX - dir * headR * 1.4f, headY - headR * 0.4f + plume) },
-                art.trim.Scaled(0.75f), ink, alpha);
+        if (!sovereign) {
+            PolyInk({ Vec2(headX - dir * headR * 0.2f, headY - headR * 0.9f),
+                      Vec2(headX - dir * headR * 1.9f, headY - headR * 1.2f + plume),
+                      Vec2(headX - dir * headR * 1.4f, headY - headR * 0.4f + plume) },
+                    art.trim.Scaled(0.75f), ink, alpha);
+        }
         Ball(Vec2(headX, headY), headR * 1.05f, helm, ink, alpha);
         Poly({ Vec2(headX - dir * headR * 0.9f, headY - headR * 0.2f), Vec2(headX - dir * headR * 0.2f, headY - headR * 1.0f),
                Vec2(headX - dir * headR * 0.95f, headY + headR * 0.5f) }, helm.Scaled(0.7f), alpha);
@@ -428,6 +508,26 @@ void DrawHumanoid(const Rect& rect, int facing, PoseKind pose, float phase,
                    headY + headR * 0.20f, art.trim, math::MaxF(1.0f, headR * 0.10f), alpha);
         draw::Circle(headX - dir * headR * 0.35f, headY - headR * 0.45f, headR * 0.22f, helm.Scaled(1.35f),
                      true, 1.0f, alpha);
+        if (sovereign) {
+            // 金の冠：兜の上に 5 本の棘。真ん中に赤い宝石
+            const float baseY = headY - headR * 0.78f;
+            const float span = headR * 0.95f;
+            std::vector<Vec2> crown = { Vec2(headX - span, baseY + headR * 0.18f) };
+            for (int i = 0; i < 5; ++i) {
+                const float t = static_cast<float>(i) / 4.0f;
+                const float x = headX - span + span * 2.0f * t;
+                const float tall = (i == 2) ? 0.95f : ((i % 2 == 0) ? 0.70f : 0.48f);
+                crown.push_back(Vec2(x - span * 0.12f, baseY));
+                crown.push_back(Vec2(x, baseY - headR * tall));
+                crown.push_back(Vec2(x + span * 0.12f, baseY));
+            }
+            crown.push_back(Vec2(headX + span, baseY + headR * 0.18f));
+            PolyInk(crown, art.trim, ink * 0.8f, alpha);
+            draw::Line(headX - span, baseY + headR * 0.08f, headX + span, baseY + headR * 0.08f,
+                       art.trim.Scaled(0.7f), math::MaxF(1.0f, headR * 0.12f), alpha);
+            draw::Circle(headX, baseY - headR * 0.05f, headR * 0.16f, kInk, true, 1.0f, alpha);
+            draw::Circle(headX, baseY - headR * 0.05f, headR * 0.11f, ColorRGB(255, 64, 96), true, 1.0f, alpha);
+        }
     } else {
         // 顔
         Ball(Vec2(headX, headY), headR, skin, ink, alpha);
@@ -1838,6 +1938,7 @@ void DrawActor(const Rect& screenRect, int facing, PoseKind pose, float phase,
         break;
     case ArtStyle::Humanoid:
     case ArtStyle::Knight:
+    case ArtStyle::Sovereign:
     case ArtStyle::Imp:
     default:
         DrawHumanoid(screenRect, facing, pose, phase, art, alpha, main, accent, motionVariant);

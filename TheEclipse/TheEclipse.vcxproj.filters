@@ -112,6 +112,9 @@
     <ClCompile Include="src\Scenes\HomeScene.cpp">
       <Filter></Filter>
     </ClCompile>
+    <ClCompile Include="src\Scenes\HomeTown.cpp">
+      <Filter></Filter>
+    </ClCompile>
     <ClCompile Include="src\Scenes\QuestScene.cpp">
       <Filter></Filter>
     </ClCompile>
@@ -289,6 +292,9 @@
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\Scenes\HomeScene.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Scenes\HomeTown.h">
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\Scenes\QuestScene.h">

@@ -83,6 +83,16 @@ ThemeColors ColorsFor(StageTheme theme)
         c.groundEdge = ColorRGB(222, 176, 86);
         c.accent = ColorRGB(255, 208, 112);
         break;
+    case StageTheme::Throne:
+        // 世界終焉の玉座：黒い太陽が昇る、崩れかけた世界の果て
+        c.skyTop = ColorRGB(6, 4, 12);
+        c.skyBottom = ColorRGB(58, 14, 34);
+        c.far_ = ColorRGB(30, 14, 30);
+        c.mid = ColorRGB(18, 9, 20);
+        c.ground = ColorRGB(30, 22, 36);
+        c.groundEdge = ColorRGB(226, 76, 118);
+        c.accent = ColorRGB(255, 96, 128);
+        break;
     case StageTheme::Home:
     default:
         c.skyTop = ColorRGB(10, 14, 30);
@@ -206,6 +216,32 @@ void Stage::DrawSky(const Camera& camera) const
                            Vec2(moonX + c * 190.0f, moonY + s * 190.0f), gold.accent, true, 90);
         }
         draw::Circle(moonX, moonY, 40.0f, ColorRGB(255, 236, 190), true, 1.0f, 150);
+    } else if (def_.theme == StageTheme::Throne) {
+        // 黒い太陽：赤いコロナと、ゆっくり回る欠けた輪。空には裂け目が走る
+        const ThemeColors end = ColorsFor(def_.theme);
+        for (int i = 0; i < 5; ++i) {
+            const float sx = std::fmod(Hash01(i * 13 + 5) * 2400.0f - camera.ViewLeft() * 0.03f, 2200.0f) - 140.0f;
+            const float sy = 60.0f + Hash01(i * 13 + 6) * 360.0f;
+            float px = sx, py = sy;
+            for (int k = 0; k < 5; ++k) {
+                const float nx = px + 40.0f + Hash01(i * 13 + k * 3 + 7) * 70.0f;
+                const float ny = py + (Hash01(i * 13 + k * 3 + 8) - 0.5f) * 80.0f;
+                draw::Line(px, py, nx, ny, end.accent, 2.0f, 70);
+                draw::Line(px, py, nx, ny, ColorRGB(255, 220, 230), 1.0f, 60);
+                px = nx;
+                py = ny;
+            }
+        }
+        draw::Glow(moonX, moonY, 260.0f, end.accent, 120, 6);
+        draw::Circle(moonX, moonY, 112.0f, ColorRGB(255, 150, 120), true, 1.0f, 200);
+        draw::Circle(moonX, moonY, 100.0f, ColorRGB(4, 2, 8), true, 1.0f, 255);
+        for (int i = 0; i < 16; ++i) {
+            if (i % 4 == 3) continue;
+            const float a0 = -time_ * 0.10f + static_cast<float>(i) * (6.2831853f / 16.0f);
+            const float a1 = a0 + 6.2831853f / 16.0f * 0.8f;
+            draw::Line(moonX + std::cos(a0) * 150.0f, moonY + std::sin(a0) * 150.0f,
+                       moonX + std::cos(a1) * 150.0f, moonY + std::sin(a1) * 150.0f, end.accent, 3.0f, 120);
+        }
     } else if (def_.theme == StageTheme::Altar) {
         draw::Glow(moonX, moonY, 200.0f, ColorRGB(210, 120, 255), 150, 6);
         draw::Circle(moonX, moonY, 96.0f, ColorRGB(255, 226, 200), true, 1.0f, 255);
@@ -266,6 +302,21 @@ void Stage::DrawFarLayer(const Camera& camera) const
                                Vec2(x, y - tierH * 0.42f), colors.far_, true, 255);
             }
             draw::Line(x, baseY - tierH * static_cast<float>(tiers + 1), x, baseY - h - 30.0f, colors.far_, 4.0f, 255);
+            break;
+        }
+        case StageTheme::Throne: {
+            // 宙に浮かぶ、砕けた大地のかけら（下側は尖った岩、縁が赤く光る）
+            const float top = baseY - h - 40.0f + std::sin(time_ * 0.4f + static_cast<float>(i)) * 8.0f;
+            draw::FillRect(Rect(x - w * 0.45f, top, x + w * 0.45f, top + 34.0f), colors.far_, 255);
+            draw::Triangle(Vec2(x - w * 0.45f, top + 34.0f), Vec2(x + w * 0.45f, top + 34.0f),
+                           Vec2(x + w * 0.08f, top + 34.0f + h * 0.45f), colors.far_, true, 255);
+            draw::Line(x - w * 0.45f, top, x + w * 0.45f, top, colors.accent, 2.0f, 90);
+            // ところどころ崩れた塔が乗っている
+            if (Hash01(i * 7 + 15) > 0.5f) {
+                draw::FillRect(Rect(x - w * 0.10f, top - h * 0.30f, x + w * 0.06f, top), colors.far_, 255);
+                draw::Triangle(Vec2(x - w * 0.10f, top - h * 0.30f), Vec2(x + w * 0.06f, top - h * 0.30f),
+                               Vec2(x + w * 0.10f, top - h * 0.38f), colors.far_, true, 255);
+            }
             break;
         }
         case StageTheme::Home:
@@ -338,14 +389,35 @@ void Stage::DrawMidLayer(const Camera& camera) const
             draw::Glow(x, baseY - h * 0.35f, 46.0f * burst, colors.accent, 120, 4);
             break;
         }
+        case StageTheme::Throne: {
+            // 折れた柱と、根元に突き刺さった赤い結晶
+            const float broken = h * (0.55f + Hash01(i * 5 + 34) * 0.35f);
+            draw::FillRect(Rect(x - w * 0.18f, baseY - broken, x + w * 0.18f, baseY), colors.mid, 255);
+            draw::Triangle(Vec2(x - w * 0.18f, baseY - broken), Vec2(x + w * 0.18f, baseY - broken),
+                           Vec2(x + w * 0.18f, baseY - broken - 34.0f), colors.mid, true, 255);
+            draw::FillRect(Rect(x - w * 0.26f, baseY - 16.0f, x + w * 0.26f, baseY), colors.mid, 255);
+            const float pulse = 0.6f + 0.4f * std::sin(time_ * 1.8f + static_cast<float>(i) * 1.3f);
+            const float cxr = x + w * 0.34f;
+            draw::Glow(cxr, baseY - 34.0f, 46.0f * pulse, colors.accent, 110, 4);
+            draw::Triangle(Vec2(cxr - 10.0f, baseY), Vec2(cxr + 10.0f, baseY), Vec2(cxr + 4.0f, baseY - 70.0f),
+                           colors.accent.Scaled(0.85f), true, 220);
+            break;
+        }
         case StageTheme::Home:
         default: {
-            // 天幕と篝火
-            draw::Triangle(Vec2(x - w * 0.8f, baseY), Vec2(x + w * 0.8f, baseY), Vec2(x, baseY - h * 0.55f),
-                           colors.mid, true, 255);
-            if (i % 4 == 0) {
-                const float flicker = 0.7f + 0.3f * std::sin(time_ * 7.0f + static_cast<float>(i));
-                draw::Glow(x + w, baseY - 30.0f, 60.0f * flicker, ColorRGB(255, 170, 90), 140, 4);
+            // 街の奥の家並み（三角屋根の影と、明かりの灯った窓）
+            const float houseH = h * 0.62f;
+            const float houseW = w * 1.3f;
+            draw::FillRect(Rect(x - houseW * 0.5f, baseY - houseH, x + houseW * 0.5f, baseY), colors.mid, 255);
+            draw::Triangle(Vec2(x - houseW * 0.62f, baseY - houseH), Vec2(x + houseW * 0.62f, baseY - houseH),
+                           Vec2(x, baseY - houseH - houseW * 0.45f), colors.mid, true, 255);
+            const float flicker = 0.75f + 0.25f * std::sin(time_ * 1.3f + static_cast<float>(i) * 2.3f);
+            for (int k = 0; k < 2; ++k) {
+                if (Hash01(i * 5 + 35 + k) < 0.35f) continue;
+                const float wx = x + houseW * (k == 0 ? -0.22f : 0.22f);
+                const float wy = baseY - houseH * 0.62f;
+                draw::FillRect(Rect::FromCenter(wx, wy, 16.0f, 20.0f), ColorRGB(255, 200, 120),
+                               static_cast<int>(170.0f * flicker));
             }
             break;
         }
@@ -458,6 +530,8 @@ void Stage::DrawPlatforms(const Camera& camera) const
 void Stage::DrawGate(const Camera& camera) const
 {
     if (def_.theme == StageTheme::Home) return;
+    // ボスフロアには閉じたゲートを置かない（ボスを倒して開いたとき＝隠しフロア・ボスラッシュの次のフロアへ進むときだけ出す）
+    if (IsBossFloor() && !gateOpen_ && gateAnim_ <= 0.01f) return;
 
     const float gateWorldX = GateX();
     const Rect area = Rect::FromCenter(gateWorldX, def_.groundY - 200.0f, 200.0f, 400.0f);

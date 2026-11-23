@@ -208,6 +208,137 @@ BossDatabase::BossDatabase()
                        BossAttackKind::DiveSlam };
         bosses_.push_back(b);
     }
+
+    //==========================================================================
+    // 100 層「世界終焉の玉座」（ボスラッシュ）
+    //   1 フロアに中ボスが 1 体ずつ。5 フロア目は中ボスのあとに最後のボスが現れる。
+    //   強さは戦力 55,000（Lv 99・エンドワールド一式・個体値 100・+14）を基準に、
+    //   竜王と戦力 14,000 の釣り合いに合わせてある（中ボスは少し弱く、最後のボスは強く）。
+    //==========================================================================
+    {
+        BossDef b;
+        b.id = kWorldEaterBossId;
+        b.name = "ワールドイーター";
+        b.title = "世界を喰らう獣";
+        b.style = ArtStyle::Beast;
+        b.main = ColorRGB(52, 30, 60);
+        b.accent = ColorRGB(226, 206, 236);
+        b.trim = ColorRGB(255, 72, 120);
+        b.maxHp = 84000.0f; b.attack = 90000.0f; b.defense = 3000.0f; b.moveSpeed = 270.0f;
+        b.halfWidth = 100.0f; b.height = 230.0f;
+        b.assetFolder = "world_eater";
+        b.expReward = 18000; b.colReward = 22000;
+        b.patterns = { BossAttackKind::Swipe, BossAttackKind::Charge, BossAttackKind::JumpSlam,
+                       BossAttackKind::Burst };
+        b.attackNames = { { BossAttackKind::Swipe, "喰らい裂き" }, { BossAttackKind::Charge, "暴食の突進" },
+                          { BossAttackKind::JumpSlam, "大地喰らい" }, { BossAttackKind::Burst, "呑界の咆哮" } };
+        bosses_.push_back(b);
+    }
+    {
+        BossDef b;
+        b.id = kAbyssDragonBossId;
+        b.name = "アビスドラゴン";
+        b.title = "深淵の竜";
+        b.style = ArtStyle::Dragon;
+        b.main = ColorRGB(22, 38, 72);
+        b.accent = ColorRGB(160, 224, 255);
+        b.trim = ColorRGB(70, 196, 255);
+        b.maxHp = 90000.0f; b.attack = 100000.0f; b.defense = 3150.0f; b.moveSpeed = 250.0f;
+        b.halfWidth = 90.0f; b.height = 310.0f;
+        b.assetFolder = "abyss_dragon";
+        b.expReward = 20000; b.colReward = 24000;
+        b.patterns = { BossAttackKind::Swipe, BossAttackKind::Charge, BossAttackKind::JumpSlam,
+                       BossAttackKind::Shot, BossAttackKind::Burst };
+        b.attackNames = { { BossAttackKind::Shot, "深淵のブレス" }, { BossAttackKind::Burst, "奈落の咆哮" },
+                          { BossAttackKind::Swipe, "深淵の爪" } };
+        bosses_.push_back(b);
+    }
+    {
+        BossDef b;
+        b.id = kChaosLordBossId;
+        b.name = "カオスロード";
+        b.title = "混沌の覇王";
+        b.style = ArtStyle::Knight;
+        b.main = ColorRGB(36, 16, 22);
+        b.accent = ColorRGB(232, 206, 206);
+        b.trim = ColorRGB(255, 58, 58);
+        b.weapon = WeaponType::Spear;
+        b.maxHp = 96000.0f; b.attack = 113000.0f; b.defense = 3300.0f; b.moveSpeed = 240.0f;
+        b.halfWidth = 66.0f; b.height = 276.0f;
+        b.assetFolder = "chaos_lord";
+        b.expReward = 22000; b.colReward = 27000;
+        b.patterns = { BossAttackKind::Combo, BossAttackKind::Charge, BossAttackKind::Shot,
+                       BossAttackKind::Swipe, BossAttackKind::JumpSlam, BossAttackKind::Burst };
+        b.attackNames = { { BossAttackKind::Combo, "混沌の連撃" }, { BossAttackKind::Shot, "混沌の魔弾" },
+                          { BossAttackKind::Burst, "覇王の波動" }, { BossAttackKind::Charge, "覇王の突撃" } };
+        bosses_.push_back(b);
+    }
+    {
+        BossDef b;
+        b.id = kVoidColossusBossId;
+        b.name = "ヴォイド・コロッサス";
+        b.title = "虚無の巨像";
+        b.style = ArtStyle::Golem;
+        b.main = ColorRGB(42, 38, 56);
+        b.accent = ColorRGB(156, 146, 190);
+        b.trim = ColorRGB(178, 96, 255);
+        b.maxHp = 100000.0f; b.attack = 124000.0f; b.defense = 3500.0f; b.moveSpeed = 170.0f;
+        b.halfWidth = 106.0f; b.height = 310.0f;
+        b.assetFolder = "void_colossus";
+        b.expReward = 24000; b.colReward = 30000;
+        b.patterns = { BossAttackKind::Swipe, BossAttackKind::JumpSlam, BossAttackKind::Shot,
+                       BossAttackKind::Burst, BossAttackKind::Charge };
+        b.attackNames = { { BossAttackKind::Swipe, "虚無の剛腕" }, { BossAttackKind::JumpSlam, "虚空落とし" },
+                          { BossAttackKind::Shot, "虚無弾" }, { BossAttackKind::Burst, "崩界の波動" },
+                          { BossAttackKind::Charge, "巨躯の進撃" } };
+        bosses_.push_back(b);
+    }
+    {
+        // 宙に浮かぶ炎の霊。ヴァジュラ・ラグナシュラと同じく、浮いている間はジャンプ攻撃でしか届かない
+        BossDef b;
+        b.id = kNemesisBossId;
+        b.name = "ネメシス・インフェルノ";
+        b.title = "終焉の焔霊";
+        b.style = ArtStyle::Wisp;
+        b.main = ColorRGB(128, 34, 22);
+        b.accent = ColorRGB(255, 206, 128);
+        b.trim = ColorRGB(255, 118, 40);
+        b.maxHp = 98000.0f; b.attack = 124000.0f; b.defense = 3200.0f; b.moveSpeed = 240.0f;
+        b.halfWidth = 100.0f; b.height = 230.0f;
+        b.flying = true;
+        b.hoverHeight = 240.0f;
+        b.assetFolder = "nemesis_inferno";
+        b.expReward = 26000; b.colReward = 32000;
+        b.patterns = { BossAttackKind::SkyVolley, BossAttackKind::SkyThunder, BossAttackKind::SkyHalo,
+                       BossAttackKind::DiveSlam };
+        b.attackNames = { { BossAttackKind::SkyVolley, "業火の雨" }, { BossAttackKind::SkyThunder, "焦熱の柱" },
+                          { BossAttackKind::SkyHalo, "炎輪" }, { BossAttackKind::DiveSlam, "焔の墜落" } };
+        bosses_.push_back(b);
+    }
+    {
+        // 世界終焉の玉座の主。黒い鎧に刃の翼と欠けた光輪、金の冠。地上の技に加えて終末の雷を落とす
+        BossDef b;
+        b.id = kArcXenosBossId;
+        b.name = "アークゼノス・ザ・エンドオブワールド";
+        b.title = "終焉の王";
+        b.style = ArtStyle::Sovereign;
+        b.main = ColorRGB(34, 26, 50);
+        b.accent = ColorRGB(228, 220, 248);
+        b.trim = ColorRGB(255, 196, 86);
+        b.weapon = WeaponType::OneHandSword;
+        b.maxHp = 138000.0f; b.attack = 150000.0f; b.defense = 3450.0f; b.moveSpeed = 250.0f;
+        b.halfWidth = 70.0f; b.height = 320.0f;
+        b.assetFolder = "arc_xenos";
+        b.expReward = 48000; b.colReward = 60000;
+        b.patterns = { BossAttackKind::Combo, BossAttackKind::Swipe, BossAttackKind::Charge,
+                       BossAttackKind::JumpSlam, BossAttackKind::Shot, BossAttackKind::SkyThunder,
+                       BossAttackKind::Burst };
+        b.attackNames = { { BossAttackKind::Combo, "終焉の剣舞" }, { BossAttackKind::Swipe, "断界" },
+                          { BossAttackKind::Charge, "終焉の進撃" }, { BossAttackKind::JumpSlam, "天墜" },
+                          { BossAttackKind::Shot, "滅びの光弾" }, { BossAttackKind::SkyThunder, "終末の雷" },
+                          { BossAttackKind::Burst, "ワールドエンド" } };
+        bosses_.push_back(b);
+    }
 }
 
 const BossDatabase& BossDatabase::Instance()
@@ -254,7 +385,8 @@ void Boss::Setup(const BossDef& def, const Vec2& position, float powerScale, int
     art.accent = def.accent;
     art.trim = def.trim;
     art.weapon = def.weapon;
-    art.hasWeapon = (def.style == ArtStyle::Knight || def.style == ArtStyle::Humanoid);
+    art.hasWeapon = (def.style == ArtStyle::Knight || def.style == ArtStyle::Humanoid
+                     || def.style == ArtStyle::Sovereign);
 
     animator.SetSet(ActorAssets::Instance().BossSet(def.id, def.assetFolder));
 
@@ -445,6 +577,9 @@ void Boss::StartWindup(BossAttackKind kind)
 {
     currentKind_ = kind;
     actionName_ = AttackName(kind);
+    for (const auto& named : def_->attackNames) {
+        if (named.first == kind) actionName_ = named.second;
+    }
 
     const PatternTiming timing = TimingFor(kind);
     // フェーズが上がるほど予備動作が短くなる
@@ -632,7 +767,8 @@ void Boss::ExecuteAttack(CombatSystem& combat)
         for (int i = -2; i <= 2; ++i) {
             const float angle = base + math::DegToRad(9.0f * static_cast<float>(i));
             const Vec2 velocityDir(std::cos(angle), std::sin(angle));
-            combat.AddProjectile(MakeProjectile(from, velocityDir * 640.0f, 18.0f, 0.75f, 260.0f, 3));
+            combat.AddProjectile(MakeProjectile(from, velocityDir * 640.0f, 18.0f, 0.75f, 260.0f,
+                                                art.style == ArtStyle::Statue ? 3 : 2));
         }
         combat.AddImpact(from, art.trim, 10, 300.0f);
         break;
@@ -933,6 +1069,10 @@ void Boss::Update(float dt, const Stage& stage, CombatSystem& combat,
         UpdateFlightAltitudeTarget();
         ApplyFlightPhysics(dt, stage);
     } else {
+        // 地上のボスが終末の雷（SkyThunder）を使うときも、落ちる地面の高さが合うように
+        stageGroundY_ = stage.GroundYAt(0.0f);
+        stageWidth_ = stage.Width();
+        groundY_ = stage.GroundYAt(z);
         ApplyPhysics(dt, stage);
     }
     UpdateTimers(dt);

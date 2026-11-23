@@ -1,6 +1,7 @@
 //==============================================================================
-// HomeScene.h : ホーム（拠点）
-//   一定範囲のフィールドを自由に歩ける。画面下部に 4 つのタブを配置。
+// HomeScene.h : ホーム（拠点の街）
+//   横スクロールの街を歩いて、自宅・ショップ・鍛冶屋・ダンジョン入口に入れる（HomeTown.h）。
+//   画面下部のタブからも同じ画面を開ける。
 //==============================================================================
 #pragma once
 
@@ -94,6 +95,8 @@ private:
     float time_ = 0.0f;
     float saveNoticeTimer_ = 0.0f;
     bool  startQuest_ = false;
+    // 入口の前に立っている建物（town::BuildingAt の番号。いなければ -1）
+    int   nearBuilding_ = -1;
 
     std::string debugMessage_;
     float debugMessageTimer_ = 0.0f;

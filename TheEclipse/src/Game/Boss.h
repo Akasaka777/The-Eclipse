@@ -6,6 +6,7 @@
 #include "Game/Actor.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ecl {
@@ -30,6 +31,14 @@ enum class BossAttackKind
 
 // 竜王の火山の隠しボス「ヴァジュラ・ラグナシュラ」の ID
 constexpr int kVajraBossId = 6;
+
+// 100 層「世界終焉の玉座」のボス（1 フロアに 1 体ずつの中ボスと、最後のフロアの最後のボス）
+constexpr int kWorldEaterBossId = 7;      // 1F ワールドイーター
+constexpr int kAbyssDragonBossId = 8;     // 2F アビスドラゴン
+constexpr int kChaosLordBossId = 9;       // 3F カオスロード
+constexpr int kVoidColossusBossId = 10;   // 4F ヴォイド・コロッサス
+constexpr int kNemesisBossId = 11;        // 5F ネメシス・インフェルノ
+constexpr int kArcXenosBossId = 12;       // 5F の最後 アークゼノス・ザ・エンドオブワールド
 
 //------------------------------------------------------------------------------
 // ボス定義
@@ -64,6 +73,8 @@ struct BossDef
     float hoverHeight = 0.0f;   // 地面から体の下端までの高さ
 
     std::vector<BossAttackKind> patterns;
+    // 技の名前を差し替える（載っていない技は共通の名前）
+    std::vector<std::pair<BossAttackKind, std::string>> attackNames;
 };
 
 class BossDatabase

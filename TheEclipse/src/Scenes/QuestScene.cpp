@@ -49,6 +49,8 @@ constexpr float kBossIntroCardOut = 4.4f;
 constexpr float kBossIntroOutro = 4.5f;     // プレイヤーへ戻るパン
 constexpr float kBossIntroEnd = 5.4f;
 constexpr float kBossIntroSkipAfter = 0.4f; // これより前の入力は飛ばしに使わない
+// ボスラッシュ：最後のフロアの中ボスを倒してから、最後のボスが現れるまで（中ボスの撃破演出を見せる）
+constexpr float kFinalBossDelay = 2.8f;
 constexpr float kLetterboxHeight = 120.0f;
 
 //------------------------------------------------------------------------------
@@ -159,6 +161,46 @@ void QuestScene::OpenHiddenGate()
     bannerTimer_ = 3.2f;
 }
 
+void QuestScene::OpenBossRushGate()
+{
+    phase_ = Phase::FloorClear;
+    phaseTimer_ = 0.0f;
+    stage_.SetGateOpen(true);
+    bannerMain_ = "FLOOR CLEAR";
+    bannerSub_ = "次の守護者が待っている……右のゲートへ";
+    bannerTimer_ = 2.6f;
+}
+
+bool QuestScene::FinalBossPending() const
+{
+    if (!quest_ || IsHiddenFloor(floorIndex_)) return false;
+    return FloorAt(floorIndex_).finalBossId >= 0 && !finalBossSpawned_;
+}
+
+void QuestScene::SpawnFinalBoss()
+{
+    awaitingFinalBoss_ = false;
+    finalBossSpawned_ = true;
+    if (!quest_) return;
+    const FloorDef& floor = FloorAt(floorIndex_);
+    const BossDef* def = BossDatabase::Instance().Find(floor.finalBossId);
+    if (!def) return;
+
+    boss_.reset(new Boss());
+    const float bossZ = stage_.Depth() * 0.5f;
+    const int bars = (floor.finalBossHpBars > 0)
+                   ? math::ClampInt(floor.finalBossHpBars, kMinBossHpBars, kMaxBossHpBars)
+                   : QuestDatabase::BossHpBarCount(*quest_);
+    // プレイヤーと反対側の、画面の少し外から現れる
+    const float x = (player_.pos.x < stage_.Width() * 0.5f) ? stage_.Width() - 600.0f : 600.0f;
+    boss_->Setup(*def, Vec2(x, stage_.GroundYAt(bossZ)), quest_->enemyPowerScale, bars);
+    boss_->z = bossZ;
+    bossRewardGranted_ = false;
+    // 中ボスの攻撃の残りは消す（登場演出の間に当たらないように）
+    combat_.Clear();
+    StartBossIntro();
+}
+
 void QuestScene::LoadFloor(int index, GameContext& context)
 {
     if (!quest_) return;
@@ -171,6 +213,9 @@ void QuestScene::LoadFloor(int index, GameContext& context)
     enemies_.clear();
     boss_.reset();
     combat_.Clear();
+    finalBossSpawned_ = false;
+    awaitingFinalBoss_ = false;
+    finalBossTimer_ = 0.0f;
 
     const float playerZ = stage_.Depth() * 0.5f;
     player_.PlaceAt(Vec2(220.0f, stage_.GroundYAt(playerZ)));
@@ -397,6 +442,8 @@ int QuestScene::AliveEnemyCount() const
         if (enemy->alive) ++count;
     }
     if (BossAlive()) ++count;
+    // ボスラッシュの最後のフロアで、中ボスを倒して最後のボスを待っている間も「残 1 体」
+    if (awaitingFinalBoss_) ++count;
     return count;
 }
 
@@ -494,10 +541,26 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
             phase_ = Phase::Defeat;
             phaseTimer_ = 0.0f;
             camera_.Shake(18.0f, 0.5f);
+        } else if (awaitingFinalBoss_) {
+            // 中ボスの撃破演出のあと、最後のボスが現れる
+            finalBossTimer_ += dt;
+            if (finalBossTimer_ >= kFinalBossDelay) SpawnFinalBoss();
         } else if (boss_ && !boss_->alive) {
             combat_.AddPopup(Vec2(player_.pos.x, player_.pos.y - 240.0f), "BOSS DEFEATED",
                              palette::kAccentWarm, true);
-            if (IsHiddenFloor(floorIndex_)) {
+            if (FinalBossPending()) {
+                // ボスラッシュの最後のフロア：中ボスを倒すと、最後のボスが現れる
+                awaitingFinalBoss_ = true;
+                finalBossTimer_ = 0.0f;
+                bannerMain_ = "???";
+                bannerSub_ = "玉座の主が目を覚ます……";
+                bannerTimer_ = kFinalBossDelay;
+                camera_.Shake(10.0f, 1.2f);
+            } else if (quest_ && quest_->bossRush && !IsHiddenFloor(floorIndex_)
+                       && floorIndex_ < quest_->FloorCount() - 1) {
+                // ボスラッシュの途中のフロア：中ボスを倒すとゲートが開く
+                OpenBossRushGate();
+            } else if (IsHiddenFloor(floorIndex_)) {
                 hiddenBossDefeated_ = true;
                 phase_ = Phase::Victory;
                 phaseTimer_ = 0.0f;
@@ -661,7 +724,9 @@ void QuestScene::LayoutDebugFloorButtons()
                                        FontSize::Small);
     float x = left + kDebugArrowW + kDebugButtonGap;
     for (int i = 0; i < count; ++i) {
-        const bool bossFloor = quest_ && quest_->floors[static_cast<size_t>(i)].bossId >= 0;
+        // ボスラッシュはどのフロアにも中ボスがいるので、「ボス」は最後のフロアだけ
+        const bool bossFloor = quest_ && quest_->floors[static_cast<size_t>(i)].bossId >= 0
+                            && !(quest_->bossRush && i < count - 1);
         debugFloorButtons_.push_back(ui::Button(Rect::FromXYWH(x, y, floorW, kDebugFloorButtonH),
                                                 bossFloor ? std::string("ボス") : str::Format("%dF", i + 1),
                                                 FontSize::Tiny));

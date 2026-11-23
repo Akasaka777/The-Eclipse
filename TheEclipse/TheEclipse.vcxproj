@@ -229,6 +229,7 @@
     <ClCompile Include="src\Graphics\CharacterArt.cpp" />
     <ClCompile Include="src\Graphics\DrawUtil.cpp" />
     <ClCompile Include="src\Scenes\HomeScene.cpp" />
+    <ClCompile Include="src\Scenes\HomeTown.cpp" />
     <ClCompile Include="src\Scenes\QuestScene.cpp" />
     <ClCompile Include="src\Scenes\ResultScene.cpp" />
     <ClCompile Include="src\Scenes\TitleScene.cpp" />
@@ -290,6 +291,7 @@
     <ClInclude Include="src\Graphics\CharacterArt.h" />
     <ClInclude Include="src\Graphics\DrawUtil.h" />
     <ClInclude Include="src\Scenes\HomeScene.h" />
+    <ClInclude Include="src\Scenes\HomeTown.h" />
     <ClInclude Include="src\Scenes\QuestScene.h" />
     <ClInclude Include="src\Scenes\ResultScene.h" />
     <ClInclude Include="src\Scenes\TitleScene.h" />

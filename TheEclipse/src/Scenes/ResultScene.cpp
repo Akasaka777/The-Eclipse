@@ -17,12 +17,51 @@
 
 namespace ecl {
 
+// 報酬パネルの下半分：左に「ドロップ装備」、右に「素材」を並べる
+struct ResultRewardLayout
+{
+    Rect  dropColumn;       // ドロップ装備の列（見出しから下）
+    Rect  materialColumn;   // 素材の列（見出しから下）
+    float headerY = 0.0f;   // 見出しの行
+    float listTop = 0.0f;   // 一覧（または壊れた装備のお知らせ）の始まり
+    float dropTop = 0.0f;   // ドロップ装備の 1 行目
+    int   visibleDrops = 0; // 一度に見せるドロップ装備の行数
+};
+
 namespace {
 
 constexpr float kScreenW = static_cast<float>(config::kScreenWidth);
 constexpr float kScreenH = static_cast<float>(config::kScreenHeight);
-constexpr int   kVisibleDrops = 7;
-constexpr float kDropRowHeight = 68.0f;
+constexpr float kDropRowHeight = 64.0f;
+constexpr float kMaterialRowHeight = 44.0f;
+
+// 左右のパネル（戦闘記録 / 報酬）。下の「ホームへ戻る」ボタンに重ならない高さにする
+const Rect kStatsPanel = Rect::FromXYWH(120.0f, 372.0f, 600.0f, 556.0f);
+const Rect kRewardPanel = Rect::FromXYWH(760.0f, 372.0f, 1040.0f, 556.0f);
+
+constexpr float kBrokenLineHeight = 26.0f;
+
+ResultRewardLayout MakeRewardLayout(const QuestResult& result)
+{
+    ResultRewardLayout l;
+    const Rect& panel = kRewardPanel;
+    l.headerY = panel.top + 160.0f;
+    l.listTop = l.headerY + 40.0f;
+    constexpr float kMaterialWidth = 280.0f;
+    constexpr float kColumnGap = 20.0f;
+    const float inner = panel.left + 28.0f;
+    const float right = panel.right - 28.0f;
+    l.materialColumn = Rect(right - kMaterialWidth, l.headerY, right, panel.bottom - 16.0f);
+    l.dropColumn = Rect(inner, l.headerY, l.materialColumn.left - kColumnGap, panel.bottom - 16.0f);
+
+    // 耐久力が尽きて壊れた装備があるときは、そのお知らせのぶん一覧を下げる
+    l.dropTop = l.listTop;
+    if (!result.brokenItems.empty()) {
+        l.dropTop += 44.0f + kBrokenLineHeight * static_cast<float>(result.brokenItems.size());
+    }
+    l.visibleDrops = math::MaxI(1, static_cast<int>((l.dropColumn.bottom - l.dropTop + 8.0f) / kDropRowHeight));
+    return l;
+}
 
 // 開放・習得のお知らせ：リザルトの表示がひととおり出そろってから出す（秒）
 constexpr float kAnnounceDelay = 1.0f;
@@ -105,7 +144,7 @@ void ResultScene::Update(float dt, GameContext& context, SceneManager& manager)
     const Input& input = Input::Instance();
 
     const int dropCount = static_cast<int>(context.lastResult.drops.size());
-    const int maxScroll = math::MaxI(0, dropCount - kVisibleDrops);
+    const int maxScroll = math::MaxI(0, dropCount - MakeRewardLayout(context.lastResult).visibleDrops);
     const int wheel = input.WheelDelta();
     if (wheel != 0) scroll_ = math::ClampInt(scroll_ - wheel, 0, maxScroll);
 
@@ -251,7 +290,7 @@ void ResultScene::DrawHeader(const GameContext& context) const
 void ResultScene::DrawStats(const GameContext& context) const
 {
     const QuestResult& result = context.lastResult;
-    const Rect panel = Rect::FromXYWH(180.0f, 380.0f, 660.0f, 500.0f);
+    const Rect& panel = kStatsPanel;
 
     draw::Panel(panel, palette::kPanel, palette::kBorder, 230, 2.0f);
     draw::Text(FontSize::Medium, panel.left + 24.0f, panel.top + 14.0f, palette::kAccent, "戦闘記録");
@@ -302,21 +341,22 @@ void ResultScene::DrawStats(const GameContext& context) const
 void ResultScene::DrawRewards(const GameContext& context) const
 {
     const QuestResult& result = context.lastResult;
-    const Rect panel = Rect::FromXYWH(900.0f, 380.0f, 840.0f, 500.0f);
+    const Rect& panel = kRewardPanel;
+    const ResultRewardLayout layout = MakeRewardLayout(result);
 
     draw::Panel(panel, palette::kPanel, palette::kBorder, 230, 2.0f);
     draw::Text(FontSize::Medium, panel.left + 24.0f, panel.top + 14.0f, palette::kAccent, "報酬");
 
     // 通貨・経験値
-    float y = panel.top + 76.0f;
+    float y = panel.top + 70.0f;
     draw::Text(FontSize::Normal, panel.left + 32.0f, y, palette::kTextDim, "獲得 col");
-    draw::Text(FontSize::Normal, panel.left + 360.0f, y, palette::kAccentWarm,
+    draw::Text(FontSize::Normal, panel.left + 440.0f, y, palette::kAccentWarm,
                str::Comma(result.colGained), draw::TextAlign::Right);
 
-    draw::Text(FontSize::Normal, panel.left + 430.0f, y, palette::kTextDim, "獲得 EXP");
+    draw::Text(FontSize::Normal, panel.left + 540.0f, y, palette::kTextDim, "獲得 EXP");
     draw::Text(FontSize::Normal, panel.right - 32.0f, y, palette::kExp,
                str::Comma(result.expGained), draw::TextAlign::Right);
-    y += 42.0f;
+    y += 40.0f;
 
     // LUK で増えたときは、獲得 EXP の下に倍率を出す
     if (result.expRate > 1.0001f) {
@@ -333,39 +373,36 @@ void ResultScene::DrawRewards(const GameContext& context) const
                                      result.abilityPointsGained)
                        : str::Format("スキルポイント  +%d", result.skillPointsGained));
     }
-    y += 44.0f;
 
-    // --- 素材（多いときは先頭 3 種だけ名前を出す）-------------------------------
-    if (!result.materials.empty()) {
-        constexpr size_t kNamedMaterials = 3;
-        std::string text = "素材  ";
-        for (size_t i = 0; i < result.materials.size() && i < kNamedMaterials; ++i) {
-            const ConsumableDef* def = ConsumableDatabase::Instance().Find(result.materials[i].itemId);
-            if (!def) continue;
-            if (i > 0) text += " ／ ";
-            text += str::Format("%s ×%d", def->name.c_str(), result.materials[i].count);
-        }
-        if (result.materials.size() > kNamedMaterials) {
-            text += str::Format("  ほか %d 種",
-                                static_cast<int>(result.materials.size() - kNamedMaterials));
-        }
-        draw::Text(FontSize::Small, panel.left + 32.0f, y - 6.0f, palette::kTextDim, text);
-        y += 32.0f;
+    const float ruleY = layout.headerY - 12.0f;
+    draw::Line(panel.left + 24.0f, ruleY, panel.right - 24.0f, ruleY, palette::kBorder, 1.0f, 140);
+    // 2 つの列の仕切り
+    const float splitX = (layout.dropColumn.right + layout.materialColumn.left) * 0.5f;
+    draw::Line(splitX, ruleY + 12.0f, splitX, layout.dropColumn.bottom, palette::kBorder, 1.0f, 110);
+
+    DrawDropColumn(result, layout);
+    DrawMaterialColumn(result, layout);
+}
+
+void ResultScene::DrawDropColumn(const QuestResult& result, const ResultRewardLayout& layout) const
+{
+    const Rect& column = layout.dropColumn;
+    const int dropCount = static_cast<int>(result.drops.size());
+    draw::Text(FontSize::Normal, column.left + 4.0f, layout.headerY, palette::kAccent,
+               str::Format("ドロップ装備  %d 個", dropCount));
+    // 入りきらないときは、見出しの右に今の位置を出す
+    if (dropCount > layout.visibleDrops) {
+        draw::Text(FontSize::Tiny, column.right, layout.headerY + 8.0f, palette::kTextDim,
+                   str::Format("ホイールでスクロール（%d / %d）",
+                               math::MinI(scroll_ + layout.visibleDrops, dropCount), dropCount),
+                   draw::TextAlign::Right);
     }
-
-    draw::Line(panel.left + 24.0f, y, panel.right - 24.0f, y, palette::kBorder, 1.0f, 140);
-    y += 14.0f;
-
-    // --- ドロップ -----------------------------------------------------------
-    draw::Text(FontSize::Normal, panel.left + 32.0f, y, palette::kAccent,
-               str::Format("ドロップ装備  %d 個", static_cast<int>(result.drops.size())));
-    y += 42.0f;
 
     // --- 耐久力が尽きて壊れた装備 ---------------------------------------------
     if (!result.brokenItems.empty()) {
         const float pulse = 0.65f + 0.35f * std::sin(time_ * 5.0f);
-        const Rect notice(panel.left + 28.0f, y - 6.0f, panel.right - 28.0f,
-                          y + 30.0f + 26.0f * static_cast<float>(result.brokenItems.size()));
+        const Rect notice(column.left, layout.listTop - 6.0f, column.right,
+                          layout.dropTop - 14.0f);
         draw::FillRect(notice, palette::kDanger.Scaled(0.30f), 210);
         draw::StrokeRect(notice, palette::kDanger, 2.0f, static_cast<int>(220.0f * pulse));
         draw::Text(FontSize::Small, notice.left + 12.0f, notice.top + 6.0f, palette::kDanger,
@@ -375,13 +412,12 @@ void ResultScene::DrawRewards(const GameContext& context) const
         for (const std::string& name : result.brokenItems) {
             draw::Text(FontSize::Small, notice.left + 26.0f, noticeY, palette::kText,
                        str::Format("・%s", name.c_str()));
-            noticeY += 26.0f;
+            noticeY += kBrokenLineHeight;
         }
-        y = notice.bottom + 14.0f;
     }
 
     if (result.drops.empty()) {
-        draw::Text(FontSize::Normal, panel.CenterX(), y + 40.0f, palette::kTextDisabled,
+        draw::Text(FontSize::Normal, column.CenterX(), layout.dropTop + 40.0f, palette::kTextDisabled,
                    "ドロップはありませんでした", draw::TextAlign::Center);
         return;
     }
@@ -390,13 +426,13 @@ void ResultScene::DrawRewards(const GameContext& context) const
     const QuestDef* quest = QuestDatabase::Instance().Find(result.questId);
     const bool guaranteedFirst = result.firstClear && quest && !quest->special;
 
-    for (int row = 0; row < kVisibleDrops; ++row) {
+    for (int row = 0; row < layout.visibleDrops; ++row) {
         const int index = scroll_ + row;
-        if (index >= static_cast<int>(result.drops.size())) break;
+        if (index >= dropCount) break;
 
         const EquipmentItem& item = result.drops[static_cast<size_t>(index)];
-        const float rowY = y + kDropRowHeight * static_cast<float>(row);
-        const Rect rect(panel.left + 28.0f, rowY, panel.right - 28.0f, rowY + kDropRowHeight - 8.0f);
+        const float rowY = layout.dropTop + kDropRowHeight * static_cast<float>(row);
+        const Rect rect(column.left, rowY, column.right, rowY + kDropRowHeight - 8.0f);
 
         const float appear = math::Clamp((time_ - 0.6f - static_cast<float>(row) * 0.1f) / 0.25f,
                                          0.0f, 1.0f);
@@ -404,9 +440,12 @@ void ResultScene::DrawRewards(const GameContext& context) const
 
         ui::DrawItemRow(rect, item, false, false, false);
 
-        // 初回クリア報酬の確定ドロップ（ボスドロップは先頭に並ぶ）
+        // 初回クリア報酬の確定ドロップ（ボスドロップは先頭に並ぶ）。戦力の数字の左に付ける
         if (index == 0 && guaranteedFirst) {
-            const Rect badge = Rect::FromXYWH(rect.right - 412.0f, rect.top + 10.0f, 112.0f, 24.0f);
+            const float powerWidth = static_cast<float>(
+                draw::TextWidth(FontSize::Small, str::Format("戦力 %d", item.Power())));
+            const float badgeRight = rect.right - 12.0f - powerWidth - 14.0f;
+            const Rect badge(badgeRight - 112.0f, rect.top + 9.0f, badgeRight, rect.top + 33.0f);
             draw::FillRect(badge, palette::kAccentWarm.Scaled(0.35f), 230);
             draw::StrokeRect(badge, palette::kAccentWarm, 1.0f, 230);
             draw::Text(FontSize::Tiny, badge.CenterX(), badge.top + 4.0f, palette::kAccentWarm,
@@ -420,15 +459,56 @@ void ResultScene::DrawRewards(const GameContext& context) const
                              static_cast<int>(180.0f * pulse));
         }
     }
+}
 
-    if (static_cast<int>(result.drops.size()) > kVisibleDrops) {
-        draw::Text(FontSize::Tiny, panel.right - 28.0f, panel.bottom - 34.0f, palette::kTextDim,
-                   str::Format("ホイールでスクロール（%d / %d）",
-                               scroll_ + kVisibleDrops > static_cast<int>(result.drops.size())
-                                   ? static_cast<int>(result.drops.size())
-                                   : scroll_ + kVisibleDrops,
-                               static_cast<int>(result.drops.size())),
-                   draw::TextAlign::Right);
+void ResultScene::DrawMaterialColumn(const QuestResult& result, const ResultRewardLayout& layout) const
+{
+    const Rect& column = layout.materialColumn;
+
+    // 名前が引けるものだけ数える
+    std::vector<std::pair<const ConsumableDef*, int>> materials;
+    for (const ItemStack& stack : result.materials) {
+        if (stack.count <= 0) continue;
+        if (const ConsumableDef* def = ConsumableDatabase::Instance().Find(stack.itemId)) {
+            materials.emplace_back(def, stack.count);
+        }
+    }
+
+    draw::Text(FontSize::Normal, column.left + 8.0f, layout.headerY, palette::kAccent,
+               str::Format("素材  %d 種", static_cast<int>(materials.size())));
+
+    if (materials.empty()) {
+        draw::Text(FontSize::Small, column.CenterX(), layout.listTop + 48.0f, palette::kTextDisabled,
+                   "素材はありませんでした", draw::TextAlign::Center);
+        return;
+    }
+
+    // 入りきらないときは、最後の行を「ほか N 種」にする
+    const int capacity = math::MaxI(1, static_cast<int>((column.bottom - layout.listTop) / kMaterialRowHeight));
+    const int count = static_cast<int>(materials.size());
+    const int shown = (count > capacity) ? capacity - 1 : count;
+
+    for (int i = 0; i < shown; ++i) {
+        const float rowY = layout.listTop + kMaterialRowHeight * static_cast<float>(i);
+        const float appear = math::Clamp((time_ - 0.6f - static_cast<float>(i) * 0.08f) / 0.25f,
+                                         0.0f, 1.0f);
+        if (appear <= 0.0f) continue;
+
+        const Rect rect(column.left, rowY, column.right, rowY + kMaterialRowHeight - 6.0f);
+        draw::FillRect(rect, palette::kPanelDark, 200);
+        draw::StrokeRect(rect, palette::kBorder.Scaled(0.6f), 1.0f, 200);
+        ui::DrawConsumableIcon(Rect(rect.left + 6.0f, rect.top + 3.0f, rect.left + 38.0f, rect.bottom - 3.0f),
+                               *materials[static_cast<size_t>(i)].first);
+        draw::Text(FontSize::Small, rect.left + 46.0f, rect.top + 8.0f, palette::kText,
+                   materials[static_cast<size_t>(i)].first->name);
+        draw::Text(FontSize::Small, rect.right - 12.0f, rect.top + 8.0f, palette::kAccentWarm,
+                   str::Format("×%d", materials[static_cast<size_t>(i)].second), draw::TextAlign::Right);
+    }
+
+    if (shown < count) {
+        const float rowY = layout.listTop + kMaterialRowHeight * static_cast<float>(shown);
+        draw::Text(FontSize::Small, column.right - 12.0f, rowY + 8.0f, palette::kTextDim,
+                   str::Format("ほか %d 種", count - shown), draw::TextAlign::Right);
     }
 }
 

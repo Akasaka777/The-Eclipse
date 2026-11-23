@@ -211,7 +211,9 @@ ItemUseResult Player::UseItem(const ConsumableDef& item, CombatSystem& combat)
         combat.AddRing(Vec2(pos.x, pos.y - height * 0.5f), 210.0f, item.color, 0.45f);
     }
 
-    itemCooldown_ = kItemUseCooldown;
+    // 効果が強いアイテムほど、次に使えるまで長く待つ
+    itemCooldown_ = item.UseCooldown();
+    itemCooldownMax_ = math::MaxF(0.01f, itemCooldown_);
     return ItemUseResult::Used;
 }
 

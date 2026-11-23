@@ -1,5 +1,9 @@
 #include "Game/Consumable.h"
 
+#include "Common/MathUtil.h"
+
+#include <cmath>
+
 namespace ecl {
 
 const char* ConsumableKindName(ConsumableKind kind)
@@ -191,6 +195,26 @@ ConsumableDatabase::ConsumableDatabase()
                                  "火山に棲む竜の鱗。熱をよく通さない。", 2));
     defs_.push_back(MakeMaterial(kMatDragonScale, "竜王の逆鱗",
                                  "竜王ヴァルグリムの喉元にあった一枚の鱗。", 3));
+    defs_.push_back(MakeMaterial(kMatAbyssScale, "深淵の鱗",
+                                 "アビスドラゴンの鱗。覗き込むと底が見えない。", 3));
+    defs_.push_back(MakeMaterial(kMatChaosCrystal, "混沌の結晶",
+                                 "世界終焉の玉座に満ちる混沌が固まった結晶。", 3));
+    defs_.push_back(MakeMaterial(kMatEndShard, "終焉の欠片",
+                                 "アークゼノスが砕いた世界の一片。かすかに脈打っている。", 3));
+}
+
+float ConsumableDef::UseCooldown() const
+{
+    if (kind == ConsumableKind::Material) return 0.0f;
+    float seconds = kItemCooldownBase + hpRate * kItemCooldownPerHp + mpRate * kItemCooldownPerMp;
+    if (kind == ConsumableKind::Buff) {
+        const float strength = math::MaxF(0.0f, rates.maxHp) + math::MaxF(0.0f, rates.maxMp)
+                             + math::MaxF(0.0f, rates.attack) + math::MaxF(0.0f, rates.defense)
+                             + math::MaxF(0.0f, rates.moveSpeed) + math::MaxF(0.0f, critRate);
+        seconds += strength * (duration / 60.0f) * kItemCooldownPerBuff;
+    }
+    // 表示と合わせて 0.1 秒単位にそろえる
+    return std::round(seconds * 10.0f) / 10.0f;
 }
 
 const ConsumableDatabase& ConsumableDatabase::Instance()

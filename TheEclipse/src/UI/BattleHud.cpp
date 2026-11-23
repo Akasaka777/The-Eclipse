@@ -673,8 +673,11 @@ void BattleHud::DrawItemCard(const Rect& rect, QuickSlot slot, bool front, const
         // 使った直後の待ち時間（スキルと同じく下から満ちる）
         if (player.ItemCooldown() > 0.0f) {
             Rect cover = rect.Expanded(-4.0f);
-            cover.top = cover.bottom - cover.Height() * (player.ItemCooldown() / kItemUseCooldown);
+            cover.top = cover.bottom - cover.Height() * math::Clamp(player.ItemCooldown() / player.ItemCooldownMax(), 0.0f, 1.0f);
             draw::FillRect(cover, palette::kBlack, 150);
+            // 残りの秒数（スキルと同じく大きめに）
+            draw::Text(FontSize::Medium, rect.CenterX(), rect.CenterY() - 18.0f, palette::kText,
+                       str::Format("%.1f", player.ItemCooldown()), draw::TextAlign::Center);
         }
 
         draw::Text(FontSize::Tiny, rect.CenterX(), rect.bottom - 22.0f,
