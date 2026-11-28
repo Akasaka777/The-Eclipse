@@ -263,7 +263,8 @@ void ResultScene::DrawHeader(const GameContext& context) const
     const QuestResult& result = context.lastResult;
     const float appear = math::Clamp(time_ / 0.4f, 0.0f, 1.0f);
 
-    const std::string title = result.retired ? "RETIRE"
+    const std::string title = result.roguelike ? (result.cleared ? "RUN CLEAR" : "RUN OVER")
+                            : result.retired ? "RETIRE"
                             : (result.cleared ? "QUEST CLEAR" : "QUEST FAILED");
     const ColorRGB color = result.cleared ? palette::kAccentWarm : palette::kDanger;
 
@@ -272,8 +273,8 @@ void ResultScene::DrawHeader(const GameContext& context) const
     draw::Text(FontSize::Medium, kScreenW * 0.5f, 170.0f, palette::kText, result.questName,
                draw::TextAlign::Center);
 
-    // 評価ランク
-    if (result.cleared) {
+    // 評価ランク（ローグライクには付けない）
+    if (result.cleared && !result.roguelike) {
         const float t = math::Clamp((time_ - 0.5f) / 0.4f, 0.0f, 1.0f);
         const float cx = kScreenW * 0.5f;
         const float cy = 286.0f;
@@ -341,6 +342,10 @@ void ResultScene::DrawStats(const GameContext& context) const
 void ResultScene::DrawRewards(const GameContext& context) const
 {
     const QuestResult& result = context.lastResult;
+    if (result.roguelike) {
+        DrawRunRewards(context);
+        return;
+    }
     const Rect& panel = kRewardPanel;
     const ResultRewardLayout layout = MakeRewardLayout(result);
 
@@ -382,6 +387,71 @@ void ResultScene::DrawRewards(const GameContext& context) const
 
     DrawDropColumn(result, layout);
     DrawMaterialColumn(result, layout);
+}
+
+void ResultScene::DrawRunRewards(const GameContext& context) const
+{
+    const QuestResult& result = context.lastResult;
+    const Rect& panel = kRewardPanel;
+    const ResultRewardLayout layout = MakeRewardLayout(result);
+    const ColorRGB violet(186, 140, 255);
+
+    draw::Panel(panel, palette::kPanel, palette::kBorder, 230, 2.0f);
+    draw::Text(FontSize::Medium, panel.left + 24.0f, panel.top + 14.0f, violet, "ランの記録");
+
+    float y = panel.top + 70.0f;
+    draw::Text(FontSize::Normal, panel.left + 32.0f, y, palette::kTextDim, "最終レベル");
+    draw::Text(FontSize::Normal, panel.left + 440.0f, y, palette::kExp, str::Format("Lv %d", result.runLevel),
+               draw::TextAlign::Right);
+    draw::Text(FontSize::Normal, panel.left + 540.0f, y, palette::kTextDim, "ラン中に拾った col");
+    draw::Text(FontSize::Normal, panel.right - 32.0f, y, palette::kAccentWarm, str::Comma(result.runColEarned),
+               draw::TextAlign::Right);
+    y += 40.0f;
+    draw::Text(FontSize::Small, panel.left + 32.0f, y, result.cleared ? palette::kText : palette::kDanger,
+               result.cleared ? "ラスボスの戦利品だけを本編へ持ち帰った（ほかの持ち物はすべて迷宮に置いてきた）"
+                              : "パーマデス：ランの成果はすべて失われた");
+
+    const float ruleY = layout.headerY - 12.0f;
+    draw::Line(panel.left + 24.0f, ruleY, panel.right - 24.0f, ruleY, palette::kBorder, 1.0f, 140);
+    const float splitX = (layout.dropColumn.right + layout.materialColumn.left) * 0.5f;
+    draw::Line(splitX, ruleY + 12.0f, splitX, layout.dropColumn.bottom, palette::kBorder, 1.0f, 110);
+
+    // 左：持ち帰った装備
+    const Rect& left = layout.dropColumn;
+    draw::Text(FontSize::Normal, left.left + 4.0f, layout.headerY, violet,
+               str::Format("持ち帰った装備  %d 個", static_cast<int>(result.drops.size())));
+    if (result.drops.empty()) {
+        draw::Text(FontSize::Normal, left.CenterX(), layout.listTop + 40.0f, palette::kTextDisabled,
+                   "持ち帰った装備はありません", draw::TextAlign::Center);
+        draw::Text(FontSize::Small, left.CenterX(), layout.listTop + 84.0f, palette::kTextDim,
+                   "ラスボスがまれに落とす「ラビリンス」の装備を、クリアすると持ち帰れる", draw::TextAlign::Center);
+    }
+    for (int row = 0; row < layout.visibleDrops; ++row) {
+        const int index = scroll_ + row;
+        if (index >= static_cast<int>(result.drops.size())) break;
+        const float rowY = layout.dropTop + kDropRowHeight * static_cast<float>(row);
+        const Rect rect(left.left, rowY, left.right, rowY + kDropRowHeight - 8.0f);
+        if (time_ < 0.6f + static_cast<float>(row) * 0.1f) continue;
+        ui::DrawItemRow(rect, result.drops[static_cast<size_t>(index)], false, false, false);
+        const float pulse = 0.6f + 0.4f * std::sin(time_ * 5.0f + static_cast<float>(row));
+        draw::StrokeRect(rect.Expanded(3.0f), violet, 2.0f, static_cast<int>(200.0f * pulse));
+    }
+
+    // 右：最後に持っていたスキル
+    const Rect& right = layout.materialColumn;
+    draw::Text(FontSize::Normal, right.left + 8.0f, layout.headerY, violet,
+               str::Format("スキル  %d 個", static_cast<int>(result.runSkills.size())));
+    if (result.runSkills.empty()) {
+        draw::Text(FontSize::Small, right.CenterX(), layout.listTop + 48.0f, palette::kTextDisabled,
+                   "スキルは無し", draw::TextAlign::Center);
+    }
+    for (size_t i = 0; i < result.runSkills.size(); ++i) {
+        const float rowY = layout.listTop + kMaterialRowHeight * static_cast<float>(i);
+        const Rect rect(right.left, rowY, right.right, rowY + kMaterialRowHeight - 6.0f);
+        draw::FillRect(rect, palette::kPanelDark, 200);
+        draw::StrokeRect(rect, palette::kBorder.Scaled(0.6f), 1.0f, 200);
+        draw::Text(FontSize::Small, rect.left + 12.0f, rect.top + 8.0f, palette::kText, result.runSkills[i]);
+    }
 }
 
 void ResultScene::DrawDropColumn(const QuestResult& result, const ResultRewardLayout& layout) const

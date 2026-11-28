@@ -8,8 +8,11 @@
 #include "Core/SceneManager.h"
 #include "Game/EnemyDatabase.h"
 #include "Game/GameContext.h"
+#include "Game/ItemDatabase.h"
+#include "Game/Roguelike.h"
 #include "Game/UniqueSkill.h"
 #include "Graphics/DrawUtil.h"
+#include "Scenes/HomeTown.h"
 #include "UI/UIWidgets.h"
 
 #include <algorithm>
@@ -85,9 +88,21 @@ QuestScene::QuestScene() = default;
 
 void QuestScene::OnEnter(GameContext& context)
 {
-    quest_ = QuestDatabase::Instance().Find(context.selectedQuestId);
+    // ローグライクモードのラン中は、生成したフロアを進む
+    roguelike_ = context.roguelike.active;
+    quest_ = roguelike_ ? &context.roguelike.quest : QuestDatabase::Instance().Find(context.selectedQuestId);
     if (!quest_) quest_ = QuestDatabase::Instance().Find(1);
     LayoutDebugFloorButtons();
+    menu_.SetRoguelike(roguelike_);
+    pickups_.Clear();
+    draft_.Close();
+    shop_.Close();
+    smith_.Close();
+    pendingDrafts_ = 0;
+    nearFacility_ = -1;
+    runNotice_.clear();
+    runNoticeTimer_ = 0.0f;
+    worldTime_ = 0.0f;
 
     player_.Setup(context.player);
     player_.FullHeal();
@@ -167,7 +182,7 @@ void QuestScene::OpenBossRushGate()
     phaseTimer_ = 0.0f;
     stage_.SetGateOpen(true);
     bannerMain_ = "FLOOR CLEAR";
-    bannerSub_ = "次の守護者が待っている……右のゲートへ";
+    bannerSub_ = roguelike_ ? "次の階層へ……右のゲートへ" : "次の守護者が待っている……右のゲートへ";
     bannerTimer_ = 2.6f;
 }
 
@@ -193,7 +208,7 @@ void QuestScene::SpawnFinalBoss()
                    : QuestDatabase::BossHpBarCount(*quest_);
     // プレイヤーと反対側の、画面の少し外から現れる
     const float x = (player_.pos.x < stage_.Width() * 0.5f) ? stage_.Width() - 600.0f : 600.0f;
-    boss_->Setup(*def, Vec2(x, stage_.GroundYAt(bossZ)), quest_->enemyPowerScale, bars);
+    boss_->Setup(*def, Vec2(x, stage_.GroundYAt(bossZ)), FloorPowerScale(floor), bars);
     boss_->z = bossZ;
     bossRewardGranted_ = false;
     // 中ボスの攻撃の残りは消す（登場演出の間に当たらないように）
@@ -213,6 +228,13 @@ void QuestScene::LoadFloor(int index, GameContext& context)
     enemies_.clear();
     boss_.reset();
     combat_.Clear();
+    pickups_.Clear();   // 拾わなかったものはフロアに置いていく
+    nearFacility_ = -1;
+    if (roguelike_ && quest_) {
+        // GameContext は const で渡されないので、たどり着いたフロアはここで記録する
+        rogue::RunState& run = context.roguelike;
+        run.deepestFloor = math::MaxI(run.deepestFloor, floorIndex_ + 1);
+    }
     finalBossSpawned_ = false;
     awaitingFinalBoss_ = false;
     finalBossTimer_ = 0.0f;
@@ -238,7 +260,7 @@ void QuestScene::LoadFloor(int index, GameContext& context)
             const int bars = (floor.bossHpBars > 0) ? math::ClampInt(floor.bossHpBars, kMinBossHpBars, kMaxBossHpBars)
                                                     : QuestDatabase::BossHpBarCount(*quest_);
             boss_->Setup(*def, Vec2(stage_.Width() - 600.0f, stage_.GroundYAt(bossZ)),
-                         quest_->enemyPowerScale, bars);
+                         FloorPowerScale(floor), bars);
             boss_->z = bossZ;
             // ボスごとに撃破の報酬を渡す（隠しボスは竜王とは別に貰える）
             bossRewardGranted_ = false;
@@ -429,7 +451,7 @@ void QuestScene::SpawnFloorEnemies(const GameContext& context)
         const float baseY = (spawn.y > 0.0f) ? spawn.y : stage_.GroundY();
 
         std::unique_ptr<Enemy> enemy(new Enemy());
-        enemy->Setup(*def, Vec2(spawn.x, baseY - spawnZ), quest_->enemyPowerScale);
+        enemy->Setup(*def, Vec2(spawn.x, baseY - spawnZ), FloorPowerScale(floor));
         enemy->z = spawnZ;
         enemies_.push_back(std::move(enemy));
     }
@@ -473,6 +495,12 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
         return;
     }
 
+    // ローグライク：スキル選択・ショップ・鍛冶屋を開いている間はゲームを止める
+    if (roguelike_ && RoguelikePanelOpen()) {
+        UpdateRoguelikePanels(dt, input, context);
+        return;
+    }
+
     hud_.Update(dt, player_, boss_.get(), input);
     if (input.Pressed(GameAction::Menu) && phase_ != Phase::Finished) {
         menu_.Open();
@@ -505,6 +533,14 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
     phaseTimer_ += dt;
     bannerTimer_ = math::MaxF(0.0f, bannerTimer_ - dt);
     breakNoticeTimer_ = math::MaxF(0.0f, breakNoticeTimer_ - dt);
+    runNoticeTimer_ = math::MaxF(0.0f, runNoticeTimer_ - dt);
+    worldTime_ += dt;
+
+    // ローグライク：フロアのショップ・鍛冶屋に入る
+    if (roguelike_) {
+        UpdateFacilities(input, context);
+        if (RoguelikePanelOpen()) return;
+    }
 
     if (phase_ == Phase::Battle || phase_ == Phase::FloorClear || phase_ == Phase::FloorIntro) {
         questTime_ += dt;
@@ -625,6 +661,7 @@ void QuestScene::Update(float dt, GameContext& context, SceneManager& manager)
         ResolveProjectiles(context);
         CleanupDead(context);
         combat_.Update(actorDt);
+        if (roguelike_) UpdatePickups(actorDt, context);
     }
 
     // --- カメラ -------------------------------------------------------------
@@ -716,14 +753,16 @@ void QuestScene::LayoutDebugFloorButtons()
     const float left = panel.left + 12.0f;
     const float width = panel.Width() - 24.0f;
     const float y = panel.top + kDebugFloorRowY;
-    // ◀ と ▶ の間に、フロアの数だけ同じ幅で並べる
-    const float floorW = (width - kDebugArrowW * 2.0f - kDebugButtonGap * static_cast<float>(count + 1))
-                       / static_cast<float>(math::MaxI(1, count));
+    // ◀ と ▶ の間に、フロアの数だけ同じ幅で並べる（ローグライクのように多いときは ◀ ▶ だけ）
+    const bool compact = count > 8;
+    const float floorW = compact ? 0.0f
+                       : (width - kDebugArrowW * 2.0f - kDebugButtonGap * static_cast<float>(count + 1))
+                             / static_cast<float>(math::MaxI(1, count));
 
     debugPrevFloorButton_ = ui::Button(Rect::FromXYWH(left, y, kDebugArrowW, kDebugFloorButtonH), "◀",
                                        FontSize::Small);
     float x = left + kDebugArrowW + kDebugButtonGap;
-    for (int i = 0; i < count; ++i) {
+    for (int i = 0; i < count && !compact; ++i) {
         // ボスラッシュはどのフロアにも中ボスがいるので、「ボス」は最後のフロアだけ
         const bool bossFloor = quest_ && quest_->floors[static_cast<size_t>(i)].bossId >= 0
                             && !(quest_->bossRush && i < count - 1);
@@ -1176,10 +1215,19 @@ void QuestScene::CleanupDead(GameContext& context)
         if (!enemy.alive && !enemy.rewardGranted) {
             enemy.rewardGranted = true;
             ++enemiesDefeated_;
-            expGained_ += enemy.ExpReward();
-            colGained_ += enemy.ColReward();
-            combat_.AddPopup(Vec2(enemy.pos.x, enemy.pos.y - enemy.height - 20.0f),
-                             str::Format("+%d EXP", enemy.ExpReward()), palette::kExp, false);
+            if (roguelike_) {
+                // ローグライク：経験値はその場でランのキャラに入り、col などはその場に落ちる
+                ++context.roguelike.kills;
+                const int exp = GrantRunExp(rogue::kRunExpPerKill, context);
+                combat_.AddPopup(Vec2(enemy.pos.x, enemy.pos.y - enemy.height - 20.0f),
+                                 str::Format("+%d EXP", exp), palette::kExp, false);
+                DropMobLoot(enemy, context);
+            } else {
+                expGained_ += enemy.ExpReward();
+                colGained_ += enemy.ColReward();
+                combat_.AddPopup(Vec2(enemy.pos.x, enemy.pos.y - enemy.height - 20.0f),
+                                 str::Format("+%d EXP", enemy.ExpReward()), palette::kExp, false);
+            }
         }
 
         if (enemy.IsRemovable()) {
@@ -1193,7 +1241,11 @@ void QuestScene::CleanupDead(GameContext& context)
     if (boss_ && !boss_->alive && !bossRewardGranted_) {
         bossRewardGranted_ = true;
         ++enemiesDefeated_;
-        if (const BossDef* def = boss_->Def()) {
+        if (roguelike_) {
+            ++context.roguelike.kills;
+            GrantRunExp(rogue::kRunExpPerBoss, context);
+            DropBossLoot(context);
+        } else if (const BossDef* def = boss_->Def()) {
             expGained_ += static_cast<int>(static_cast<float>(def->expReward)
                                            * (quest_ ? quest_->enemyPowerScale : 1.0f));
             colGained_ += static_cast<int>(static_cast<float>(def->colReward)
@@ -1216,6 +1268,11 @@ void QuestScene::UpdateFloorTransition(float dt, GameContext& context)
 
 void QuestScene::FinishQuest(bool cleared, bool retired, GameContext& context)
 {
+    // ローグライクは別の締め方（ランを終えて本編のキャラに戻す）
+    if (roguelike_) {
+        FinishRoguelike(cleared, retired, context);
+        return;
+    }
     QuestResult& result = context.lastResult;
     result.Reset();
 
@@ -1370,12 +1427,21 @@ void QuestScene::Draw(GameContext& context)
         hud_.Draw(player_, context.player, boss_.get(), info);
     }
 
+    if (roguelike_ && phase_ != Phase::BossIntro) DrawRunInfo(context);
+
     DrawDebugOverlay(context);
 
     if (breakNoticeTimer_ > 0.0f) DrawBreakNotice();
     if (bannerTimer_ > 0.0f) DrawBanner();
     if (phase_ == Phase::Defeat) DrawDefeatOverlay();
     if (phase_ == Phase::Victory) DrawVictoryOverlay();
+
+    // ローグライク：施設とスキル選択の画面
+    if (roguelike_) {
+        draft_.Draw(context.player);
+        shop_.Draw(context.roguelike, context.player);
+        smith_.Draw(context);
+    }
 
     menu_.Draw(context);
 
@@ -1392,6 +1458,7 @@ void QuestScene::Draw(GameContext& context)
 void QuestScene::DrawWorld(const GameContext& context)
 {
     stage_.DrawBackground(camera_);
+    if (roguelike_) DrawFacilities();
     combat_.DrawBehindActors(camera_);
 
     // 奥にいるものから順に描く（手前が上に重なる）
@@ -1418,6 +1485,7 @@ void QuestScene::DrawWorld(const GameContext& context)
         else if (item.boss) item.boss->Draw(camera_);
         else if (item.player) item.player->Draw(camera_);
     }
+    if (roguelike_) pickups_.Draw(camera_, worldTime_);
 
     stage_.DrawForeground(camera_);
     combat_.DrawFrontOfActors(camera_, context.settings.showDamageNumbers);
@@ -1474,9 +1542,10 @@ void QuestScene::DrawDefeatOverlay() const
     const float t = math::Clamp(phaseTimer_ / 1.2f, 0.0f, 1.0f);
     ui::DrawDimOverlay(static_cast<int>(t * 190.0f));
     draw::TextAlpha(FontSize::Title, kScreenW * 0.5f, kScreenH * 0.5f - 80.0f, palette::kDanger,
-                    "DEFEAT", static_cast<int>(t * 255.0f), draw::TextAlign::Center);
+                    roguelike_ ? "RUN OVER" : "DEFEAT", static_cast<int>(t * 255.0f), draw::TextAlign::Center);
     draw::TextAlpha(FontSize::Normal, kScreenW * 0.5f, kScreenH * 0.5f + 30.0f, palette::kTextDim,
-                    "戦闘不能になった…", static_cast<int>(t * 255.0f), draw::TextAlign::Center);
+                    roguelike_ ? "戦闘不能になった… ランの成果はすべて失われる" : "戦闘不能になった…",
+                    static_cast<int>(t * 255.0f), draw::TextAlign::Center);
 }
 
 void QuestScene::DrawVictoryOverlay() const
@@ -1484,7 +1553,312 @@ void QuestScene::DrawVictoryOverlay() const
     const float t = math::Clamp(phaseTimer_ / 1.0f, 0.0f, 1.0f);
     ui::DrawDimOverlay(static_cast<int>(t * 120.0f));
     draw::TextAlpha(FontSize::Title, kScreenW * 0.5f, kScreenH * 0.5f - 80.0f, palette::kAccentWarm,
-                    "QUEST CLEAR", static_cast<int>(t * 255.0f), draw::TextAlign::Center);
+                    roguelike_ ? "RUN CLEAR" : "QUEST CLEAR", static_cast<int>(t * 255.0f), draw::TextAlign::Center);
+}
+
+//==============================================================================
+// ローグライクモード
+//==============================================================================
+float QuestScene::FloorPowerScale(const FloorDef& floor) const
+{
+    if (floor.enemyPowerScale > 0.0f) return floor.enemyPowerScale;
+    return quest_ ? quest_->enemyPowerScale : 1.0f;
+}
+
+bool QuestScene::RoguelikePanelOpen() const
+{
+    return draft_.IsOpen() || shop_.IsOpen() || smith_.IsOpen();
+}
+
+void QuestScene::UpdateRoguelikePanels(float dt, const Input& input, GameContext& context)
+{
+    if (draft_.IsOpen()) {
+        draft_.Update(dt, input, context.player);
+        if (!draft_.IsOpen()) {
+            if (draft_.Changed()) player_.RefreshEquipment(context.player);
+            if (!draft_.Message().empty()) ShowRunNotice(draft_.Message(), draft_.Changed());
+            // 続けて拾っていたら次の選択へ
+            if (pendingDrafts_ > 0) OpenNextDraft(context);
+        }
+        return;
+    }
+    if (shop_.IsOpen()) {
+        shop_.Update(dt, input, context.roguelike, context.player);
+        return;
+    }
+    if (smith_.IsOpen()) {
+        smith_.Update(dt, input, context);
+        // 強化・修理した装備をその場で能力に反映する
+        player_.RefreshEquipment(context.player);
+    }
+}
+
+int QuestScene::FacilityNear() const
+{
+    if (!quest_) return -1;
+    const FloorDef& floor = FloorAt(floorIndex_);
+    for (size_t i = 0; i < floor.facilities.size(); ++i) {
+        if (math::Abs(player_.pos.x - floor.facilities[i].x) <= rogue::kFacilityRange) return static_cast<int>(i);
+    }
+    return -1;
+}
+
+bool QuestScene::EnemyNear(float x, float range) const
+{
+    for (const std::unique_ptr<Enemy>& enemy : enemies_) {
+        if (enemy->alive && math::Abs(enemy->pos.x - x) < range) return true;
+    }
+    return BossAlive() && math::Abs(boss_->pos.x - x) < range;
+}
+
+void QuestScene::UpdateFacilities(const Input& input, GameContext& context)
+{
+    nearFacility_ = -1;
+    if (transitioning_ || !quest_ || !player_.alive) return;
+    if (!(phase_ == Phase::Battle || phase_ == Phase::FloorClear || phase_ == Phase::FloorIntro)) return;
+    nearFacility_ = FacilityNear();
+    if (nearFacility_ < 0 || !input.Pressed(GameAction::Confirm)) return;
+
+    const FacilitySpot& spot = FloorAt(floorIndex_).facilities[static_cast<size_t>(nearFacility_)];
+    // 敵がそばにいる間は入れない（買い物で戦闘を止めて逃げないように）
+    if (EnemyNear(spot.x, rogue::kFacilityEnemyRange)) {
+        ShowRunNotice("近くに敵がいる！ 先に倒そう", false);
+        return;
+    }
+    if (spot.kind == FacilityKind::Shop) {
+        rogue::ShopAt(context.roguelike, floorIndex_, nearFacility_);   // 初めて開くときに品ぞろえを決める
+        shop_.Open(floorIndex_, nearFacility_);
+    } else {
+        smith_.Open();
+    }
+}
+
+void QuestScene::UpdatePickups(float dt, GameContext& context)
+{
+    if (!player_.alive) return;
+    std::vector<Pickup> collected;
+    // 敵を全滅させたら（ボスを倒したら）、残っている col・アイテム・強化結晶はプレイヤーへ集まる
+    const bool gather = (phase_ == Phase::FloorClear || phase_ == Phase::Victory);
+    pickups_.Update(dt, stage_, player_.pos, player_.z, gather, collected);
+    if (!collected.empty()) HandlePickups(collected, context);
+}
+
+void QuestScene::HandlePickups(const std::vector<Pickup>& collected, GameContext& context)
+{
+    Inventory& inventory = context.player.GetInventory();
+    rogue::RunState& run = context.roguelike;
+    const Vec2 head(player_.pos.x, player_.pos.y - player_.height - 34.0f);
+    int col = 0;
+    int crystals = 0;
+    for (const Pickup& p : collected) {
+        switch (p.kind) {
+        case PickupKind::Col:
+            inventory.AddCol(p.amount);
+            run.colEarned += p.amount;
+            col += p.amount;
+            break;
+        case PickupKind::Item: {
+            const ConsumableDef* def = ConsumableDatabase::Instance().Find(p.itemId);
+            if (inventory.AddItemCount(p.itemId, p.amount) > 0) {
+                rogue::AutoAssignQuickSlots(inventory);
+                combat_.AddPopup(Vec2(head.x, head.y - 30.0f), def ? def->name : "アイテム", palette::kHp, false);
+            }
+            break;
+        }
+        case PickupKind::Crystal:
+            inventory.AddMaterial(p.amount);
+            crystals += p.amount;
+            break;
+        case PickupKind::Gear:
+            inventory.AddItem(p.gear);
+            combat_.AddPopup(Vec2(head.x, head.y - 60.0f), p.gear.DisplayName(), palette::kAccentWarm, true);
+            ShowRunNotice(str::Format("装備を拾った：%s（ESC のメニュー →「装備」で付け替え）",
+                                      p.gear.DisplayName().c_str()));
+            break;
+        case PickupKind::Skill:
+            ++pendingDrafts_;
+            break;
+        }
+    }
+    if (col > 0) combat_.AddPopup(head, str::Format("+%d col", col), palette::kAccentWarm, false);
+    if (crystals > 0) {
+        combat_.AddPopup(Vec2(head.x, head.y + 26.0f), str::Format("強化結晶 +%d", crystals), ColorRGB(120, 210, 255),
+                         false);
+    }
+    if (pendingDrafts_ > 0 && !draft_.IsOpen()) OpenNextDraft(context);
+}
+
+void QuestScene::OpenNextDraft(GameContext& context)
+{
+    if (pendingDrafts_ <= 0) return;
+    --pendingDrafts_;
+    const std::vector<int> choices = rogue::DraftSkills(context.player, context.roguelike.weapon,
+                                                        rogue::kSkillChoices, context.roguelike.rng);
+    if (choices.empty()) {
+        // どのスキルも Lv 5 になったら、代わりに col を渡す
+        context.player.GetInventory().AddCol(100);
+        ShowRunNotice("覚えられるスキルがもう無い（代わりに 100 col）");
+        return;
+    }
+    draft_.Open(choices);
+}
+
+int QuestScene::GrantRunExp(float levelShare, GameContext& context)
+{
+    // 1 レベルぶんを超えるときは、超えたぶんを次のレベルの必要経験値で数える
+    int exp = 0;
+    int levels = 0;
+    float share = levelShare;
+    while (share > 0.0f) {
+        const float part = math::MinF(share, 1.0f);
+        const int amount = math::MaxI(1, static_cast<int>(std::lround(context.player.ExpToNext() * part)));
+        exp += amount;
+        levels += context.player.AddExp(amount);
+        share -= part;
+    }
+    context.roguelike.expEarned += exp;
+    if (levels <= 0) return exp;
+    // ステータスは自動で振り、上がった能力をその場で反映して少し回復する
+    rogue::AutoAllocate(context.player);
+    player_.RefreshEquipment(context.player);
+    player_.Recover(0.3f, 0.3f);
+    combat_.AddPopup(Vec2(player_.pos.x, player_.pos.y - player_.height - 90.0f),
+                     str::Format("LEVEL UP!  Lv %d", context.player.Level()), palette::kExp, true);
+    return exp;
+}
+
+void QuestScene::DropMobLoot(const Enemy& enemy, GameContext& context)
+{
+    const rogue::DropRoll drop = rogue::RollMobDrop(context.roguelike, floorIndex_);
+    const Vec2 at(enemy.pos.x, enemy.pos.y);
+    if (drop.col > 0) pickups_.Add(PickupKind::Col, at, enemy.z, drop.col);
+    for (const ItemStack& item : drop.items) pickups_.Add(PickupKind::Item, at, enemy.z, item.count, item.itemId);
+    if (drop.crystals > 0) pickups_.Add(PickupKind::Crystal, at, enemy.z, drop.crystals);
+    if (drop.skill) pickups_.Add(PickupKind::Skill, at, enemy.z);
+}
+
+void QuestScene::DropBossLoot(GameContext& context)
+{
+    if (!boss_) return;
+    rogue::RunState& run = context.roguelike;
+    const rogue::DropRoll drop = rogue::RollBossDrop(run, floorIndex_, context.player.DropRateMultiplier());
+    const Vec2 at(boss_->pos.x, stage_.GroundYAt(boss_->z));
+    const float z = boss_->z;
+    // col はいくつかに分けてばらまく
+    const int coins = 5;
+    for (int i = 0; i < coins; ++i) {
+        const int amount = drop.col / coins + (i == 0 ? drop.col % coins : 0);
+        if (amount > 0) pickups_.Add(PickupKind::Col, at, z, amount);
+    }
+    for (const ItemStack& item : drop.items) pickups_.Add(PickupKind::Item, at, z, item.count, item.itemId);
+    if (drop.crystals > 0) pickups_.Add(PickupKind::Crystal, at, z, drop.crystals);
+    const bool last = rogue::IsLastFloor(floorIndex_);
+    if (drop.skill && !last) pickups_.Add(PickupKind::Skill, at, z);
+    for (const EquipmentItem& item : drop.gear) pickups_.Add(PickupKind::Gear, at, z, 1, 0, item);
+    // ラスボスの迷宮の装備は、拾わなくても手に入る（クリアしたら本編へ持ち帰る）
+    for (const EquipmentItem& item : drop.carryHome) {
+        run.carryHome.push_back(item);
+        combat_.AddPopup(Vec2(at.x, at.y - boss_->height - 60.0f), item.DisplayName(), ColorRGB(206, 160, 255), true);
+        ShowRunNotice(str::Format("ラスボスが「%s」を落とした！ 本編へ持ち帰れる", item.DisplayName().c_str()));
+    }
+}
+
+void QuestScene::ShowRunNotice(const std::string& text, bool good)
+{
+    runNotice_ = text;
+    runNoticeGood_ = good;
+    runNoticeTimer_ = 3.2f;
+}
+
+void QuestScene::DrawFacilities() const
+{
+    if (!quest_) return;
+    const FloorDef& floor = FloorAt(floorIndex_);
+    const float baseY = stage_.GroundYAt(stage_.Depth()) + 4.0f;
+    for (size_t i = 0; i < floor.facilities.size(); ++i) {
+        town::DrawStall(camera_, floor.facilities[i].kind, floor.facilities[i].x, baseY, worldTime_,
+                        static_cast<int>(i) == nearFacility_);
+    }
+}
+
+void QuestScene::DrawRunInfo(const GameContext& context) const
+{
+    const PlayerData& data = context.player;
+    const rogue::RunState& run = context.roguelike;
+    const ColorRGB violet(186, 140, 255);
+
+    // 右上：ランの様子（レベル・col・強化結晶・撃破数・スキル）
+    const Rect panel = Rect::FromXYWH(kScreenW - 452.0f, 24.0f, 424.0f, 128.0f);
+    draw::ChamferRect(panel, 10.0f, palette::kPanelDark, 210);
+    draw::StrokeRect(panel, violet.Scaled(0.8f), 1.0f, 200);
+    draw::Text(FontSize::Small, panel.left + 16.0f, panel.top + 10.0f, violet, "LABYRINTH");
+    draw::Text(FontSize::Small, panel.right - 16.0f, panel.top + 10.0f, palette::kText,
+               str::Format("Lv %d", data.Level()), draw::TextAlign::Right);
+    const Rect expBar = Rect::FromXYWH(panel.left + 16.0f, panel.top + 42.0f, panel.Width() - 32.0f, 8.0f);
+    const float expRatio = (data.ExpToNext() > 0) ? static_cast<float>(data.Exp()) / static_cast<float>(data.ExpToNext()) : 0.0f;
+    draw::Bar(expBar, expRatio, palette::kExp, palette::kPanel);
+    draw::Text(FontSize::Small, panel.left + 16.0f, panel.top + 60.0f, palette::kAccentWarm,
+               str::Format("%s col", str::Comma(data.GetInventory().Col()).c_str()));
+    draw::Text(FontSize::Small, panel.left + 190.0f, panel.top + 60.0f, ColorRGB(120, 210, 255),
+               str::Format("強化結晶 %d", data.GetInventory().Material()));
+    draw::Text(FontSize::Small, panel.right - 16.0f, panel.top + 60.0f, palette::kTextDim,
+               str::Format("撃破 %d", run.kills), draw::TextAlign::Right);
+    draw::Text(FontSize::Tiny, panel.left + 16.0f, panel.top + 96.0f, palette::kTextDim,
+               str::Format("スキル %d / %d ／ 持ち帰り %d 個", rogue::OwnedSkillCount(data), data.SkillSlotLimit(),
+                           static_cast<int>(run.carryHome.size())));
+
+    // ショップ・鍛冶屋の入口の案内
+    //   フロア名などのバナーが出ている間は重ならないように出さない
+    if (nearFacility_ >= 0 && quest_ && !RoguelikePanelOpen() && !menu_.IsOpen() && bannerTimer_ <= 0.0f) {
+        const FacilitySpot& spot = FloorAt(floorIndex_).facilities[static_cast<size_t>(nearFacility_)];
+        const bool shop = spot.kind == FacilityKind::Shop;
+        town::DrawPromptAt(camera_, spot.x, stage_.GroundYAt(stage_.Depth()) + 4.0f,
+                           context.settings.keys.PrimaryName(GameAction::Confirm), shop ? "ショップ" : "鍛冶屋",
+                           shop ? "行商人：アイテム・装備・強化結晶を売っている" : "旅の鍛冶屋：装備の強化・修理・売却",
+                           worldTime_);
+    }
+
+    // ひとこと（スキルを覚えた・装備を拾った・敵が近い など）
+    if (runNoticeTimer_ > 0.0f) {
+        const int alpha = static_cast<int>(math::Clamp(runNoticeTimer_ / 0.5f, 0.0f, 1.0f) * 255.0f);
+        const float w = static_cast<float>(draw::TextWidth(FontSize::Normal, runNotice_)) + 60.0f;
+        const Rect box = Rect::FromCenter(kScreenW * 0.5f, kScreenH - 290.0f, w, 52.0f);
+        draw::ChamferRect(box, 10.0f, palette::kPanelDark, alpha * 220 / 255);
+        draw::StrokeRect(box, runNoticeGood_ ? violet : palette::kDanger, 1.0f, alpha);
+        draw::TextAlpha(FontSize::Normal, box.CenterX(), box.top + 12.0f,
+                        runNoticeGood_ ? palette::kText : palette::kDanger, runNotice_, alpha, draw::TextAlign::Center);
+    }
+}
+
+void QuestScene::FinishRoguelike(bool cleared, bool retired, GameContext& context)
+{
+    QuestResult& result = context.lastResult;
+    result.Reset();
+    rogue::RunState& run = context.roguelike;
+
+    result.roguelike = true;
+    result.cleared = cleared;
+    result.retired = retired && !cleared;
+    result.questId = rogue::kQuestId;
+    result.questName = "ローグライク ― 迷宮";
+    result.clearTime = questTime_;
+    result.floorCount = quest_ ? quest_->FloorCount() : rogue::kFloorCount;
+    result.floorsCleared = cleared ? result.floorCount : floorIndex_;
+    result.enemiesDefeated = enemiesDefeated_;
+    result.maxCombo = maxCombo_;
+    result.parryCount = parryCount_;
+    result.totalDamage = totalDamage_;
+    result.damageTaken = damageTaken_;
+    result.runLevel = context.player.Level();
+    result.runColEarned = run.colEarned;
+    result.expGained = run.expEarned;
+    for (int i = 0; i < context.player.SkillSlotLimit(); ++i) {
+        if (const SwordSkill* skill = context.player.SkillAt(i)) {
+            result.runSkills.push_back(str::Format("%s Lv %d", skill->name.c_str(), context.player.SkillLevel(skill->id)));
+        }
+    }
+    // 本編のキャラに戻す（ランの持ち物は捨て、クリアしたらラスボスの戦利品だけ持ち帰る）
+    result.drops = rogue::EndRun(context, cleared, cleared ? result.floorCount : floorIndex_ + 1);
 }
 
 } // namespace ecl

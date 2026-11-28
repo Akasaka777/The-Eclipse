@@ -16,6 +16,8 @@
 - 2026-11-22 追記：タイトル画面の背景とサブタイトルを Ars Gladii に合わせて作り直し、v0.10.1 として push
 - 2026-11-23 追記：ボスフロアのゲート削除・アイテムの待ち時間・推奨戦力の見直し・リザルトの素材の列・
   100 層「世界終焉の玉座」（ボスラッシュ）・歩いて回れるホームの街を v0.11.0 として push（下の「2.」の表）
+- 2026-11-28 追記：ローグライクモード（迷宮の門・持ち込み不可・ランダム生成・ドロップ・スキルの Lv・パーマデス）を
+  v0.12.0 として push（下の「2.」の表）
 
 ---
 
@@ -77,6 +79,7 @@ DxLib / C++17 / Visual Studio 2022 / 1920x1080 の横スクロール 2D アク�
 | v0.8.2 | リリースで DXライブラリの公式サイトにつながらないときはキャッシュを使う | v0.8.1 の 1 回目のリリースが公式サイトへの接続の時間切れ（WinError 10060）で失敗したため。`release.py` の `dxlib-url` は 3 回読み直し、だめなら `url=`（空）を出して止めない。ワークフローは url が空のとき `actions/cache/restore@v4`（`restore-keys: dxlib-http`、`fail-on-cache-miss`）で前回のキャッシュを使う |
 | v0.9.0 | 端でカメラがいきなり止まる → 端に近づくとカメラを遅くする／LUK で経験値の獲得倍率を上げる | カメラ：`Core/Camera.*` の `EaseIntoRange` と `kCameraEdgeEase = 240`（追従の目標を端の内側 240px から寄せ、外側 240px でちょうど端。ボス登場演出は `SnapToTarget(false)` / `Update(dt, false)` で今までどおり）。LUK：`Game/Ability.*` の `kLukExpRatePerPoint = 0.01` と `AbilityExpRate`、`PlayerData::ExpRateMultiplier`、`QuestScene::FinishQuest` で合計に掛けて四捨五入（`QuestResult::expRate`）。ステータス画面に「獲得経験値」の行、リザルトに「LUK 補正 ×1.20 込み」 |
 | v0.10.0 | ゲーム名を Ars Gladii に／竜王の火山に隠しフロア（10〜30 回に 1 回の抽選）／隠しボス ヴァジュラ・ラグナシュラ（上半身の仏像・腕 6 本・空から遠距離、たまに降りる）／黒い剣（1%・戦力 700〜710・クエスト詳細に出さない）／開発者モードに「隠しフロア」「隠しクエスト」 | 名前：`config::kGameTitle`。リリース：`release.py` の `product()` / `RENAMED_VERSION = (0,10,0)` で zip・exe・題名を版ごとに切り替え（ワークフローは `matrix.asset` / `matrix.title`）。抽選：`QuestDatabase.h` の `kHiddenFloor*`（確率 50% は**仕様に無く私が決めた**）、`PlayerData::Begin/EndHiddenFloorAttempt`、セーブの `hiddenfloor` 行。隠しフロア：`QuestDef::hasHiddenFloor / hiddenFloor / hiddenBoss*`（floors には含めず、番号は `FloorCount()`）、`QuestScene::FloorAt / IsHiddenFloor / OpenHiddenGate`、テーマ `StageTheme::Sanctum`。ボス：`kVajraBossId = 6`、`BossDef::flying / hoverHeight = 240`、攻撃 `SkyVolley / SkyThunder / SkyHalo / DiveSlam`、描画 `ArtStyle::Statue`（`CharacterArt.cpp` の `DrawStatue`）、雷 `CombatSystem::AddBolt`。剣：`kBlackSwordId = 170`、個体値 98〜100 で落とす。隠しクエストのボタンは**未実装の案内だけ** |
+| v0.12.0 | ローグライクモード（全クエストクリアで解放・デバッグに「クエストをすべてクリア」・持ち込み不可・ランダムなマップ・ランダムな場所のショップと鍛冶屋・敵はランダム・col / アイテム / 装備のドロップ・ラスボスから低確率で装備・雑魚敵は装備を落とさない・パーマデス・装備を強化して強くなる・スキルのドロップと選択・同じスキルで Lv アップ（最大 Lv 5）） | 中身：`Game/Roguelike.*`（`rogue::RunState`・`GenerateRun`・`StartRun / EndRun`・`RollMobDrop / RollBossDrop`・`DraftSkills / ApplySkillPick`・`ShopAt / Buy`）、拾い物 `Game/Pickup.*`、画面 `UI/RoguelikePanel.*`（迷宮の門）・`UI/SkillDraftPanel.*`・`UI/RogueShopPanel.*`。**ランの間は `GameContext::player` をランのキャラにして、本編のキャラは `roguelike.mainPlayer` にしまう**（`SaveSystem::Save` は `roguelike.active` のとき mainPlayer を書く）。戦闘は `QuestScene` を使い回す（`roguelike_`・`FloorDef::enemyPowerScale` / `facilities`・`FinishRoguelike`）。ボスと敵はローグライク用の写し（ID 100 + 元の ID）。スキルの Lv は `PlayerData::SkillLevel`（`SwordSkill.h` の `kMaxSkillLevel` など、セーブしない）。**私が決めたこと**：3 階層 × 4 フロア、Lv 1・初期装備・ポーション 3 個・0 col から、経験値は「次のレベルまでの割合」（雑魚 0.24・ボス 1.2）、レベルアップの振り分けは自動、階層のボスは装備を必ず落とす、ラスボスの装備（ラビリンスシリーズ 11 点・10%）はクリアしたときだけ本編へ持ち帰る、スキルは今の 4 スロットだけを持つ（入れ替えたら忘れる）、近くに敵がいると施設に入れない、ランの途中からは再開できない |
 | v0.11.0 | ボスのステージのゲートを削除／アイテムのクールタイムを効果が強いほど長く／森・石牢・祭壇の推奨戦力を見直し（火山が 50 層）／リザルトのドロップ装備の隣に素材／100 層「世界終焉の玉座」（推奨 55,000・5 フロア・ボスラッシュ・中ボス 5 体・最後のボス アークゼノス・武器全種とエンドワールドシリーズ）／ホームに歩いて回れる街 | ゲート：`Stage::DrawGate` で `IsBossFloor()` かつ閉じているときは描かない。待ち時間：`ConsumableDef::UseCooldown()`（`Consumable.h` の `kItemCooldown*`）、`Player::itemCooldownMax_`、HUD の札に残り秒数。推奨戦力：`RecommendedPowerForFloor`（`kPowerAnchor*`）と `QuestDef::floorLevel`（森 1 / 石牢 12 / 祭壇 25 / 火山 50 / 玉座 100）。**層の割り振りと、石牢 ×1.98・祭壇 ×4.66 の敵と報酬の引き上げは私が決めた**（ユーザーの指示は「バランスよく。100 層は 50,000〜100,000 なら可」）。リザルト：`ResultScene` の `kRewardPanel` / `MakeRewardLayout` / `DrawDropColumn` / `DrawMaterialColumn`（はみ出しも修正）。ボスラッシュ：`QuestDef::bossRush`、`FloorDef::finalBossId`、`QuestScene::OpenBossRushGate / SpawnFinalBoss / FinalBossPending / awaitingFinalBoss_`（`kFinalBossDelay = 2.8`）。ボス：ID 7〜12（`kWorldEaterBossId`〜`kArcXenosBossId`）、`BossDef::attackNames`、描画 `ArtStyle::Sovereign`（`DrawHumanoid` の中で翼・光輪・冠）、背景 `StageTheme::Throne`。**4・5 体目の中ボスの名前（ヴォイド・コロッサス / ネメシス・インフェルノ）とボスの強さは私が決めた**（戦力 55,000 の基準＝Lv 99・エンドワールド一式・個体値 100・+14 で 54,356）。装備：ID 180〜184・205・215・225・233・243・253（`IsEndWorldSetItem`）。素材 1214〜1216。街：`Scenes/HomeTown.*`（`kBuildings`・`kDoorRange`・`kTownWidth = 4400`）、`HomeScene::nearBuilding_`、ENTER（`GameAction::Confirm`）で入る |
 | v0.10.1 | タイトル画面を Ars Gladii に合う背景・サブタイトルへ | `Scenes/TitleScene.cpp` の `DrawTitleBackground`（夜明けの空・朝日と光の筋・山並み・丘・`PlantedSword`・`GreatSword`・火の粉・`Vignette`）。サブタイトル `kTitleSubtitle`「― 剣は技となり、技は道となる ―」、添え書き `kTitleCaption`、金色 `kTitleGold`（ボタンの縁も） |
 
@@ -264,6 +267,10 @@ v0.6.0=`0aec2fc`、v0.7.0=`bdfe659`。v0.5.0 以前はバージョンの仕組�
 - 2026-11-20 のセッションでは camera_edge（50 件）・luk_exp（36 件）・shots_luk を足した（すべて fail=0）。
 - 2026-11-22 のセッションでは hidden_floor（150 件）・test_release_names.py（20 件）・shots_vajra・shots_debug を足した。
   続けて title_screen（16 件）・shots_title を足した。
+- 2026-11-28 のセッションでは rogue（41,950 件。解放・迷宮の門・持ち込み不可とセーブの保護・生成・ドロップ・スキル・
+  ラン中の画面・クリアとリタイア・本編への影響なし）と shots_rogue・probe_rogue（成長の目安）を足した。
+  壊しテストは break_rogue.sh（15 通り。どれも NG）。hidden_floor のデバッグボタンの確認は名前で探すように直した。
+  DxLib スタブに `#define far` / `#define near` を入れてある（Windows でだけ起きるビルドエラーに気づくため）。
 - 2026-11-23 のセッションでは v011（219 件。待ち時間・推奨戦力・ボスフロアのゲート・リザルト・ボスラッシュ・街）と
   shots_result・shots_rush・shots_town・probe_boss（戦力とボスの強さの釣り合いを測る）を足した。
   壊しテストは break_v011.sh（13 通り。どれも NG になることを確認）。壊したあとは中間ファイルを消して必ず作り直す。

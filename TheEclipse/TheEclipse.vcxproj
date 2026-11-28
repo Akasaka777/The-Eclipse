@@ -228,6 +228,11 @@
     <ClCompile Include="src\Graphics\Animation.cpp" />
     <ClCompile Include="src\Graphics\CharacterArt.cpp" />
     <ClCompile Include="src\Graphics\DrawUtil.cpp" />
+    <ClCompile Include="src\Game\Pickup.cpp" />
+    <ClCompile Include="src\Game\Roguelike.cpp" />
+    <ClCompile Include="src\UI\RogueShopPanel.cpp" />
+    <ClCompile Include="src\UI\RoguelikePanel.cpp" />
+    <ClCompile Include="src\UI\SkillDraftPanel.cpp" />
     <ClCompile Include="src\Scenes\HomeScene.cpp" />
     <ClCompile Include="src\Scenes\HomeTown.cpp" />
     <ClCompile Include="src\Scenes\QuestScene.cpp" />
@@ -290,6 +295,11 @@
     <ClInclude Include="src\Graphics\Animation.h" />
     <ClInclude Include="src\Graphics\CharacterArt.h" />
     <ClInclude Include="src\Graphics\DrawUtil.h" />
+    <ClInclude Include="src\Game\Pickup.h" />
+    <ClInclude Include="src\Game\Roguelike.h" />
+    <ClInclude Include="src\UI\RogueShopPanel.h" />
+    <ClInclude Include="src\UI\RoguelikePanel.h" />
+    <ClInclude Include="src\UI\SkillDraftPanel.h" />
     <ClInclude Include="src\Scenes\HomeScene.h" />
     <ClInclude Include="src\Scenes\HomeTown.h" />
     <ClInclude Include="src\Scenes\QuestScene.h" />

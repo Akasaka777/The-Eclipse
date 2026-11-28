@@ -134,6 +134,28 @@ EnemyDatabase::EnemyDatabase()
         e.expReward = 1280; e.colReward = 1560;
         enemies_.push_back(e);
     }
+
+    // --- ローグライクモード用の写し（ID = 100 + 元の ID）----------------------------
+    //   竜王の火山の敵は強すぎるので、蝕の祭壇の敵と同じくらいの素の強さにする
+    //   （第 3 階層でフロアの倍率を掛けて使う）
+    struct RogueStats { int baseId; float hp; float attack; float defense; int exp; };
+    const RogueStats rogue[] = {
+        { 7, 520.0f, 60.0f, 24.0f, 56 },   // レッドドレイク
+        { 8, 380.0f, 54.0f, 18.0f, 44 },   // ドラゴンハッチリング
+        { 9, 760.0f, 68.0f, 34.0f, 70 },   // マグマリザード
+    };
+    for (const RogueStats& r : rogue) {
+        const EnemyDef* base = Find(r.baseId);
+        if (!base) continue;
+        EnemyDef e = *base;
+        e.id = kRoguelikeEnemyIdBase + r.baseId;
+        e.maxHp = r.hp;
+        e.attack = r.attack;
+        e.defense = r.defense;
+        e.expReward = r.exp;
+        e.colReward = 0;
+        enemies_.push_back(e);
+    }
 }
 
 const EnemyDatabase& EnemyDatabase::Instance()

@@ -69,6 +69,17 @@ constexpr int kSkillSlotCount = 4;
 constexpr int kUniqueSkillSlotCount = 3;
 
 //------------------------------------------------------------------------------
+// スキルのレベル（ローグライクモードで、同じスキルを選ぶと上がる。本編は常に Lv 1）
+//   1 つ上がるごとに威力 +15%・再使用までの時間 -8%（Lv 5 で威力 +60%・再使用 -32%）
+//------------------------------------------------------------------------------
+constexpr int   kMaxSkillLevel = 5;
+constexpr float kSkillDamagePerLevel = 0.15f;
+constexpr float kSkillCooldownPerLevel = 0.08f;
+inline int   ClampSkillLevel(int level) { return level < 1 ? 1 : (level > kMaxSkillLevel ? kMaxSkillLevel : level); }
+inline float SkillLevelDamageRate(int level) { return 1.0f + kSkillDamagePerLevel * static_cast<float>(ClampSkillLevel(level) - 1); }
+inline float SkillLevelCooldownRate(int level) { return 1.0f - kSkillCooldownPerLevel * static_cast<float>(ClampSkillLevel(level) - 1); }
+
+//------------------------------------------------------------------------------
 // スキルのマスターデータ
 //------------------------------------------------------------------------------
 class SkillDatabase

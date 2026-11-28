@@ -25,6 +25,11 @@ public:
     void Update(float dt, const Input& input, GameContext& context);
     void Draw(const GameContext& context) const;
 
+    // ローグライクモード：スキルは拾って覚えるのでスキルツリーは開けない。
+    //   リタイアは「ランをあきらめる」（成果はすべて失う）
+    void SetRoguelike(bool roguelike);
+    bool IsRoguelike() const { return roguelike_; }
+
     // リタイアが確定したら true
     bool RetireConfirmed() const { return retireConfirmed_; }
     // 装備またはスキル構成が変更されたら true（このフレームのみ）
@@ -44,6 +49,7 @@ private:
     SkillPanel    skills_;
 
     bool open_ = false;
+    bool roguelike_ = false;
     bool equipmentChanged_ = false;
     bool confirmingRetire_ = false;
     bool retireConfirmed_ = false;

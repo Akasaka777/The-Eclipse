@@ -113,6 +113,7 @@ void Player::ApplyEquipment(const PlayerData& data)
 
     for (int i = 0; i < kSkillSlotCount; ++i) {
         skills_[i] = data.SkillAt(i);
+        skillLevels_[i] = skills_[i] ? data.SkillLevel(skills_[i]->id) : 1;
     }
 
     animator.SetSet(ActorAssets::Instance().PlayerSet());
@@ -134,6 +135,13 @@ void Player::PlaceAt(const Vec2& position)
     parrySignal_ = false;
     facing = 1;
     pose = PoseKind::Idle;
+}
+
+void Player::Recover(float hpRate, float mpRate)
+{
+    if (!alive) return;
+    hp = math::MinF(maxHp, hp + maxHp * math::MaxF(0.0f, hpRate));
+    mp_ = math::MinF(maxMp_, mp_ + maxMp_ * math::MaxF(0.0f, mpRate));
 }
 
 void Player::FullHeal()
@@ -231,9 +239,22 @@ float Player::SkillCooldown(int index) const
 
 float Player::SkillCooldownRatio(int index) const
 {
+    const float full = SkillCooldownFull(index);
+    if (full <= 0.0f) return 0.0f;
+    return math::Clamp(SkillCooldown(index) / full, 0.0f, 1.0f);
+}
+
+int Player::SkillLevel(int index) const
+{
+    if (index < 0 || index >= kSkillSlotCount) return 1;
+    return skillLevels_[index];
+}
+
+float Player::SkillCooldownFull(int index) const
+{
     const SwordSkill* skill = Skill(index);
-    if (!skill || skill->cooldown <= 0.0f) return 0.0f;
-    return math::Clamp(SkillCooldown(index) / skill->cooldown, 0.0f, 1.0f);
+    if (!skill) return 0.0f;
+    return skill->cooldown * SkillLevelCooldownRate(SkillLevel(index));
 }
 
 bool Player::CanUseSkill(int index) const
@@ -254,9 +275,10 @@ bool Player::UseSkill(int index, CombatSystem& combat)
 
     const SwordSkill* skill = Skill(index);
     mp_ -= skill->mpCost;
-    cooldowns_[index] = skill->cooldown;
+    cooldowns_[index] = SkillCooldownFull(index);
 
     currentSkill_ = skill;
+    currentSkillLevel_ = SkillLevel(index);
     skillTimer_ = 0.0f;
     nextStrikeIndex_ = 0;
     state_ = PlayerState::Skill;
@@ -557,7 +579,8 @@ void Player::SpawnSkillStrike(const SkillStrike& strike, CombatSystem& combat)
     hitBox.team = Team::Player;
     hitBox.sourceId = id;
     hitBox.attack = AttackPower();
-    hitBox.damageMultiplier = strike.damageMultiplier;
+    // ローグライクで上げたスキルのレベルぶん威力が上がる（本編は Lv 1 で等倍）
+    hitBox.damageMultiplier = strike.damageMultiplier * SkillLevelDamageRate(currentSkillLevel_);
     hitBox.critRate = CritRate();
     hitBox.critDamage = stats.critDamage;
     hitBox.knockback = strike.knockback;

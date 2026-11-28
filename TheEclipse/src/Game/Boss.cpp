@@ -339,6 +339,36 @@ BossDatabase::BossDatabase()
                           { BossAttackKind::Burst, "ワールドエンド" } };
         bosses_.push_back(b);
     }
+
+    //==========================================================================
+    // ローグライクモード用の写し（ID = 100 + 元の ID）
+    //   第 1 階層（狼王・ゴーレム）≒ はじまりの森の少し上、第 2 階層 ≒ 石牢の回廊、
+    //   第 3 階層の最後のボス ≒ 蝕の祭壇の 0.65 倍。フロアの倍率は掛けない（1.0）。
+    //   経験値はラン中は使わない（次のレベルまでの割合で渡す。Roguelike.h の kRunExpPerBoss）
+    //==========================================================================
+    struct RogueStats { int baseId; float hp; float attack; float defense; int exp; };
+    const RogueStats rogue[] = {
+        { 1, 6000.0f, 80.0f, 28.0f, 420 },            // 第 1 階層
+        { 2, 6000.0f, 80.0f, 28.0f, 420 },
+        { 3, 17000.0f, 190.0f, 100.0f, 1500 },        // 第 2 階層
+        { 4, 17000.0f, 190.0f, 100.0f, 1500 },
+        { kWorldEaterBossId, 17000.0f, 190.0f, 100.0f, 1500 },
+        { 5, 40000.0f, 400.0f, 200.0f, 0 },           // 第 3 階層（ラスボス）
+        { kAbyssDragonBossId, 40000.0f, 400.0f, 200.0f, 0 },
+        { kArcXenosBossId, 40000.0f, 400.0f, 200.0f, 0 },
+    };
+    for (const RogueStats& r : rogue) {
+        const BossDef* base = Find(r.baseId);
+        if (!base) continue;
+        BossDef b = *base;
+        b.id = kRoguelikeBossIdBase + r.baseId;
+        b.maxHp = r.hp;
+        b.attack = r.attack;
+        b.defense = r.defense;
+        b.expReward = r.exp;
+        b.colReward = 0;   // col はその場に落とす（ドロップで出す）
+        bosses_.push_back(b);
+    }
 }
 
 const BossDatabase& BossDatabase::Instance()

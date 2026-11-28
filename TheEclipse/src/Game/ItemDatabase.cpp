@@ -24,6 +24,16 @@ bool IsEndWorldSetItem(int templateId)
         || templateId == kEndWorldGloveId || templateId == kEndWorldBootsId;
 }
 
+bool IsLabyrinthSetItem(int templateId)
+{
+    return templateId == kLabyrinthSwordId || templateId == kLabyrinthMaceId
+        || templateId == kLabyrinthDaggerId || templateId == kLabyrinthRapierId
+        || templateId == kLabyrinthSpearId
+        || templateId == kLabyrinthHelmId || templateId == kLabyrinthMailId
+        || templateId == kLabyrinthShieldId || templateId == kLabyrinthArmId
+        || templateId == kLabyrinthGloveId || templateId == kLabyrinthBootsId;
+}
+
 namespace {
 
 // 武器用ステータス生成
@@ -191,6 +201,13 @@ ItemDatabase::ItemDatabase()
         { 183, "アークゼノスレイピア", "終焉の光を一点に束ねた細剣。",                       EquipSlot::WeaponRight, RPR, 3, WeaponStats(326.0f, 0.23f, 0.48f, 0.22f, 20.0f) },
         { 184, "アークゼノススピア",   "終焉の王の玉座を支えていた槍。届かぬ果てはない。",   EquipSlot::WeaponRight, SPR, 3, WeaponStats(420.0f, 0.14f, 0.48f, 0.02f) },
 
+        //--- ローグライクのラスボスのドロップ（ラビリンスシリーズ。クリアしたときだけ持ち帰れる）--
+        { 185, "ラビリンスソード",     "迷宮の最奥で眠っていた剣。抜くたびに道が変わる。",     EquipSlot::WeaponRight, SWD, 3, WeaponStats(428.0f, 0.15f, 0.50f, 0.08f) },
+        { 186, "ラビリンスメイス",     "迷宮の壁を砕いて道を作ったという槌。",                 EquipSlot::WeaponRight, MCE, 3, WeaponStats(510.0f, 0.09f, 0.60f, -0.03f) },
+        { 187, "ラビリンスダガー",     "迷宮の影に溶け込む短剣。",                             EquipSlot::WeaponRight, DGR, 3, WeaponStats(297.0f, 0.32f, 0.54f, 0.32f, 26.0f) },
+        { 188, "ラビリンスレイピア",   "迷宮の出口を一点に指し示す細剣。",                     EquipSlot::WeaponRight, RPR, 3, WeaponStats(352.0f, 0.25f, 0.52f, 0.24f, 22.0f) },
+        { 189, "ラビリンススピア",     "迷宮の主が門を守るのに使った槍。",                     EquipSlot::WeaponRight, SPR, 3, WeaponStats(454.0f, 0.15f, 0.52f, 0.03f) },
+
         //--- 頭装備 -------------------------------------------------------------
         { 200, "レザーキャップ",       "軽い革の帽子。",                           EquipSlot::Head, SWD, 1, ArmorStats(6.0f,  40.0f, 10.0f) },
         { 201, "アイアンヘルム",       "視界は狭いが頑丈。",                       EquipSlot::Head, SWD, 2, ArmorStats(12.0f, 75.0f,  6.0f) },
@@ -198,6 +215,7 @@ ItemDatabase::ItemDatabase()
         { 203, "蝕の兜",               "闇を見通す視界を得る。",                   EquipSlot::Head, SWD, 3, ArmorStats(19.0f, 110.0f, 24.0f, 0.03f) },
         { 204, "エンシェントドラゴンヘルム", "竜鱗を重ねた兜。灼熱の息すら通さない。", EquipSlot::Head, SWD, 3, ArmorStats(42.0f, 280.0f, 60.0f, 0.04f) },
         { 205, "エンドワールドヘルム", "世界の終わりを見届けた兜。目を閉じても果てが見える。", EquipSlot::Head, SWD, 3, ArmorStats(126.0f, 840.0f, 96.0f, 0.05f) },
+        { 206, "ラビリンスヘルム",     "迷宮を何度も巡った者の兜。",                           EquipSlot::Head, SWD, 3, ArmorStats(136.0f, 908.0f, 104.0f, 0.05f) },
 
         //--- 体装備 -------------------------------------------------------------
         { 210, "レザーアーマー",       "動きを妨げない革鎧。",                     EquipSlot::Body, SWD, 1, ArmorStats(11.0f, 80.0f,  8.0f, 0.0f, 6.0f) },
@@ -206,6 +224,7 @@ ItemDatabase::ItemDatabase()
         { 213, "蝕の鎧",               "蝕の夜を纏うかのような漆黒。",             EquipSlot::Body, SWD, 3, ArmorStats(32.0f, 210.0f, 30.0f, 0.02f, 8.0f) },
         { 214, "エンシェントドラゴンメイル", "古竜の背鱗を並べた鎧。重さを感じさせない。", EquipSlot::Body, SWD, 3, ArmorStats(68.0f, 520.0f, 70.0f, 0.02f, 6.0f) },
         { 215, "エンドワールドメイル", "崩れ落ちる世界の欠片を鍛え合わせた鎧。",             EquipSlot::Body, SWD, 3, ArmorStats(204.0f, 1560.0f, 112.0f, 0.03f, 8.0f) },
+        { 216, "ラビリンスメイル",     "迷宮の石を編み込んだ鎧。崩れても形を取り戻す。",       EquipSlot::Body, SWD, 3, ArmorStats(220.0f, 1685.0f, 121.0f, 0.03f, 9.0f) },
 
         //--- 盾 -----------------------------------------------------------------
         { 220, "ラウンドシールド",     "取り回しの良い小盾。",                     EquipSlot::Shield, SWD, 1, ArmorStats(9.0f,  55.0f, 0.0f) },
@@ -215,24 +234,28 @@ ItemDatabase::ItemDatabase()
         { 223, "聖盾エーギス",         "神聖剣と対になる盾。あらゆる刃を受け止める。", EquipSlot::Shield, SWD, 3, ArmorStats(125.0f, 480.0f, 70.0f) },
         { 224, "エンシェントドラゴンシールド", "竜の翼膜を張った盾。炎を受け流す。", EquipSlot::Shield, SWD, 3, ArmorStats(58.0f, 380.0f, 40.0f) },
         { 225, "エンドワールドシールド", "終焉の一撃すら受け止めた盾。表面に星図が浮かぶ。", EquipSlot::Shield, SWD, 3, ArmorStats(174.0f, 1140.0f, 64.0f) },
+        { 226, "ラビリンスシールド",   "迷宮の扉をそのまま盾にしたもの。",                     EquipSlot::Shield, SWD, 3, ArmorStats(188.0f, 1231.0f, 69.0f) },
 
         //--- 腕装備 -------------------------------------------------------------
         { 230, "レザーブレイサー",     "手首を守る革当て。",                       EquipSlot::Arm, SWD, 1, ArmorStats(5.0f, 30.0f, 6.0f, 0.02f) },
         { 231, "鋼の篭手",             "打撃の威力を底上げする。",                 EquipSlot::Arm, SWD, 2, ArmorStats(10.0f, 55.0f, 0.0f, 0.04f) },
         { 232, "エンシェントドラゴンアーム", "竜爪を模した篭手。急所を的確に捉える。", EquipSlot::Arm, SWD, 3, ArmorStats(26.0f, 160.0f, 30.0f, 0.06f) },
         { 233, "エンドワールドアーム", "終焉の王の腕甲。振るうたびに空間が軋む。",           EquipSlot::Arm, SWD, 3, ArmorStats(78.0f, 480.0f, 48.0f, 0.08f) },
+        { 234, "ラビリンスアーム",     "迷宮の罠を幾度もしのいだ腕甲。",                       EquipSlot::Arm, SWD, 3, ArmorStats(84.0f, 518.0f, 52.0f, 0.09f) },
 
         //--- 手装備 -------------------------------------------------------------
         { 240, "戦士のグローブ",       "武器を握る力が増す。",                     EquipSlot::Hand, SWD, 1, ArmorStats(4.0f, 24.0f, 4.0f, 0.03f) },
         { 241, "疾風の手甲",           "振りの速度が上がる。",                     EquipSlot::Hand, SWD, 2, ArmorStats(7.0f, 38.0f, 8.0f, 0.03f) },
         { 242, "エンシェントドラゴングローブ", "竜の握力を宿す手甲。武器がぴたりと吸い付く。", EquipSlot::Hand, SWD, 3, ArmorStats(20.0f, 120.0f, 24.0f, 0.05f) },
         { 243, "エンドワールドグローブ", "掴んだものを決して離さない、終焉の手甲。",         EquipSlot::Hand, SWD, 3, ArmorStats(60.0f, 360.0f, 38.0f, 0.07f) },
+        { 244, "ラビリンスグローブ",   "迷宮の鍵を探り当てる手甲。",                           EquipSlot::Hand, SWD, 3, ArmorStats(65.0f, 389.0f, 41.0f, 0.08f) },
 
         //--- 足装備 -------------------------------------------------------------
         { 250, "レザーブーツ",         "長時間の探索に向く。",                     EquipSlot::Foot, SWD, 1, ArmorStats(5.0f, 28.0f, 4.0f, 0.0f, 18.0f) },
         { 251, "韋駄天のブーツ",       "駆け抜ける者のための靴。",                 EquipSlot::Foot, SWD, 2, ArmorStats(9.0f, 46.0f, 8.0f, 0.0f, 34.0f) },
         { 252, "エンシェントドラゴンブーツ", "溶岩の上でも足を取られない具足。", EquipSlot::Foot, SWD, 3, ArmorStats(24.0f, 150.0f, 26.0f, 0.0f, 52.0f) },
         { 253, "エンドワールドブーツ", "崩れゆく大地を踏みしめて歩くための具足。",           EquipSlot::Foot, SWD, 3, ArmorStats(72.0f, 450.0f, 42.0f, 0.0f, 64.0f) },
+        { 254, "ラビリンスブーツ",     "迷宮のどこへでも歩いて行ける具足。",                   EquipSlot::Foot, SWD, 3, ArmorStats(78.0f, 486.0f, 45.0f, 0.0f, 70.0f) },
 
         //======================================================================
         // ショップ専用の武器（ドロップには出ない）
@@ -342,7 +365,8 @@ ItemDatabase::ItemDatabase()
     // 手装備の攻撃速度補正は個別に付与
     for (ItemTemplate& t : templates_) {
         if (t.slot == EquipSlot::Hand) {
-            if (t.id == kEndWorldGloveId) t.base.attackSpeed = 0.18f;
+            if (t.id == kLabyrinthGloveId) t.base.attackSpeed = 0.19f;
+            else if (t.id == kEndWorldGloveId) t.base.attackSpeed = 0.18f;
             else if (t.id == 242) t.base.attackSpeed = 0.14f;
             else if (t.id == 241) t.base.attackSpeed = 0.10f;
             else t.base.attackSpeed = 0.05f;
@@ -359,6 +383,8 @@ ItemDatabase::ItemDatabase()
         if (t.id == kBlackSwordId) t.special = true;
         // 世界終焉の玉座のボスドロップも専用
         if (IsEndWorldSetItem(t.id)) t.special = true;
+        // ローグライクのラスボスのドロップも専用
+        if (IsLabyrinthSetItem(t.id)) t.special = true;
         // ショップ専用の装備とアクセサリーはドロップ抽選に出さない
         if (t.id >= kShopOnlyIdBase) t.special = true;
     }

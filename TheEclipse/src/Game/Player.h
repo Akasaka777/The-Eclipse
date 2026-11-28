@@ -49,6 +49,8 @@ public:
     void PlaceAt(const Vec2& position);
     // HP/MP を全快
     void FullHeal();
+    // 最大値に対する割合で HP / MP を回復する（戦闘不能のときは何もしない）
+    void Recover(float hpRate, float mpRate);
 
     void Update(float dt, const Stage& stage, CombatSystem& combat,
                 const Input& input, bool controlEnabled);
@@ -82,6 +84,10 @@ public:
     const SwordSkill* Skill(int index) const;
     float SkillCooldown(int index) const;
     float SkillCooldownRatio(int index) const;
+    // スロットのスキルのレベル（ローグライクで上がる。本編は 1）
+    int   SkillLevel(int index) const;
+    // レベルを反映した再使用までの時間
+    float SkillCooldownFull(int index) const;
     bool  CanUseSkill(int index) const;
     // スキル発動（成功したら true）
     bool  UseSkill(int index, CombatSystem& combat);
@@ -162,6 +168,8 @@ private:
     float skillTimer_ = 0.0f;
     size_t nextStrikeIndex_ = 0;
     float cooldowns_[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    int   skillLevels_[4] = { 1, 1, 1, 1 };
+    int   currentSkillLevel_ = 1;   // 発動中のスキルのレベル（威力に掛ける）
     const SwordSkill* skills_[4] = { nullptr, nullptr, nullptr, nullptr };
 
     // 回避

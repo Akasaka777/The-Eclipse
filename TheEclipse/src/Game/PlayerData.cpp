@@ -61,6 +61,68 @@ void PlayerData::SetupNewGame(WeaponType weapon)
     inventory_.SetQuickItem(QuickSlot::Recovery, kStarterPotionId);
 }
 
+int PlayerData::SkillLevel(int skillId) const
+{
+    for (const auto& entry : skillLevels_) {
+        if (entry.first == skillId) return entry.second;
+    }
+    return 1;
+}
+
+void PlayerData::SetSkillLevel(int skillId, int level)
+{
+    level = ClampSkillLevel(level);
+    for (auto it = skillLevels_.begin(); it != skillLevels_.end(); ++it) {
+        if (it->first != skillId) continue;
+        if (level <= 1) skillLevels_.erase(it);
+        else it->second = level;
+        return;
+    }
+    if (level > 1) skillLevels_.emplace_back(skillId, level);
+}
+
+void PlayerData::GrantSkill(int skillId)
+{
+    if (!SkillDatabase::Instance().Find(skillId)) return;
+    if (!IsSkillUnlocked(skillId)) unlockedSkills_.push_back(skillId);
+}
+
+void PlayerData::RevokeSkill(int skillId)
+{
+    for (int i = 0; i < kSkillSlotCount; ++i) {
+        if (skillLoadout_[i] == skillId) skillLoadout_[i] = 0;
+    }
+    for (auto it = unlockedSkills_.begin(); it != unlockedSkills_.end();) {
+        if (*it == skillId) it = unlockedSkills_.erase(it);
+        else ++it;
+    }
+    SetSkillLevel(skillId, 1);
+}
+
+void PlayerData::ClearSkillsForRun()
+{
+    unlockedSkills_.clear();
+    for (int i = 0; i < kSkillSlotCount; ++i) skillLoadout_[i] = 0;
+    skillLevels_.clear();
+    skillPoints_ = 0;
+    lastLoadoutWeapon_ = CurrentWeaponType();
+    lastLoadoutUnique_ = UsesUniqueSkillSet();
+}
+
+void PlayerData::RecordRoguelikeRun(bool cleared, int floorReached)
+{
+    ++roguelikeRuns_;
+    if (cleared) ++roguelikeClears_;
+    if (floorReached > roguelikeBestFloor_) roguelikeBestFloor_ = floorReached;
+}
+
+void PlayerData::RestoreRoguelikeRecord(int runs, int clears, int bestFloor)
+{
+    roguelikeRuns_ = runs < 0 ? 0 : runs;
+    roguelikeClears_ = clears < 0 ? 0 : clears;
+    roguelikeBestFloor_ = bestFloor < 0 ? 0 : bestFloor;
+}
+
 int PlayerData::ExpToNext() const
 {
     return ExpTableFor(level_);

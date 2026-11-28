@@ -10,6 +10,7 @@
 #include "Game/GameContext.h"
 #include "Game/ItemDatabase.h"
 #include "Game/QuestDatabase.h"
+#include "Game/Roguelike.h"
 #include "Game/SaveData.h"
 #include "Game/UniqueSkill.h"
 #include "Graphics/DrawUtil.h"
@@ -48,6 +49,7 @@ HomeTab TabFor(town::Facility facility)
     case town::Facility::Home:    return HomeTab::Player;
     case town::Facility::Shop:    return HomeTab::Shop;
     case town::Facility::Smith:   return HomeTab::Smith;
+    case town::Facility::Labyrinth: return HomeTab::Roguelike;
     case town::Facility::Dungeon: return HomeTab::Quest;
     }
     return HomeTab::None;
@@ -68,6 +70,7 @@ enum class DebugAction
     UnlockSkills,  // スキルを全解放
     UnlockUnique,  // ユニークスキルを解放（プルダウンで選ぶ）
     HiddenQuest,   // 隠しクエスト（まだ実装していない。押すと案内だけ出す。隠しフロアとは別）
+    ClearAllQuests,// クエストをすべてクリア済みにする（ローグライクモードが開く）
 };
 
 struct DebugButtonDef
@@ -87,6 +90,7 @@ const DebugButtonDef kDebugButtons[] = {
     { DebugAction::UnlockSkills,  "スキル全習得" },
     { DebugAction::UnlockUnique,  "ユニーク解放 ▼" },
     { DebugAction::HiddenQuest,   "隠しクエスト" },
+    { DebugAction::ClearAllQuests, "クエストをすべてクリア" },
 };
 
 constexpr int   kDebugButtonCount = static_cast<int>(sizeof(kDebugButtons) / sizeof(kDebugButtons[0]));
@@ -365,6 +369,10 @@ void HomeScene::UpdateDebugButtons(float dt, const Input& input, GameContext& co
             debugMenuOpen_ =
                 (debugMenuOpen_ == DebugMenu::Unique) ? DebugMenu::None : DebugMenu::Unique;
             return;
+        case DebugAction::ClearAllQuests:
+            rogue::MarkAllQuestsCleared(context.player);
+            debugMessage_ = "すべてのクエストをクリア済みにしました（迷宮の門が開きます）";
+            break;
         case DebugAction::HiddenQuest:
             // 隠しクエストはまだ無い（竜王の火山の隠しフロアとは別のもの）
             debugMessage_ = "隠しクエストはまだ実装されていません";
@@ -459,7 +467,7 @@ void HomeScene::OnEnter(GameContext& context)
 bool HomeScene::AnyPanelOpen() const
 {
     return playerPanel_.IsOpen() || questPanel_.IsOpen() || shopPanel_.IsOpen()
-        || smithPanel_.IsOpen() || settingsPanel_.IsOpen();
+        || smithPanel_.IsOpen() || settingsPanel_.IsOpen() || roguelikePanel_.IsOpen();
 }
 
 void HomeScene::CloseAllTabs()
@@ -469,6 +477,7 @@ void HomeScene::CloseAllTabs()
     shopPanel_.Close();
     smithPanel_.Close();
     settingsPanel_.Close();
+    roguelikePanel_.Close();
     activeTab_ = HomeTab::None;
 }
 
@@ -483,6 +492,7 @@ void HomeScene::OpenTab(HomeTab tab, GameContext& context)
     case HomeTab::Shop:     shopPanel_.Open(); break;
     case HomeTab::Smith:    smithPanel_.Open(); break;
     case HomeTab::Settings: settingsPanel_.Open(context.settings); break;
+    case HomeTab::Roguelike: roguelikePanel_.Open(context); break;
     default: break;
     }
 }
@@ -532,6 +542,13 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
         settingsPanel_.Update(dt, input, context);
         camera_.SetShakeEnabled(context.settings.screenShake);
         if (settingsPanel_.CloseRequested()) activeTab_ = HomeTab::None;
+    } else if (roguelikePanel_.IsOpen()) {
+        roguelikePanel_.Update(dt, input, context);
+        if (roguelikePanel_.StartRequested()) {
+            startRoguelike_ = true;
+            activeTab_ = HomeTab::None;
+        }
+        if (roguelikePanel_.CloseRequested()) activeTab_ = HomeTab::None;
     }
 
     // --- タブボタン ----------------------------------------------------------
@@ -611,6 +628,16 @@ void HomeScene::Update(float dt, GameContext& context, SceneManager& manager)
         SaveSystem::Save(context);   // 出撃前にも保存しておく
         manager.RequestChange(SceneId::Quest);
     }
+    // --- ローグライクモードのランを始める --------------------------------------------
+    //   本編のキャラを保存してから、何も持たない新しいキャラにして迷宮へ
+    if (startRoguelike_ && !manager.IsTransitioning()) {
+        startRoguelike_ = false;
+        SaveSystem::Save(context);
+        const unsigned int seed = static_cast<unsigned int>(GetNowCount()) * 2654435761u
+                                ^ static_cast<unsigned int>(context.globalTime * 1000.0f);
+        rogue::StartRun(context, roguelikePanel_.ChosenWeapon(), seed);
+        manager.RequestChange(SceneId::Quest);
+    }
 }
 
 void HomeScene::Draw(GameContext& context)
@@ -635,6 +662,7 @@ void HomeScene::Draw(GameContext& context)
         shopPanel_.Draw(context);
         smithPanel_.Draw(context);
         settingsPanel_.Draw(context);
+        roguelikePanel_.Draw(context);
     }
 
     if (saveNoticeTimer_ > 0.0f) {
@@ -654,7 +682,8 @@ void HomeScene::DrawField(const GameContext& context)
     (void)context;
     stage_.DrawBackground(camera_);
     // 建物は通りの奥の端に建っている（プレイヤーより奥）
-    town::DrawBuildings(camera_, stage_.GroundYAt(stage_.Depth()) + 4.0f, time_, nearBuilding_);
+    town::DrawBuildings(camera_, stage_.GroundYAt(stage_.Depth()) + 4.0f, time_, nearBuilding_,
+                        rogue::IsUnlocked(context.player));
 }
 
 void HomeScene::DrawFieldForeground(const GameContext& context)
@@ -663,8 +692,12 @@ void HomeScene::DrawFieldForeground(const GameContext& context)
     town::DrawForeground(camera_, stage_.GroundY(), time_);
     // 入口の前に立っているときの案内
     if (nearBuilding_ >= 0 && !AnyPanelOpen()) {
+        // 迷宮の門は、閉じている間は開く条件を出す
+        const bool lockedGate = town::BuildingAt(nearBuilding_).facility == town::Facility::Labyrinth
+                             && !rogue::IsUnlocked(context.player);
         town::DrawEnterPrompt(camera_, nearBuilding_, stage_.GroundYAt(stage_.Depth()) + 4.0f,
-                              context.settings.keys.PrimaryName(GameAction::Confirm), time_);
+                              context.settings.keys.PrimaryName(GameAction::Confirm), time_,
+                              lockedGate ? "閉ざされている（すべてのクエストをクリアすると開く）" : nullptr);
     }
 }
 

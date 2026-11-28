@@ -123,7 +123,9 @@ bool SaveSystem::Save(const GameContext& context)
         return false;
     }
 
-    const PlayerData& player = context.player;
+    // ローグライクのラン中は、しまってある本編のキャラを書く（ランのキャラは保存しない）
+    const bool inRun = context.roguelike.active;
+    const PlayerData& player = inRun ? context.roguelike.mainPlayer : context.player;
     const Inventory& inventory = player.GetInventory();
 
     file << "# " << config::kGameTitle << " セーブデータ（" << version::kVersionLabel << " で保存）\n";
@@ -194,7 +196,10 @@ bool SaveSystem::Save(const GameContext& context)
     for (const QuestDef& quest : QuestDatabase::Instance().Quests()) {
         if (player.IsQuestCleared(quest.id)) file << "cleared " << quest.id << "\n";
     }
-    file << "selectedquest " << context.selectedQuestId << "\n";
+    file << "selectedquest " << (inRun ? context.roguelike.mainSelectedQuestId : context.selectedQuestId) << "\n";
+    //   roguelike <挑戦した回数> <クリアした回数> <いちばん奥にたどり着いたフロア>
+    file << "roguelike " << player.RoguelikeRuns() << ' ' << player.RoguelikeClears() << ' '
+         << player.RoguelikeBestFloor() << "\n";
     //   hiddenfloor <クエストID> <前回の抽選からの挑戦回数> <次に抽選する回>
     for (const HiddenFloorProgress& entry : player.HiddenFloors()) {
         file << "hiddenfloor " << entry.questId << ' ' << entry.attempts << ' ' << entry.threshold << "\n";
@@ -286,6 +291,9 @@ bool SaveSystem::Load(GameContext& context)
         else if (key == "col") col = ToInt(arg(1));
         else if (key == "material") material = ToInt(arg(1));
         else if (key == "selectedquest") selectedQuest = ToInt(arg(1), 1);
+        else if (key == "roguelike") {
+            loaded.RestoreRoguelikeRecord(ToInt(arg(1)), ToInt(arg(2)), ToInt(arg(3)));
+        }
         else if (key == "hiddenfloor" && tokens.size() >= 4) {
             hiddenFloors.push_back({ ToInt(arg(1)), ToInt(arg(2)), ToInt(arg(3)) });
         }

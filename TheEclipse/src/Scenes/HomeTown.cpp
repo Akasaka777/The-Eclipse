@@ -14,10 +14,11 @@ namespace {
 
 // 通りに並ぶ順（西から東へ）。x は入口の中心
 const Building kBuildings[] = {
-    { Facility::Home,    "自宅",           "ステータス・装備・アイテム・スキル", 620.0f,  440.0f, 290.0f },
-    { Facility::Shop,    "ショップ",       "武器・防具・アイテム・アクセサリー", 1620.0f, 540.0f, 270.0f },
-    { Facility::Smith,   "鍛冶屋",         "装備の強化・修理",                   2640.0f, 520.0f, 280.0f },
-    { Facility::Dungeon, "ダンジョン入口", "クエストを選んで出撃する",           3880.0f, 440.0f, 400.0f },
+    { Facility::Home,      "自宅",           "ステータス・装備・アイテム・スキル", 620.0f,  440.0f, 290.0f },
+    { Facility::Shop,      "ショップ",       "武器・防具・アイテム・アクセサリー", 1620.0f, 540.0f, 270.0f },
+    { Facility::Smith,     "鍛冶屋",         "装備の強化・修理",                   2640.0f, 520.0f, 280.0f },
+    { Facility::Labyrinth, "迷宮の門",       "ローグライクモード（毎回変わる迷宮）", 3660.0f, 420.0f, 360.0f },
+    { Facility::Dungeon,   "ダンジョン入口", "クエストを選んで出撃する",           4680.0f, 440.0f, 400.0f },
 };
 constexpr int kBuildingCount = static_cast<int>(sizeof(kBuildings) / sizeof(kBuildings[0]));
 
@@ -374,6 +375,171 @@ void DrawDungeon(const Building& b, float x, float base, float time, bool lit)
                draw::TextAlign::Center);
 }
 
+//------------------------------------------------------------------------------
+// 迷宮の門：紫の符が光る黒い石の尖塔門。閉じているときは鉄格子と鎖と錠前、
+//   開いているときは奥で紫の光が渦を巻く
+//------------------------------------------------------------------------------
+void DrawLabyrinth(const Building& b, float x, float base, float time, bool lit, bool open)
+{
+    const float w = b.width;
+    const float h = b.height;
+    const ColorRGB stone(62, 58, 84);
+    const ColorRGB violet(186, 140, 255);
+    const float pillarW = 74.0f;
+    const float innerL = x - w * 0.5f + pillarW;
+    const float innerR = x + w * 0.5f - pillarW;
+    const float archTop = base - h - 70.0f;
+
+    // 奥（開いていれば紫の渦、閉じていれば暗闇）
+    const float pulse = 0.8f + 0.2f * std::sin(time * 1.8f);
+    if (open) draw::Glow(x, base - h * 0.45f, w * 0.7f * pulse, violet, lit ? 160 : 110, 6);
+    FillConvex({ Vec2(innerL, base), Vec2(innerL, base - h + 40.0f), Vec2(x, archTop + 50.0f),
+                 Vec2(innerR, base - h + 40.0f), Vec2(innerR, base) }, ColorRGB(10, 8, 20));
+    if (open) {
+        for (int i = 0; i < 6; ++i) {
+            const float r = (innerR - innerL) * (0.10f + 0.07f * static_cast<float>(i));
+            const float a = time * (0.7f + 0.25f * i) * ((i % 2 == 0) ? 1.0f : -1.0f);
+            const float cy = base - h * 0.42f;
+            for (int k = 0; k < 3; ++k) {
+                const float a0 = a + k * 2.094f;
+                draw::Line(x + std::cos(a0) * r, cy + std::sin(a0) * r * 1.4f, x + std::cos(a0 + 1.3f) * r,
+                           cy + std::sin(a0 + 1.3f) * r * 1.4f, ColorRGB::Lerp(violet, palette::kWhite, 0.15f * i), 3.0f,
+                           170 - i * 18);
+            }
+        }
+    }
+
+    // 柱（紫の符が光る）
+    for (int side = -1; side <= 1; side += 2) {
+        const Rect pillar = (side < 0) ? Rect(x - w * 0.5f, base - h, innerL, base) : Rect(innerR, base - h, x + w * 0.5f, base);
+        draw::FillRect(pillar.Expanded(4.0f), kInk, 255);
+        draw::GradientRectH(pillar, stone, stone.Scaled(0.65f), 255, 6);
+        for (int k = 0; k < 4; ++k) {
+            const float ry = pillar.top + 50.0f + 70.0f * static_cast<float>(k);
+            const float flicker = 0.5f + 0.5f * std::sin(time * 2.0f + k + side);
+            draw::Line(pillar.CenterX() - 12.0f, ry, pillar.CenterX() + 12.0f, ry + 18.0f, violet, 3.0f,
+                       open ? static_cast<int>(120.0f + 120.0f * flicker) : 70);
+            draw::Line(pillar.CenterX() + 12.0f, ry, pillar.CenterX() - 12.0f, ry + 18.0f, violet, 3.0f,
+                       open ? static_cast<int>(120.0f + 120.0f * flicker) : 70);
+        }
+        // 尖った頂
+        FillConvex({ Vec2(pillar.left - 8.0f, pillar.top + 4.0f), Vec2(pillar.CenterX(), pillar.top - 90.0f),
+                     Vec2(pillar.right + 8.0f, pillar.top + 4.0f) }, kInk);
+        FillConvex({ Vec2(pillar.left - 4.0f, pillar.top), Vec2(pillar.CenterX(), pillar.top - 82.0f),
+                     Vec2(pillar.right + 4.0f, pillar.top) }, stone.Scaled(0.85f));
+    }
+    // 尖頭アーチの縁
+    draw::Line(innerL, base - h + 40.0f, x, archTop + 50.0f, kInk, 12.0f, 255);
+    draw::Line(innerR, base - h + 40.0f, x, archTop + 50.0f, kInk, 12.0f, 255);
+    draw::Line(innerL, base - h + 40.0f, x, archTop + 50.0f, stone.Scaled(1.2f), 6.0f, 255);
+    draw::Line(innerR, base - h + 40.0f, x, archTop + 50.0f, stone.Scaled(1.2f), 6.0f, 255);
+
+    if (!open) {
+        // 鉄格子・鎖・錠前
+        for (float bx = innerL + 20.0f; bx < innerR - 10.0f; bx += 34.0f) {
+            draw::Line(bx, base - h + 30.0f, bx, base, ColorRGB(30, 30, 36), 7.0f, 255);
+            draw::Line(bx, base - h + 30.0f, bx, base, ColorRGB(96, 96, 108), 3.0f, 255);
+        }
+        for (int k = 0; k < 2; ++k) {
+            const float cy = base - h * (0.35f + 0.25f * k);
+            draw::Line(innerL, cy, innerR, cy + 20.0f, ColorRGB(120, 116, 128), 6.0f, 255);
+        }
+        const Rect lock = Rect::FromCenter(x, base - h * 0.42f, 44.0f, 40.0f);
+        draw::Circle(x, lock.top, 14.0f, ColorRGB(160, 140, 90), false, 5.0f, 255);
+        draw::FillRect(lock.Expanded(3.0f), kInk, 255);
+        draw::FillRect(lock, ColorRGB(196, 164, 90), 255);
+        draw::FillRect(Rect::FromCenter(x, lock.CenterY() + 2.0f, 6.0f, 14.0f), kInk, 255);
+    }
+
+    // 石段と銘板
+    draw::FillRect(Rect(x - w * 0.5f - 16.0f, base - 14.0f, x + w * 0.5f + 16.0f, base + 4.0f), stone.Scaled(0.7f), 255);
+    const Rect plate = Rect::FromCenter(x, archTop - 4.0f, 220.0f, 46.0f);
+    draw::FillRect(plate.Expanded(4.0f), kInk, 255);
+    draw::GradientRectV(plate, stone.Scaled(1.15f), stone.Scaled(0.8f), 255, 6);
+    draw::StrokeRect(plate.Expanded(-5.0f), violet, 1.0f, open ? 220 : 90);
+    draw::Text(FontSize::Small, plate.CenterX(), plate.top + 10.0f, open ? ColorRGB(230, 210, 255) : palette::kTextDim,
+               b.name, draw::TextAlign::Center);
+}
+
+//------------------------------------------------------------------------------
+// ダンジョンの中の施設
+//------------------------------------------------------------------------------
+// 行商人のテント：縞の屋根、台に並んだ瓶、吊るしたランタン
+void DrawMerchantTent(float x, float base, float time, bool lit)
+{
+    const float w = 300.0f;
+    const float roofY = base - 230.0f;
+    // 支柱
+    draw::Line(x - w * 0.42f, roofY + 20.0f, x - w * 0.42f, base, kInk, 10.0f, 255);
+    draw::Line(x + w * 0.42f, roofY + 20.0f, x + w * 0.42f, base, kInk, 10.0f, 255);
+    draw::Line(x - w * 0.42f, roofY + 20.0f, x - w * 0.42f, base, ColorRGB(120, 86, 56), 5.0f, 255);
+    draw::Line(x + w * 0.42f, roofY + 20.0f, x + w * 0.42f, base, ColorRGB(120, 86, 56), 5.0f, 255);
+    // 奥の布
+    draw::FillRect(Rect(x - w * 0.42f, roofY + 30.0f, x + w * 0.42f, base - 70.0f), ColorRGB(70, 40, 48), 230);
+    // 縞の屋根
+    const int stripes = 7;
+    for (int i = 0; i < stripes; ++i) {
+        const float x0 = x - w * 0.5f + w * static_cast<float>(i) / stripes;
+        const float x1 = x - w * 0.5f + w * static_cast<float>(i + 1) / stripes;
+        const ColorRGB c = (i % 2 == 0) ? ColorRGB(196, 64, 70) : ColorRGB(236, 224, 200);
+        FillConvex({ Vec2(x, roofY - 60.0f), Vec2(x1, roofY + 26.0f), Vec2(x0, roofY + 26.0f) }, c);
+        draw::Circle((x0 + x1) * 0.5f, roofY + 26.0f, (x1 - x0) * 0.5f, c, true, 1.0f, 255);
+    }
+    // 台と品物
+    const Rect counter(x - w * 0.40f, base - 74.0f, x + w * 0.40f, base - 40.0f);
+    draw::FillRect(counter.Expanded(3.0f), kInk, 255);
+    draw::FillRect(counter, ColorRGB(140, 100, 64), 255);
+    draw::FillRect(Rect(counter.left + 8.0f, counter.bottom, counter.left + 20.0f, base), ColorRGB(110, 78, 50), 255);
+    draw::FillRect(Rect(counter.right - 20.0f, counter.bottom, counter.right - 8.0f, base), ColorRGB(110, 78, 50), 255);
+    for (int k = 0; k < 5; ++k) {
+        const float bx = counter.left + 24.0f + static_cast<float>(k) * (counter.Width() - 48.0f) / 4.0f;
+        const ColorRGB potion = (k % 3 == 0) ? ColorRGB(220, 70, 80) : (k % 3 == 1) ? ColorRGB(70, 140, 240)
+                                                                                  : ColorRGB(120, 220, 140);
+        draw::Circle(bx, counter.top - 11.0f, 10.0f, kInk, true, 1.0f, 255);
+        draw::Circle(bx, counter.top - 11.0f, 8.0f, potion, true, 1.0f, 255);
+    }
+    // ランタン
+    const float f = 0.85f + 0.15f * std::sin(time * 5.0f + x);
+    draw::Glow(x + w * 0.30f, roofY + 60.0f, 50.0f * f, kLampLight, lit ? 150 : 110, 4);
+    draw::FillRect(Rect::FromCenter(x + w * 0.30f, roofY + 60.0f, 16.0f, 22.0f), kLampLight, 240);
+    // 看板
+    DrawHangingSign(x, roofY + 34.0f, "ショップ", ColorRGB(70, 50, 36), ColorRGB(255, 226, 170));
+}
+
+// 旅の鍛冶屋：石の炉と煙、金床、立てかけた剣
+void DrawTravelSmith(float x, float base, float time, bool lit)
+{
+    const ColorRGB stone(100, 96, 104);
+    // 炉
+    const Rect forge(x - 150.0f, base - 150.0f, x - 20.0f, base);
+    for (int i = 0; i < 4; ++i) {
+        const float t = std::fmod(time * 0.35f + static_cast<float>(i) / 4.0f, 1.0f);
+        draw::Circle(forge.CenterX() + t * 40.0f, forge.top - 70.0f - t * 120.0f, 10.0f + t * 18.0f,
+                     ColorRGB(70, 70, 78), true, 1.0f, static_cast<int>(140.0f * (1.0f - t)));
+    }
+    draw::FillRect(Rect(forge.CenterX() - 18.0f, forge.top - 70.0f, forge.CenterX() + 18.0f, forge.top), kInk, 255);
+    draw::FillRect(Rect(forge.CenterX() - 14.0f, forge.top - 66.0f, forge.CenterX() + 14.0f, forge.top), stone.Scaled(0.8f), 255);
+    draw::FillRect(forge.Expanded(4.0f), kInk, 255);
+    draw::GradientRectV(forge, stone, stone.Scaled(0.7f), 255, 6);
+    const float flicker = 0.75f + 0.25f * std::sin(time * 9.0f) * std::sin(time * 3.3f + 1.0f);
+    const Rect mouth = Rect::FromCenter(forge.CenterX(), forge.CenterY() + 20.0f, 70.0f, 60.0f);
+    draw::Glow(mouth.CenterX(), mouth.CenterY(), 90.0f * flicker, ColorRGB(255, 120, 40), lit ? 150 : 110, 5);
+    draw::FillRect(mouth, ColorRGB(255, 150, 60), 255);
+    draw::FillRect(Rect(mouth.left, mouth.bottom - 16.0f, mouth.right, mouth.bottom), ColorRGB(80, 30, 20), 255);
+    // 金床
+    const float ax = x + 70.0f;
+    FillConvex({ Vec2(ax - 50.0f, base - 70.0f), Vec2(ax + 60.0f, base - 70.0f), Vec2(ax + 36.0f, base - 50.0f),
+                 Vec2(ax - 24.0f, base - 50.0f) }, ColorRGB(56, 58, 66));
+    draw::FillRect(Rect(ax - 14.0f, base - 52.0f, ax + 20.0f, base - 16.0f), ColorRGB(46, 48, 56), 255);
+    draw::FillRect(Rect(ax - 34.0f, base - 18.0f, ax + 40.0f, base), ColorRGB(56, 58, 66), 255);
+    draw::Line(ax - 44.0f, base - 70.0f, ax + 54.0f, base - 70.0f, ColorRGB(150, 156, 170), 2.0f, 255);
+    // 立てかけた剣と槌
+    draw::Line(x + 150.0f, base, x + 130.0f, base - 130.0f, ColorRGB(200, 206, 220), 6.0f, 255);
+    draw::Line(x + 118.0f, base - 104.0f, x + 146.0f, base - 110.0f, ColorRGB(150, 110, 60), 6.0f, 255);
+    // 看板
+    DrawHangingSign(x + 70.0f, base - 194.0f, "鍛冶屋", ColorRGB(52, 46, 44), ColorRGB(255, 186, 110));
+}
+
 // 街灯（手前）
 void DrawLamp(float x, float groundY, float time)
 {
@@ -413,7 +579,7 @@ const Building& BuildingFor(Facility facility)
     return kBuildings[0];
 }
 
-void DrawBuildings(const Camera& camera, float baseY, float time, int highlighted)
+void DrawBuildings(const Camera& camera, float baseY, float time, int highlighted, bool labyrinthOpen)
 {
     const Vec2 offset = camera.WorldToScreen(Vec2(0.0f, 0.0f));
     for (int i = 0; i < kBuildingCount; ++i) {
@@ -427,6 +593,7 @@ void DrawBuildings(const Camera& camera, float baseY, float time, int highlighte
         case Facility::Home:    DrawHome(b, x, base, time, lit); break;
         case Facility::Shop:    DrawShop(b, x, base, time, lit); break;
         case Facility::Smith:   DrawSmith(b, x, base, time, lit); break;
+        case Facility::Labyrinth: DrawLabyrinth(b, x, base, time, lit, labyrinthOpen); break;
         case Facility::Dungeon: DrawDungeon(b, x, base, time, lit); break;
         }
     }
@@ -438,7 +605,7 @@ void DrawForeground(const Camera& camera, float groundY, float time)
     const float ground = groundY + offset.y;
 
     // 街灯：建物と建物の間に立てる
-    const float lamps[] = { 160.0f, 1110.0f, 2130.0f, 3220.0f, 4300.0f };
+    const float lamps[] = { 160.0f, 1110.0f, 2130.0f, 3150.0f, 4170.0f, 5100.0f };
     for (float lx : lamps) {
         const float x = lx + offset.x;
         if (x < -120.0f || x > static_cast<float>(config::kScreenWidth) + 120.0f) continue;
@@ -450,7 +617,7 @@ void DrawForeground(const Camera& camera, float groundY, float time)
     if (sx > -200.0f && sx < static_cast<float>(config::kScreenWidth) + 200.0f) {
         draw::Line(sx, ground - 170.0f, sx, ground + 6.0f, kInk, 12.0f, 255);
         draw::Line(sx, ground - 170.0f, sx, ground + 6.0f, ColorRGB(110, 84, 60), 7.0f, 255);
-        const char* rows[] = { config::kGameTitleUpper, "ショップ・鍛冶屋 →", "ダンジョン入口 →" };
+        const char* rows[] = { config::kGameTitleUpper, "ショップ・鍛冶屋 →", "迷宮の門・ダンジョン入口 →" };
         for (int i = 0; i < 3; ++i) {
             const float y = ground - 168.0f + static_cast<float>(i) * 40.0f;
             const bool title = (i == 0);
@@ -466,16 +633,15 @@ void DrawForeground(const Camera& camera, float groundY, float time)
     }
 }
 
-void DrawEnterPrompt(const Camera& camera, int index, float baseY, const std::string& keyName, float time)
+void DrawPromptAt(const Camera& camera, float worldX, float baseY, const std::string& keyName, const char* name,
+                  const std::string& guide, float time)
 {
-    if (index < 0 || index >= kBuildingCount) return;
-    const Building& b = kBuildings[index];
-    const Vec2 door = camera.WorldToScreen(Vec2(b.x, baseY));
+    const Vec2 door = camera.WorldToScreen(Vec2(worldX, baseY));
     const float bob = std::sin(time * 4.0f) * 4.0f;
 
     const std::string head = str::Format("%s  入る", keyName.c_str());
-    const float w = math::MaxF(static_cast<float>(draw::TextWidth(FontSize::Small, b.guide)),
-                               static_cast<float>(draw::TextWidth(FontSize::Medium, head) + draw::TextWidth(FontSize::Small, b.name) + 28)) + 48.0f;
+    const float w = math::MaxF(static_cast<float>(draw::TextWidth(FontSize::Small, guide)),
+                               static_cast<float>(draw::TextWidth(FontSize::Medium, head) + draw::TextWidth(FontSize::Small, name) + 28)) + 48.0f;
     const Rect panel = Rect::FromCenter(door.x, door.y - kPromptAboveBase + bob, w, 92.0f);
     draw::ChamferRect(panel.Expanded(2.0f), 10.0f, palette::kAccent, 230);
     draw::ChamferRect(panel, 10.0f, palette::kPanelDark, 240);
@@ -486,12 +652,28 @@ void DrawEnterPrompt(const Camera& camera, int index, float baseY, const std::st
     draw::FillRect(keyCap, palette::kAccent, 255);
     draw::Text(FontSize::Small, keyCap.CenterX(), keyCap.top + 6.0f, palette::kBlack, keyName, draw::TextAlign::Center);
     draw::Text(FontSize::Medium, keyCap.right + 12.0f, panel.top + 8.0f, palette::kText, "入る");
-    draw::Text(FontSize::Small, panel.right - 22.0f, panel.top + 15.0f, palette::kAccent, b.name, draw::TextAlign::Right);
-    draw::Text(FontSize::Small, panel.left + 22.0f, panel.top + 56.0f, palette::kTextDim, b.guide);
+    draw::Text(FontSize::Small, panel.right - 22.0f, panel.top + 15.0f, palette::kAccent, name, draw::TextAlign::Right);
+    draw::Text(FontSize::Small, panel.left + 22.0f, panel.top + 56.0f, palette::kTextDim, guide);
 
     // 下向きの矢印（入口を指す）
     draw::Triangle(Vec2(panel.CenterX() - 14.0f, panel.bottom + 2.0f), Vec2(panel.CenterX() + 14.0f, panel.bottom + 2.0f),
                    Vec2(panel.CenterX(), panel.bottom + 20.0f), palette::kAccent, true, 230);
+}
+
+void DrawEnterPrompt(const Camera& camera, int index, float baseY, const std::string& keyName, float time,
+                     const char* guide)
+{
+    if (index < 0 || index >= kBuildingCount) return;
+    const Building& b = kBuildings[index];
+    DrawPromptAt(camera, b.x, baseY, keyName, b.name, guide ? std::string(guide) : std::string(b.guide), time);
+}
+
+void DrawStall(const Camera& camera, FacilityKind kind, float worldX, float baseY, float time, bool lit)
+{
+    const Vec2 at = camera.WorldToScreen(Vec2(worldX, baseY));
+    if (at.x < -300.0f || at.x > static_cast<float>(config::kScreenWidth) + 300.0f) return;
+    if (kind == FacilityKind::Shop) DrawMerchantTent(at.x, at.y, time, lit);
+    else DrawTravelSmith(at.x, at.y, time, lit);
 }
 
 } // namespace town

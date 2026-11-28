@@ -11,6 +11,9 @@
 
 namespace ecl {
 
+// ローグライクモード用の敵（竜王の火山の敵の強さを下げた写し）。ID は 100 + 元の ID
+constexpr int kRoguelikeEnemyIdBase = 100;
+
 struct EnemyDef
 {
     int         id = 0;

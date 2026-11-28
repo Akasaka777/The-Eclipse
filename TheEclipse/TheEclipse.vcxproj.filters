@@ -109,6 +109,21 @@
     <ClCompile Include="src\Graphics\DrawUtil.cpp">
       <Filter></Filter>
     </ClCompile>
+    <ClCompile Include="src\Game\Pickup.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Roguelike.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\RogueShopPanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\RoguelikePanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\SkillDraftPanel.cpp">
+      <Filter></Filter>
+    </ClCompile>
     <ClCompile Include="src\Scenes\HomeScene.cpp">
       <Filter></Filter>
     </ClCompile>
@@ -289,6 +304,21 @@
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\Graphics\DrawUtil.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Pickup.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Roguelike.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\RogueShopPanel.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\RoguelikePanel.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\SkillDraftPanel.h">
       <Filter></Filter>
     </ClInclude>
     <ClInclude Include="src\Scenes\HomeScene.h">

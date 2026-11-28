@@ -26,6 +26,15 @@ BattleMenu::BattleMenu()
                                             190.0f, 64.0f), "戻る");
 }
 
+void BattleMenu::SetRoguelike(bool roguelike)
+{
+    roguelike_ = roguelike;
+    skillButton_.SetEnabled(!roguelike);
+    skillButton_.SetLabel(roguelike ? "スキル（迷宮では拾って覚える）" : "スキル");
+    retireButton_.SetLabel(roguelike ? "ランをあきらめる" : "クエストリタイア");
+    retireYesButton_.SetLabel(roguelike ? "あきらめる" : "リタイアする");
+}
+
 void BattleMenu::Open()
 {
     open_ = true;
@@ -88,7 +97,7 @@ void BattleMenu::Update(float dt, const Input& input, GameContext& context)
     if (equipButton_.Update(input, dt)) {
         equipment_.Open();
     }
-    if (skillButton_.Update(input, dt)) {
+    if (skillButton_.Update(input, dt) && !roguelike_) {
         skills_.Open(context);
     }
     if (settingsButton_.Update(input, dt)) {
@@ -122,9 +131,10 @@ void BattleMenu::Draw(const GameContext& context) const
 
     if (confirmingRetire_) {
         draw::Text(FontSize::Medium, window_.CenterX(), window_.top + 160.0f, palette::kText,
-                   "クエストを中断しますか？", draw::TextAlign::Center);
-        draw::Text(FontSize::Small, window_.CenterX(), window_.top + 220.0f, palette::kTextDim,
-                   "入手したドロップの一部は失われます", draw::TextAlign::Center);
+                   roguelike_ ? "ランをあきらめますか？" : "クエストを中断しますか？", draw::TextAlign::Center);
+        draw::Text(FontSize::Small, window_.CenterX(), window_.top + 220.0f, roguelike_ ? palette::kDanger : palette::kTextDim,
+                   roguelike_ ? "パーマデス：ここまでのランの成果はすべて失われます" : "入手したドロップの一部は失われます",
+                   draw::TextAlign::Center);
         retireYesButton_.Draw();
         retireNoButton_.Draw();
         return;

@@ -12,6 +12,7 @@
 #include "Game/Stage.h"
 #include "UI/PlayerPanel.h"
 #include "UI/QuestPanel.h"
+#include "UI/RoguelikePanel.h"
 #include "UI/SettingsPanel.h"
 #include "UI/UIWidgets.h"
 #include "UI/ShopPanel.h"
@@ -32,7 +33,8 @@ enum class HomeTab
     Quest,     // クエスト選択
     Shop,      // ショップ（武器 / 装備 / アイテム / アクセサリー）
     Smith,     // 鍛冶屋（強化・修理）
-    Settings   // 設定
+    Settings,  // 設定
+    Roguelike  // 迷宮の門（ローグライクモード。下のタブは無く、街の建物から入る）
 };
 
 //------------------------------------------------------------------------------
@@ -91,10 +93,12 @@ private:
     ui::ShopPanel     shopPanel_;
     ui::SmithPanel    smithPanel_;
     ui::SettingsPanel settingsPanel_;
+    ui::RoguelikePanel roguelikePanel_;
 
     float time_ = 0.0f;
     float saveNoticeTimer_ = 0.0f;
     bool  startQuest_ = false;
+    bool  startRoguelike_ = false;   // 迷宮の門で「挑戦する」を押した（ランを始めて出撃する）
     // 入口の前に立っている建物（town::BuildingAt の番号。いなければ -1）
     int   nearBuilding_ = -1;
 

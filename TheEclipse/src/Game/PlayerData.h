@@ -9,6 +9,7 @@
 #include "Game/UniqueSkill.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ecl {
@@ -119,6 +120,24 @@ public:
     bool CanUnlockSkill(int skillId) const;
     bool UnlockSkill(int skillId);
 
+    // --- スキルのレベル（ローグライクモード用。本編のスキルは常に Lv 1）-------------
+    int  SkillLevel(int skillId) const;
+    void SetSkillLevel(int skillId, int level);
+    // スキルポイントを使わずに習得する（ローグライクで拾ったスキル）
+    void GrantSkill(int skillId);
+    // 習得していないことにする（スロットとレベルからも外す）
+    void RevokeSkill(int skillId);
+    // 習得済みのスキル・スロット・レベル・スキルポイントをすべて消す（ローグライクの開始時）
+    void ClearSkillsForRun();
+
+    // --- ローグライクの記録（本編のキャラに残す）-----------------------------------
+    int  RoguelikeRuns() const { return roguelikeRuns_; }
+    int  RoguelikeClears() const { return roguelikeClears_; }
+    int  RoguelikeBestFloor() const { return roguelikeBestFloor_; }
+    // ランを 1 回終えたら呼ぶ（floorReached はたどり着いたフロア。1 始まり）
+    void RecordRoguelikeRun(bool cleared, int floorReached);
+    void RestoreRoguelikeRecord(int runs, int clears, int bestFloor);
+
     // --- ユニークスキル -------------------------------------------------------
     // 習得中のユニークスキル（未習得なら None）
     UniqueSkillType UniqueSkill() const { return uniqueSkill_; }
@@ -203,6 +222,11 @@ private:
     std::vector<int> unlockedSkills_;
     std::vector<int> clearedQuests_;
     std::vector<HiddenFloorProgress> hiddenFloors_;
+    // スキルのレベル（Lv 2 以上のものだけ持つ。ローグライク用でセーブしない）
+    std::vector<std::pair<int, int>> skillLevels_;
+    int roguelikeRuns_ = 0;
+    int roguelikeClears_ = 0;
+    int roguelikeBestFloor_ = 0;
 
     HiddenFloorProgress& HiddenFloorEntry(int questId);
 };

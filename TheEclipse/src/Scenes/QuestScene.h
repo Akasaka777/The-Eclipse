@@ -9,11 +9,15 @@
 #include "Game/Boss.h"
 #include "Game/Combat.h"
 #include "Game/Enemy.h"
+#include "Game/Pickup.h"
 #include "Game/Player.h"
 #include "Game/QuestDatabase.h"
 #include "Game/Stage.h"
 #include "UI/BattleHud.h"
 #include "UI/BattleMenu.h"
+#include "UI/RogueShopPanel.h"
+#include "UI/SkillDraftPanel.h"
+#include "UI/SmithPanel.h"
 #include "UI/UIWidgets.h"
 
 #include <memory>
@@ -100,6 +104,33 @@ private:
     // 今のフロアの中ボスを倒すと最後のボスが出るか（まだ出していない）
     bool FinalBossPending() const;
 
+    // --- ローグライクモード ----------------------------------------------------------
+    //   GameContext::roguelike が立っているときは、生成したフロア（roguelike.quest）を進む。
+    //   敵は col・アイテム・強化結晶・スキル（ボスは装備も）をその場に落とし、フロアの施設で
+    //   買い物と強化ができる。倒れたら（リタイアしても）ランの成果はすべて失う。
+    bool  IsRoguelike() const { return roguelike_; }
+    // フロアの敵・ボスの強さの倍率（フロアで決めていればそれ、無ければクエストの値）
+    float FloorPowerScale(const FloorDef& floor) const;
+    // 施設・スキル選択の画面を開いているか（開いている間はゲームが止まる）
+    bool  RoguelikePanelOpen() const;
+    void  UpdateRoguelikePanels(float dt, const Input& input, GameContext& context);
+    void  UpdateFacilities(const Input& input, GameContext& context);
+    void  UpdatePickups(float dt, GameContext& context);
+    void  HandlePickups(const std::vector<Pickup>& collected, GameContext& context);
+    void  OpenNextDraft(GameContext& context);
+    // ランのキャラに経験値を渡す（levelShare は「次のレベルまでの何割か」。
+    //   レベルが上がったらステータスを自動で振り、少し回復する）。渡した経験値を返す
+    int   GrantRunExp(float levelShare, GameContext& context);
+    void  DropMobLoot(const Enemy& enemy, GameContext& context);
+    void  DropBossLoot(GameContext& context);
+    // 入口の前に立っている施設（今のフロアの facilities の番号。いなければ -1）
+    int   FacilityNear() const;
+    bool  EnemyNear(float x, float range) const;
+    void  DrawFacilities() const;
+    void  DrawRunInfo(const GameContext& context) const;
+    void  ShowRunNotice(const std::string& text, bool good = true);
+    void  FinishRoguelike(bool cleared, bool retired, GameContext& context);
+
     // --- デバッグモード -------------------------------------------------------
     void UpdateDebug(const Input& input, GameContext& context);
     void DrawDebugOverlay(const GameContext& context) const;
@@ -114,6 +145,18 @@ private:
     std::string DebugFloorName(int index) const;
 
     const QuestDef* quest_ = nullptr;
+    // ローグライクモード
+    bool  roguelike_ = false;
+    PickupField pickups_;
+    ui::SkillDraftPanel draft_;
+    ui::RogueShopPanel  shop_;
+    ui::SmithPanel      smith_;
+    int   pendingDrafts_ = 0;      // まだ選んでいないスキル（続けて拾ったとき）
+    int   nearFacility_ = -1;
+    std::string runNotice_;
+    bool  runNoticeGood_ = true;
+    float runNoticeTimer_ = 0.0f;
+    float worldTime_ = 0.0f;       // 拾い物・施設の動き用
     Stage  stage_;
     Player player_;
     Camera camera_;

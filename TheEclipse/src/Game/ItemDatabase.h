@@ -56,6 +56,24 @@ constexpr int kEndWorldBootsId  = 253;  // 足
 bool IsEndWorldSetItem(int templateId);
 
 //------------------------------------------------------------------------------
+// ローグライクモードのラスボスが低確率で落とす「ラビリンス」シリーズ
+//   武器 5 種と防具 6 部位。エンドワールドシリーズの 1.08 倍ほど。
+//   ラン中には使えず、ラスボスを倒してクリアしたときだけ本編へ持ち帰れる。
+//------------------------------------------------------------------------------
+constexpr int kLabyrinthSwordId  = 185;
+constexpr int kLabyrinthMaceId   = 186;
+constexpr int kLabyrinthDaggerId = 187;
+constexpr int kLabyrinthRapierId = 188;
+constexpr int kLabyrinthSpearId  = 189;
+constexpr int kLabyrinthHelmId   = 206;
+constexpr int kLabyrinthMailId   = 216;
+constexpr int kLabyrinthShieldId = 226;
+constexpr int kLabyrinthArmId    = 234;
+constexpr int kLabyrinthGloveId  = 244;
+constexpr int kLabyrinthBootsId  = 254;
+bool IsLabyrinthSetItem(int templateId);
+
+//------------------------------------------------------------------------------
 // 初期装備
 //------------------------------------------------------------------------------
 // 初期装備の個体値（低めに固定して、ドロップで更新していく想定）

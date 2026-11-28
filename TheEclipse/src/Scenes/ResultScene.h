@@ -52,6 +52,8 @@ private:
     void DrawHeader(const GameContext& context) const;
     void DrawStats(const GameContext& context) const;
     void DrawRewards(const GameContext& context) const;
+    // ローグライクのランの記録（最終レベル・持ち帰った装備・スキル）
+    void DrawRunRewards(const GameContext& context) const;
     void DrawDropColumn(const QuestResult& result, const ResultRewardLayout& layout) const;
     void DrawMaterialColumn(const QuestResult& result, const ResultRewardLayout& layout) const;
     void DrawAnnouncement() const;

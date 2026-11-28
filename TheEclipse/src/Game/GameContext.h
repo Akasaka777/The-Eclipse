@@ -7,6 +7,7 @@
 #include "Game/Consumable.h"
 #include "Game/Equipment.h"
 #include "Game/PlayerData.h"
+#include "Game/Roguelike.h"
 #include "Game/UniqueSkill.h"
 
 #include <string>
@@ -51,6 +52,12 @@ struct QuestResult
     std::string unlockedUniqueSkillName;
     UniqueSkillType unlockedUniqueSkillType = UniqueSkillType::None;
 
+    // --- ローグライクモード（roguelike が立っているときだけ使う）---------------------
+    bool roguelike = false;
+    int  runLevel = 1;                       // ランのキャラの最後のレベル
+    int  runColEarned = 0;                   // ラン中に拾った col
+    std::vector<std::string> runSkills;      // 最後に持っていたスキル（「ソニックリープ Lv 3」）
+
     void Reset();
     // S / A / B / C 評価
     const char* Rank() const;
@@ -68,6 +75,8 @@ public:
     bool         quitRequested = false;
     // セーブデータを削除した後は、終了時などに書き戻さないよう自動セーブを止める
     bool         autoSaveEnabled = true;
+    // ローグライクモードのラン（挑戦中は player がランのキャラ、本編のキャラは roguelike.mainPlayer）
+    rogue::RunState roguelike;
 };
 
 } // namespace ecl

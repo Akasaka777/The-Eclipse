@@ -582,6 +582,15 @@ void BattleHud::DrawSkillBar(const Player& player, const PlayerData& data) const
         // スキル名と消費 MP
         draw::Text(FontSize::Tiny, rect.CenterX(), rect.bottom - 22.0f, palette::kText,
                    skill->name, draw::TextAlign::Center);
+        // ローグライクで上げたスキルの Lv（Lv 2 以上のときだけ）
+        const int level = player.SkillLevel(i);
+        if (level >= 2) {
+            const Rect badge = Rect::FromXYWH(rect.left + 4.0f, rect.bottom - 50.0f, 46.0f, 22.0f);
+            draw::FillRect(badge, palette::kExp.Scaled(0.35f), 230);
+            draw::StrokeRect(badge, palette::kExp, 1.0f, 230);
+            draw::Text(FontSize::Tiny, badge.CenterX(), badge.top + 3.0f, palette::kExp,
+                       level >= kMaxSkillLevel ? std::string("MAX") : str::Format("Lv%d", level), draw::TextAlign::Center);
+        }
         draw::Text(FontSize::Tiny, rect.right - 6.0f, rect.top + 4.0f, palette::kMp,
                    str::Format("%d", static_cast<int>(skill->mpCost)), draw::TextAlign::Right);
     }
